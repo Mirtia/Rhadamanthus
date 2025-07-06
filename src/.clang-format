@@ -1,0 +1,31 @@
+# Minimal .clang-format configuration for C
+Language: C
+BasedOnStyle: LLVM
+
+# Indentation
+IndentWidth: 2
+TabWidth: 2
+UseTab: Never
+
+# Braces
+BreakBeforeBraces: Attach
+
+# Line length
+ColumnLimit: 80
+
+# Spacing
+SpaceAfterCStyleCast: true
+SpaceBeforeParens: Never
+SpacesInParentheses: false
+
+# Alignment
+AlignConsecutiveDeclarations: false
+AlignConsecutiveAssignments: false
+
+# Function calls
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortIfStatementsOnASingleLine: false
+AllowShortLoopsOnASingleLine: false
+
+# Pointers and references
+PointerAlignment: Right
