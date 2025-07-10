@@ -1,17 +1,17 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
 #include <errno.h>
-#include <unistd.h>
-#include <inttypes.h>
-#include <signal.h>
 #include <fcntl.h>
+#include <inttypes.h>
+#include <libvmi/events.h>
+#include <libvmi/libvmi.h>
+#include <libvmi/libvmi_extra.h>
+#include <openssl/md5.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <sys/mman.h>
 #include <sys/mount.h>
-#include <openssl/md5.h>
-#include <libvmi/libvmi_extra.h>
-#include <libvmi/libvmi.h>
-#include <libvmi/events.h>
+#include <unistd.h>
 
 /**
  * default is using INT 3 for event notification
@@ -20,56 +20,53 @@
 
 #define MEM_EVENT
 
-
 /* task_struct offsets */
 extern unsigned long tasks_offset;
 extern unsigned long pid_offset;
 extern unsigned long name_offset;
 
-
 static int set_breakpoint(vmi_instance_t vmi, addr_t addr, pid_t pid) {
 
-    uint32_t data;
-    if (VMI_FAILURE == vmi_read_32_va(vmi, addr, pid, &data)) {
-        printf("failed to read memory.\n");
-        return -1;
-    }
-    data = (data & 0xFFFFFF00) | 0xCC;
-    if (VMI_FAILURE == vmi_write_32_va(vmi, addr, pid, &data)) {
-        printf("failed to write memory.\n");
-        return -1;
-    }
-    return 0;
+  uint32_t data;
+  if (VMI_FAILURE == vmi_read_32_va(vmi, addr, pid, &data)) {
+    printf("failed to read memory.\n");
+    return -1;
+  }
+  data = (data & 0xFFFFFF00) | 0xCC;
+  if (VMI_FAILURE == vmi_write_32_va(vmi, addr, pid, &data)) {
+    printf("failed to write memory.\n");
+    return -1;
+  }
+  return 0;
 }
 
 static int interrupted = 0;
 
-static void close_handler(int sig){
-    interrupted = sig;
-}
+static void close_handler(int sig) { interrupted = sig; }
 
-int introspect_process_list(char *name);
+// TODO(mirtia): Add docstrings for each one of those.
+int introspect_process_list(const char *name);
 
-int introspect_module_list(char *name);
+int introspect_module_list(const char *name);
 
 int introspect_syscall_check(const char *name);
 
-int introspect_kernel_check(char *name);
+int introspect_kernel_check(const char *name);
 
-int introspect_idt_check(char *name);
+int introspect_idt_check(const char *name);
 
-int introspect_network_check(char *name);
+int introspect_network_check(const char *name);
 
-int introspect_procfs_check(char *name);
+int introspect_procfs_check(const char *name);
 
 int introspect_syscall_trace(const char *name);
 
-int introspect_socketapi_trace(char *name);
+int introspect_socketapi_trace(const char *name);
 
-int introspect_driverapi_trace(char *name);
+int introspect_driverapi_trace(const char *name);
 
-int introspect_sleepapi_nop(char *name);
+int introspect_sleepapi_nop(const char *name);
 
-int introspect_process_block(char *name);
+int introspect_process_block(const char *name);
 
-int introspect_process_kill(char *name, char *arg);
+int introspect_process_kill(const char *name, const char *arg);

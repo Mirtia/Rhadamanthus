@@ -1,14 +1,13 @@
 #include "vmi.h"
 
-int introspect_network_check(char *name) {
+int introspect_network_check(const char *name) {
   vmi_instance_t vmi = {0};
-  vmi_init_data_t *init_data = NULL;
-  /* initialize the libvmi library */
+  /* Initialize the libvmi library */
   if (VMI_FAILURE == vmi_init_complete(&vmi, name, VMI_INIT_DOMAINNAME,
-                                       init_data, VMI_CONFIG_GLOBAL_FILE_ENTRY,
+                                       NULL, VMI_CONFIG_GLOBAL_FILE_ENTRY,
                                        NULL, NULL)) {
     printf("Failed to init LibVMI library.\n");
-    return 1;
+                                          
   }
 
   addr_t tcp_hashinfo_addr;
@@ -39,6 +38,7 @@ int introspect_network_check(char *name) {
     // Non terminating condition
     while (!((unsigned long)node_addr & 1)) {
       vmi_read_16_va(vmi, node_addr + sportOffset, 0, &sport);
+      // ntohs
       uint16_t port = ((sport & 0xFF) << 8) + (sport >> 8);
       printf("%" PRIu16 "\n", port);
       vmi_read_addr_va(vmi, node_addr + nextOffset, 0, &node_addr);
