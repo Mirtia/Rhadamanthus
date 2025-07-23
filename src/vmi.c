@@ -75,8 +75,6 @@ int main(int argc, char *argv[]) {
     return introspect_module_list(vm_name);
   } else if (!strcmp(mode, "syscall-check")) {
     introspect_syscall_check(vm_name);
-  } else if (!strcmp(mode, "kernel-check")) {
-    introspect_kernel_check(vm_name);
   } else if (!strcmp(mode, "idt-check")) {
     introspect_idt_check(vm_name);
   } else if (!strcmp(mode, "network-check")) {

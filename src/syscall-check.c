@@ -40,7 +40,7 @@ int introspect_syscall_check(const char *name) {
   // Get the OS of the vm.
   os_t os = vmi_get_ostype(vmi);
   if (VMI_OS_LINUX != os) {
-    printf(stderr, "Unsupported OS. Only Linux supported.\n");
+    fprintf(stderr, "Unsupported OS. Only Linux supported.\n");
     goto error_exit;
   }
 

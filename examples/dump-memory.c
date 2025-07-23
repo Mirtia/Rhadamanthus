@@ -33,7 +33,6 @@
 #include <getopt.h>
 #include <signal.h>
 #include <sys/mman.h>
-#include <config.h>
 #include <libvmi/libvmi.h>
 
 #define FRAME_SIZE (1UL << 12)

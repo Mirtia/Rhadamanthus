@@ -1,6 +1,6 @@
 #include "vmi.h"
 
-int introspect_procfs_check(char *name) {
+int introspect_procfs_check(const char *name) {
   vmi_instance_t vmi;
   addr_t init_net_addr, pde_addr, name_addr, tcp_addr, show_addr;
   addr_t stext, etext;

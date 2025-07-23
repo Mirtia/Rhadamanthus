@@ -1,6 +1,6 @@
 #include "vmi.h"
 
-int introspect_idt_check(char *name) {
+int introspect_idt_check(const char *name) {
   vmi_instance_t vmi;
   addr_t idt_addr, int_addr, kernel_start, kernel_end;
   int count_int = 0;

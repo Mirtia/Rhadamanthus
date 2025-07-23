@@ -1,0 +1,77 @@
+# Build directories
+/build/
+build/
+out/
+bin/
+lib/
+dist/
+
+# Object files
+*.o
+*.obj
+
+# Libraries
+*.a
+*.lib
+*.so
+*.so.*
+*.dll
+*.dylib
+
+# Executables (add your main binary name(s) if needed)
+*.exe
+*.out
+*.app
+*.run
+
+# Core dumps
+core
+*.core
+
+# CMake files
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+Makefile
+CTestTestfile.cmake
+install_manifest.txt
+
+# AutoTools files
+*.lo
+*.la
+*.dep
+*.deps
+*.dirstamp
+*.in
+
+# Generated configuration
+config.h
+config.log
+config.status
+libtool
+
+# Editor/IDE files
+*~
+.*.swp
+*.swo
+*.swp
+*.bak
+*.tmp
+*.orig
+*.rej
+.#*
+*.kate-swp
+
+# Others
+tags
+TAGS
+
+# Visual Studio Code
+.vscode/
+
+# CLion
+.idea/
+
+# Ignore python bytecode (if you use scripts)
+__pycache__/
+*.pyc

@@ -132,7 +132,7 @@ int main(int argc, char **argv) {
   os_t os = vmi_get_ostype(vmi);
 
   if(VMI_OS_LINUX != os) {
-    printf(stderr, "Unsupported OS. Only Linux supported.");
+    fprintf(stderr, "Unsupported OS. Only Linux supported.");
     goto error_exit;
   }
 

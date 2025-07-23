@@ -29,7 +29,6 @@
 #include <getopt.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-#include <config.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <libvmi/libvmi.h>

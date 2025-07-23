@@ -1,6 +1,6 @@
 #include "vmi.h"
 
-int introspect_process_list(char *name) {
+int introspect_process_list(const char *name) {
   vmi_instance_t vmi = {0};
   addr_t list_head = 0, cur_list_entry = 0, next_list_entry = 0;
   addr_t current_process = 0;

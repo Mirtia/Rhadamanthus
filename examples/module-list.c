@@ -61,12 +61,12 @@ int main(int argc, char **argv) {
 
   os_t os = vmi_get_ostype(vmi);
   if (VMI_OS_LINUX != os) {
-    printf(stderr, "Unsupported OS. Only Linux supported.\n");
+    fprintf(stderr, "Unsupported OS. Only Linux supported.\n");
     goto error_exit;
   }
 
   if (vmi_read_addr_ksym(vmi, "modules", &next_module) == VMI_FAILURE) {
-    printf(stderr, "Failed to read kernel symbol `modules`.\n");
+    fprintf(stderr, "Failed to read kernel symbol `modules`.\n");
     goto error_exit;
   }
 
