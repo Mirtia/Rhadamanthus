@@ -1,9 +1,9 @@
 #ifndef DISPATCHER_H
 #define DISPATCHER_H
 
-#include <glib-2.0/glib.h>
 #include <libvmi/events.h>
 #include <libvmi/libvmi.h>
+#include <glib-2.0/glib.h>
 
 /**
  * @brief Constants
@@ -126,7 +126,7 @@ struct state_task {
  * @param id The state task ID to convert.
  * @return const char* The string representation of the task ID.
  */
-const char *state_task_id_to_string(state_task_id id);
+const char *state_task_id_to_string(state_task_id_t id);
 
 /**
  * @brief Convert a state task ID to a string representation.
@@ -134,7 +134,7 @@ const char *state_task_id_to_string(state_task_id id);
  * @param id The event task ID to convert.
  * @return const char* The string representation of the task ID.
  */
-const char *event_task_id_to_string(event_task_id id);
+const char *event_task_id_to_string(event_task_id_t id);
 
 /**
  * @brief Creating and initializing the dispatcher is responsible for managing

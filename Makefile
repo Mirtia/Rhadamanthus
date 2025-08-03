@@ -7,9 +7,10 @@ vmi:
 	cp $(CODE_DIR)/vmi ./
 
 clean:
-	$(MAKE) -C $(CODE_DIR) clean
-	rm -rf vmi
+# 	$(MAKE) -C $(CODE_DIR) clean
+	rm -rf build
 
 build:
-	conan install . --output-folder=build --build=missing
-	conan build .
+	conan install . --build=missing
+	conan build . 
+

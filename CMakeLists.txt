@@ -2,23 +2,45 @@ cmake_minimum_required(VERSION 3.15)
 project(vmi_examples C)
 
 set(CMAKE_C_STANDARD 99)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+set(CMAKE_BUILD_TYPE Release)
+# log.c issue with exposing only on Release
+
+# Dependencies
+find_package(PkgConfig REQUIRED)
+pkg_check_modules(GLIB2 REQUIRED glib-2.0)
 
 find_package(cJSON REQUIRED)
-find_package(glib REQUIRED)
 find_package(log.c REQUIRED)
 find_package(yaml REQUIRED)
-# # Enable building using cmake-conan   
-# list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-# set(CMAKE_PROJECT_TOP_LEVEL_INCLUDES "cmake/external/conan.cmake")
 
-# Conan integration
-# include(${CMAKE_BINARY_DIR}/conan_toolchain.cmake OPTIONAL RESULT_VARIABLE _toolchain_included)
-# Always include dependencies before using targets
-# include(${CMAKE_BINARY_DIR}/conan_deps.cmake OPTIONAL RESULT_VARIABLE _conan_deps_included)
+# Dispatcher library
+add_library(vmi_dispatcher STATIC
+    src/dispatcher.c
+)
 
+target_include_directories(vmi_dispatcher PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${GLIB2_INCLUDE_DIRS}
+)
+    
+target_link_libraries(vmi_dispatcher PUBLIC vmi log.c::log.c)
+
+# Example builder
 function(add_vmi_example exe source)
     add_executable(${exe} src/${source})
-    target_link_libraries(${exe} PRIVATE cjson::cjson yaml log.c::log.c vmi m glib::glib)
+    target_include_directories(${exe} PRIVATE
+        ${GLIB2_INCLUDE_DIRS}
+    )
+    target_compile_options(${exe} PRIVATE ${GLIB2_CFLAGS_OTHER})
+    target_link_libraries(${exe} PRIVATE
+        cjson::cjson
+        yaml
+        log.c::log.c
+        vmi_dispatcher
+        m
+        ${GLIB2_LIBRARIES}
+    )
 endfunction()
 
 # Main executables
@@ -47,12 +69,6 @@ add_vmi_example(vmi-module-list module-list.c)
 add_vmi_example(switch-view-example switch-view-example.c)
 add_vmi_example(vmi-rwmem rwmem.c)
 
-# Platform-specific
-if(ENABLE_WINDOWS)
-    add_vmi_example(vmi-win-guid win-guid.c)
-    add_vmi_example(vmi-win-offsets win-offsets.c)
-endif()
-
 if(ENABLE_LINUX)
     add_vmi_example(vmi-dmesg dmesg.c)
     add_vmi_example(vmi-linux-offsets linux-offsets.c)
@@ -64,13 +80,6 @@ install(TARGETS
     vmi-module-list
     vmi-dump-memory
     DESTINATION bin)
-
-if(ENABLE_WINDOWS)
-    install(TARGETS
-        vmi-win-guid
-        vmi-win-offsets
-        DESTINATION bin)
-endif()
 
 if(ENABLE_LINUX)
     install(TARGETS

@@ -34,8 +34,6 @@
 #include <signal.h>
 #include <sys/mman.h>
 #include <libvmi/libvmi.h>
-#include <cjson/cJSON.h>
-#include <log.h>
 
 
 #define FRAME_SIZE (1UL << 12)

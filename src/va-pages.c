@@ -27,11 +27,10 @@
 #include <stdio.h>
 #include <inttypes.h>
 #include <signal.h>
-#include <glib.h>
+#include <glib-2.0/glib.h>
 
 #include <libvmi/libvmi.h>
 #include <libvmi/events.h>
-#define LIBVMI_EXTRA_GLIB
 #include <libvmi/libvmi_extra.h>
 
 reg_t cr3;
