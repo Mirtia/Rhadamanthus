@@ -1,6 +1,6 @@
 #include "vmi.h"
 
-int introspect_process_list(const char *name) {
+int introspect_process_list(const char *domain_name) {
   vmi_instance_t vmi = {0};
   addr_t list_head = 0, cur_list_entry = 0, next_list_entry = 0;
   addr_t current_process = 0;
@@ -17,7 +17,7 @@ int introspect_process_list(const char *name) {
 
   init_data = malloc(sizeof(vmi_init_data_t) + sizeof(vmi_init_data_entry_t));
 
-  if (VMI_FAILURE == vmi_init_complete(&vmi, (void *)name,
+  if (VMI_FAILURE == vmi_init_complete(&vmi, (void *)domain_name,
                                        VMI_INIT_DOMAINNAME | VMI_INIT_EVENTS,
                                        init_data, VMI_CONFIG_GLOBAL_FILE_ENTRY,
                                        NULL, NULL)) {

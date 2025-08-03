@@ -1,9 +1,9 @@
 #include "vmi.h"
 
-int introspect_network_check(const char *name) {
+int introspect_network_check(const char *domain_name) {
   vmi_instance_t vmi = {0};
   /* Initialize the libvmi library */
-  if (VMI_FAILURE == vmi_init_complete(&vmi, name, VMI_INIT_DOMAINNAME,
+  if (VMI_FAILURE == vmi_init_complete(&vmi, domain_name, VMI_INIT_DOMAINNAME,
                                        NULL, VMI_CONFIG_GLOBAL_FILE_ENTRY,
                                        NULL, NULL)) {
     printf("Failed to init LibVMI library.\n");

@@ -45,28 +45,28 @@ static int interrupted = 0;
 static void close_handler(int sig) { interrupted = sig; }
 
 // TODO(mirtia): Add docstrings for each one of those.
-int introspect_process_list(const char *name);
+int introspect_process_list(const char *domain_name);
 
-int introspect_module_list(const char *name);
+int introspect_module_list(const char *domain_name);
 
-int introspect_syscall_check(const char *name);
+int introspect_syscall_check(const char *domain_name);
 
-int introspect_kernel_check(const char *name);
+int introspect_kernel_check(const char *domain_name);
 
-int introspect_idt_check(const char *name);
+int introspect_idt_check(const char *domain_name);
 
-int introspect_network_check(const char *name);
+int introspect_network_check(const char *domain_name);
 
-int introspect_procfs_check(const char *name);
+int introspect_procfs_check(const char *domain_name);
 
-int introspect_syscall_trace(const char *name);
+int introspect_syscall_trace(const char *domain_name);
 
-int introspect_socketapi_trace(const char *name);
+int introspect_socketapi_trace(const char *domain_name);
 
-int introspect_driverapi_trace(const char *name);
+int introspect_driverapi_trace(const char *domain_name);
 
-int introspect_sleepapi_nop(const char *name);
+int introspect_sleepapi_nop(const char *domain_name);
 
-int introspect_process_block(const char *name);
+int introspect_process_block(const char *domain_name);
 
-int introspect_process_kill(const char *name, const char *arg);
+int introspect_process_kill(const char *domain_name, const char *arg);

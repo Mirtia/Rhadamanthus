@@ -1,4 +1,4 @@
-#include "vmi.h"
+  #include "vmi.h"
 #include <assert.h>
 #include <libvmi/libvmi.h>
 #include <string.h>
@@ -87,7 +87,7 @@ event_response_t syscall_enter_cb(vmi_instance_t vmi, vmi_event_t *event) {
   return 0;
 }
 
-int introspect_syscall_trace(const char *name) {
+int introspect_syscall_trace(const char *domain_name) {
 
   struct sigaction act;
   act.sa_handler = close_handler;
@@ -120,7 +120,7 @@ int introspect_syscall_trace(const char *name) {
   vmi_instance_t vmi = NULL;
   vmi_init_data_t *init_data = NULL;
 
-  if (VMI_FAILURE == vmi_init_complete(&vmi, name, VMI_INIT_DOMAINNAME,
+  if (VMI_FAILURE == vmi_init_complete(&vmi, domain_name, VMI_INIT_DOMAINNAME,
                                        init_data, VMI_CONFIG_GLOBAL_FILE_ENTRY,
                                        NULL, NULL)) {
     printf("Failed to init LibVMI library.\n");

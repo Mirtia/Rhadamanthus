@@ -145,13 +145,13 @@ int main(int argc, char **argv)
     }
 
     /* this is the VM or file that we are looking at */
-    const char *name = argv[optind];
+    const char *domain_name = argv[optind];
 
     /* this is the file name to write the memory image to */
     const char *filename = argv[optind + 1];
 
     vmi_mode_t mode;
-    if (VMI_FAILURE == vmi_get_access_mode(NULL, name, VMI_INIT_DOMAINNAME, init_data, &mode) ) {
+    if (VMI_FAILURE == vmi_get_access_mode(NULL, domain_name, VMI_INIT_DOMAINNAME, init_data, &mode) ) {
         goto free_setup_info;
     }
 
@@ -162,7 +162,7 @@ int main(int argc, char **argv)
 
     /* initialize the libvmi library */
     vmi_instance_t vmi = NULL;
-    if (VMI_FAILURE == vmi_init(&vmi, mode, (void*)name, VMI_INIT_DOMAINNAME, init_data, NULL)) {
+    if (VMI_FAILURE == vmi_init(&vmi, mode, (void*)domain_name, VMI_INIT_DOMAINNAME, init_data, NULL)) {
         printf("Failed to initialize LibVMI library.\n");
         goto free_setup_info;
     }

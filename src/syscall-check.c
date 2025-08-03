@@ -1,6 +1,6 @@
 #include "vmi.h"
 
-int introspect_syscall_check(const char *name) {
+int introspect_syscall_check(const char *domain_name) {
   vmi_instance_t vmi = {0};
   addr_t sys_call_table_addr, sys_call_addr, kernel_start, kernel_end = 0;
   int syscall_hit_count = 0;
@@ -30,7 +30,7 @@ int introspect_syscall_check(const char *name) {
   }
   fclose(_file);
 
-  if (VMI_FAILURE == vmi_init_complete(&vmi, name, VMI_INIT_DOMAINNAME, NULL,
+  if (VMI_FAILURE == vmi_init_complete(&vmi, domain_name, VMI_INIT_DOMAINNAME, NULL,
                                        VMI_CONFIG_GLOBAL_FILE_ENTRY, NULL,
                                        NULL)) {
     printf("Failed to init LibVMI library.\n");

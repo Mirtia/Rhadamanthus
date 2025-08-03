@@ -302,7 +302,7 @@ int introspect_socketapi_trace(char *name) {
   vmi_instance_t vmi = NULL;
   vmi_init_data_t *init_data = NULL;
 
-  if (VMI_FAILURE == vmi_init_complete(&vmi, name, VMI_INIT_DOMAINNAME,
+  if (VMI_FAILURE == vmi_init_complete(&vmi, domain_name, VMI_INIT_DOMAINNAME,
                                        init_data, VMI_CONFIG_GLOBAL_FILE_ENTRY,
                                        NULL, NULL)) {
     printf("Failed to init LibVMI library.\n");

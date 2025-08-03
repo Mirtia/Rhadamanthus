@@ -31,12 +31,12 @@
 #include <string.h>
 #include <sys/mman.h>
 
-int introspect_module_list(const char *name) {
+int introspect_module_list(const char *domain_name) {
   vmi_instance_t vmi = {0};
   addr_t next_module = 0;
   addr_t list_head = 0;
   // Initialize the libvmi library.
-  if (vmi_init_complete(&vmi, name, VMI_INIT_DOMAINNAME, NULL,
+  if (vmi_init_complete(&vmi, domain_name, VMI_INIT_DOMAINNAME, NULL,
                         VMI_CONFIG_GLOBAL_FILE_ENTRY, NULL,
                         NULL) == VMI_FAILURE) {
     fprintf(stderr, "Failed to init LibVMI library.\n");
