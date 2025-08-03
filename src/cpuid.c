@@ -22,7 +22,6 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
 #include <sys/mman.h>
 #include <stdio.h>
 #include <inttypes.h>
@@ -31,6 +30,7 @@
 
 #include <libvmi/libvmi.h>
 #include <libvmi/events.h>
+#include <log/log.h>
 
 event_response_t cpuid_cb(vmi_instance_t vmi, vmi_event_t *event)
 {

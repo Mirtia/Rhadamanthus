@@ -1,0 +1,21 @@
+# Which Xen domain (domain name) to attach to (LibVMI)
+vm_name: "ubuntu-20-04"
+
+# How long the entire introspection window should last (in seconds)
+monitor:
+  duration_s: 300          # e.g 5 minutes 
+  interval_ms: 1000        # e.g 1 second
+
+# Which detection services to dispatch.
+# Tasks are split into two categories:
+# 1. State polling tasks (e.g., task_module_list)
+# 2. Event-driven tasks (e.g., mem_event)
+features:
+  state:
+    - id: TASK_MODULE_LIST       # Enum key matching state_task_id_t
+    # TODO: Other options may be placed here, unique to the task.
+      # parameters:
+    - id: TASK_NETWORK_PORTS     # Another state‐polling task
+
+  event:
+    - id: EVENT_CR0_ACCESS

@@ -24,42 +24,50 @@
  * along with LibVMI.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "utils.h"
-#include <libvmi/libvmi.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
 
-int introspect_module_list(const char *domain_name) {
+#include <libvmi/libvmi.h>
+
+int main(int argc, char **argv) {
   vmi_instance_t vmi = {0};
   addr_t next_module = 0;
   addr_t list_head = 0;
+  int retcode = 1;
+
+  if (argc < 2) {
+    fprintf(stderr, "Usage: %s <domain_name>", argv[0]);
+    return retcode;
+  }
+
+  // This is the VM or file that we are looking at.
+  char *name = argv[1];
+
   // Initialize the libvmi library.
-  if (vmi_init_complete(&vmi, domain_name, VMI_INIT_DOMAINNAME, NULL,
-                        VMI_CONFIG_GLOBAL_FILE_ENTRY, NULL,
-                        NULL) == VMI_FAILURE) {
-    fprintf(stderr, "Failed to init LibVMI library.\n");
-    return post_clean_up(vmi, 1);
+  if (VMI_FAILURE == vmi_init_complete(&vmi, name, VMI_INIT_DOMAINNAME, NULL,
+                                       VMI_CONFIG_GLOBAL_FILE_ENTRY, NULL,
+                                       NULL)) {
+    printf("Failed to init LibVMI library.\n");
+    goto error_exit;
   }
 
   // Pause the vm for consistent memory access.
-  if (vmi_pause_vm(vmi) == VMI_FAILURE) {
-    fprintf(stderr, "Failed to pause VM.\n");
-    return post_clean_up(vmi, 1);
+  if (vmi_pause_vm(vmi) != VMI_SUCCESS) {
+    printf("Failed to pause VM.\n");
+    goto error_exit;
   }
 
-  // Get the OS of the vm.
   os_t os = vmi_get_ostype(vmi);
   if (VMI_OS_LINUX != os) {
     fprintf(stderr, "Unsupported OS. Only Linux supported.\n");
-    return post_clean_up(vmi, 1);
+    goto error_exit;
   }
 
-  // Attempt to read the symbol modules. First module address in the list.
   if (vmi_read_addr_ksym(vmi, "modules", &next_module) == VMI_FAILURE) {
     fprintf(stderr, "Failed to read kernel symbol `modules`.\n");
-    return post_clean_up(vmi, 1);
+    goto error_exit;
   }
 
   list_head = next_module;
@@ -89,9 +97,18 @@ int introspect_module_list(const char *domain_name) {
     } else {
       modname = vmi_read_str_va(vmi, next_module + 8, 0);
     }
-    fprintf(stdout, "%s\n", modname);
+    printf("%s\n", modname);
     free(modname);
     next_module = tmp_next;
   }
-  return post_clean_up(vmi, 0);
+
+  retcode = 0;
+error_exit:
+  // Resume the vm.
+  vmi_resume_vm(vmi);
+
+  // Cleanup any memory associated with the libvmi instance.
+  vmi_destroy(vmi);
+
+  return retcode;
 }

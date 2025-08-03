@@ -1,6 +1,39 @@
-#include "vmi.h"
+/* The LibVMI Library is an introspection library that simplifies access to
+ * memory in a target virtual machine or in a file containing a dump of
+ * a system's physical memory.  LibVMI is based on the XenAccess Library.
+ *
+ * Copyright 2011 Sandia Corporation. Under the terms of Contract
+ * DE-AC04-94AL85000 with Sandia Corporation, the U.S. Government
+ * retains certain rights in this software.
+ *
+ * Author: Bryan D. Payne (bdpayne@acm.org)
+ *
+ * This file is part of LibVMI.
+ *
+ * LibVMI is free software: you can redistribute it and/or modify it under
+ * the terms of the GNU Lesser General Public License as published by the
+ * Free Software Foundation, either version 3 of the License, or (at your
+ * option) any later version.
+ *
+ * LibVMI is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
+ * License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public License
+ * along with LibVMI.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
-int introspect_process_list(const char *domain_name) {
+#include <getopt.h>
+#include <inttypes.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/mman.h>
+
+#include <libvmi/libvmi.h>
+
+int main(int argc, char **argv) {
   vmi_instance_t vmi = {0};
   addr_t list_head = 0, cur_list_entry = 0, next_list_entry = 0;
   addr_t current_process = 0;
@@ -15,81 +48,170 @@ int introspect_process_list(const char *domain_name) {
   void *input = NULL, *config = NULL;
   int retcode = 1;
 
-  init_data = malloc(sizeof(vmi_init_data_t) + sizeof(vmi_init_data_entry_t));
+  if(argc < 2) {
+    printf("Usage: %s\n", argv[0]);
+    printf("\t -n/--name <domain name>\n");
+    printf("\t -d/--domid <domain id>\n");
+    printf("\t -j/--json <path to kernel's json profile>\n");
+    return retcode;
+  }
 
-  if (VMI_FAILURE == vmi_init_complete(&vmi, (void *)domain_name,
-                                       VMI_INIT_DOMAINNAME | VMI_INIT_EVENTS,
-                                       init_data, VMI_CONFIG_GLOBAL_FILE_ENTRY,
-                                       NULL, NULL)) {
+  // left for compatibility
+  if(argc == 2)
+    input = argv[1];
+
+  if(argc > 2) {
+    const struct option long_opts[] = {{"name", required_argument, NULL, 'n'},
+                                       {"json", required_argument, NULL, 'j'},
+                                       {NULL, 0, NULL, 0}};
+    const char *opts = "n:d:j:";
+    int c;
+    int long_index = 0;
+
+    while((c = getopt_long(argc, argv, opts, long_opts, &long_index)) != -1)
+      switch(c) {
+      case 'n':
+        input = optarg;
+        break;
+      case 'd':
+        init = VMI_INIT_DOMAINID;
+        domid = strtoull(optarg, NULL, 0);
+        input = (void *) &domid;
+        break;
+      case 'j':
+        config_type = VMI_CONFIG_JSON_PATH;
+        config = (void *) optarg;
+        break;
+      default:
+        printf("Unknown option\n");
+        if(init_data) {
+          free(init_data->entry[0].data);
+          free(init_data);
+        }
+        return retcode;
+      }
+  }
+
+  /* initialize the libvmi library */
+  if(VMI_FAILURE == vmi_init_complete(&vmi, input, init, init_data, config_type,
+                                      config, NULL)) {
     printf("Failed to init LibVMI library.\n");
-    goto exit;
+    goto error_exit;
   }
 
-  vmi_pause_vm(vmi);
+  /* init the offset values */
+  if(VMI_FAILURE == vmi_get_offset(vmi, "linux_tasks", &tasks_offset))
+    goto error_exit;
+  if(VMI_FAILURE == vmi_get_offset(vmi, "linux_name", &name_offset))
+    goto error_exit;
+  if(VMI_FAILURE == vmi_get_offset(vmi, "linux_pid", &pid_offset))
+    goto error_exit;
 
-  /**
-   * get offsets of the kernel data structures
-   * get the head of the task_struct
+  /* pause the vm for consistent memory access */
+  if(vmi_pause_vm(vmi) != VMI_SUCCESS) {
+    printf("Failed to pause VM\n");
+    goto error_exit;
+  }
+
+  /* demonstrate name and id accessors */
+  char *name2 = vmi_get_name(vmi);
+  vmi_mode_t mode;
+
+  if(VMI_FAILURE == vmi_get_access_mode(vmi, NULL, 0, NULL, &mode))
+    goto error_exit;
+
+  if(VMI_FILE != mode) {
+    uint64_t id = vmi_get_vmid(vmi);
+
+    printf("Process listing for VM %s (id=%" PRIu64 ")\n", name2, id);
+  } else {
+    printf("Process listing for file %s\n", name2);
+  }
+  free(name2);
+
+  os_t os = vmi_get_ostype(vmi);
+
+  if(VMI_OS_LINUX != os) {
+    fprintf(stderr, "Unsupported OS. Only Linux supported.");
+    goto error_exit;
+  }
+
+  /* Begin at PID 0, the 'swapper' task. It's not typically shown by OS
+   *  utilities, but it is indeed part of the task list and useful to
+   *  display as such.
    */
+  if(VMI_FAILURE == vmi_translate_ksym2v(vmi, "init_task", &list_head))
+    goto error_exit;
 
-  switch (vmi_get_ostype(vmi)) {
-  case VMI_OS_LINUX:
-    vmi_get_offset(vmi, "linux_tasks", &tasks_offset);
-    vmi_get_offset(vmi, "linux_name", &name_offset);
-    vmi_get_offset(vmi, "linux_pid", &pid_offset);
+  list_head += tasks_offset;
 
-    vmi_translate_ksym2v(vmi, "init_task", &list_head);
-    list_head += tasks_offset;
-    
-    break;
-  case VMI_OS_WINDOWS:
-    vmi_get_offset(vmi, "win_tasks", &tasks_offset);
-    vmi_get_offset(vmi, "win_pname", &name_offset);
-    vmi_get_offset(vmi, "win_pid", &pid_offset);
-
-    vmi_translate_ksym2v(vmi, "PsActiveProcessHead", &list_head);
-
-    break;
-  default:
-    goto exit;
+  cur_list_entry = list_head;
+  if(VMI_FAILURE ==
+     vmi_read_addr_va(vmi, cur_list_entry, 0, &next_list_entry)) {
+    printf("Failed to read next pointer at %" PRIx64 "\n", cur_list_entry);
+    goto error_exit;
   }
 
-  if (tasks_offset == 0 || pid_offset == 0 || name_offset == 0) {
-    printf("Failed to find offsets\n");
-    goto exit;
-  }
+  /* Walk the task list. */
+  while(1) {
 
-  next_list_entry = list_head;
+    current_process = cur_list_entry - tasks_offset;
 
-  /**
-   * traverse the task lists and print out each process
-   */
-  do {
-    current_process = next_list_entry - tasks_offset;
-    vmi_read_32_va(vmi, current_process + pid_offset, 0, (uint32_t *)&pid);
+    /* Note: the task_struct that we are looking at has a lot of
+     * information.  However, the process name and id are burried
+     * nice and deep.  Instead of doing something sane like mapping
+     * this data to a task_struct, I'm just jumping to the location
+     * with the info that I want.  This helps to make the example
+     * code cleaner, if not more fragile.  In a real app, you'd
+     * want to do this a little more robust :-)  See
+     * include/linux/sched.h for mode details */
+
+    vmi_read_32_va(vmi, current_process + pid_offset, 0, (uint32_t *) &pid);
+
     procname = vmi_read_str_va(vmi, current_process + name_offset, 0);
-    if (!procname) {
+
+    if(!procname) {
       printf("Failed to find procname\n");
-      goto exit;
+      goto error_exit;
     }
 
-    printf("[%5d] %s\n", pid, procname);
+    /* print out the process name */
+    printf("[%5d] %s (struct addr:%" PRIx64 ")\n", pid, procname,
+           current_process);
+    if(procname) {
+      free(procname);
+      procname = NULL;
+    }
 
-    free(procname);
-    procname = NULL;
-
-    if (vmi_read_addr_va(vmi, next_list_entry, 0, &next_list_entry) ==
-        VMI_FAILURE) {
+    /* Follow the next pointer */
+    cur_list_entry = next_list_entry;
+    status = vmi_read_addr_va(vmi, cur_list_entry, 0, &next_list_entry);
+    if(status == VMI_FAILURE) {
       printf("Failed to read next pointer in loop at %" PRIx64 "\n",
-             next_list_entry);
-      goto exit;
+             cur_list_entry);
+      goto error_exit;
     }
+    /*
+     * In Linux, we should stop the loop when coming back to the first element
+     * of the loop
+     */
+    if(cur_list_entry == list_head) {
+      break;
+    }
+  };
 
-  } while (next_list_entry != list_head);
-
-exit:
+  retcode = 0;
+error_exit:
+  /* resume the vm */
   vmi_resume_vm(vmi);
+
+  /* cleanup any memory associated with the LibVMI instance */
   vmi_destroy(vmi);
 
-  return 0;
+  if(init_data) {
+    free(init_data->entry[0].data);
+    free(init_data);
+  }
+
+  return retcode;
 }

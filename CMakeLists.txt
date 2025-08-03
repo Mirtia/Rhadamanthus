@@ -5,6 +5,8 @@ set(CMAKE_C_STANDARD 99)
 
 find_package(cJSON REQUIRED)
 find_package(glib REQUIRED)
+find_package(log.c REQUIRED)
+find_package(yaml REQUIRED)
 # # Enable building using cmake-conan   
 # list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 # set(CMAKE_PROJECT_TOP_LEVEL_INCLUDES "cmake/external/conan.cmake")
@@ -15,8 +17,8 @@ find_package(glib REQUIRED)
 # include(${CMAKE_BINARY_DIR}/conan_deps.cmake OPTIONAL RESULT_VARIABLE _conan_deps_included)
 
 function(add_vmi_example exe source)
-    add_executable(${exe} examples/${source})
-    target_link_libraries(${exe} PRIVATE cjson::cjson vmi m glib::glib)
+    add_executable(${exe} src/${source})
+    target_link_libraries(${exe} PRIVATE cjson::cjson yaml log.c::log.c vmi m glib::glib)
 endfunction()
 
 # Main executables

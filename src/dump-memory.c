@@ -34,6 +34,9 @@
 #include <signal.h>
 #include <sys/mman.h>
 #include <libvmi/libvmi.h>
+#include <cjson/cJSON.h>
+#include <log.h>
+
 
 #define FRAME_SIZE (1UL << 12)
 #define PROGRESS_STRIDE (1024 * 1024 * 32) // 32 MiB
@@ -58,7 +61,6 @@ static int bareflank_setup(vmi_init_data_t **init_data_ptr, memory_map_t **memma
     printf("Using this example on Bareflank is not safe.\n");
     printf("You have to adjust it to match your machine before running it.\n");
     return 1;
-
     /* The following is an example based on the e820 map described in
      * notes/memory_map.txt. */
     uint32_t e820_entries = 5;
