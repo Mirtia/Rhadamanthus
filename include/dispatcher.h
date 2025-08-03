@@ -15,18 +15,47 @@
  * @brief  Task IDs for state tasks.
  */
 enum state_task_id {
-  TASK_MODULE_LIST,
+  STATE_KERNEL_MODULE_LIST,
+  STATE_FTRACE_HOOKS,
+  STATE_NETWORK_TRACE,
+  STATE_SYSCALL_TABLE,
+  STATE_IDT_TABLE,
+  STATE_DIR_STRING_MATCHING,
+  STATE_PROCESS_LIST,
+  // TODO: What is this?
+  STATE_PROCFS_ARTIFACTS,
+  STATE_NETFILTER_HOOKS,
+  STATE_KERNEL_THREADS,
+  STATE_KPROBES_JPROBES_KRETPROBES,
+  STATE_MSR_REGISTERS,
+  STATE_KERNEL_CODE_INTEGRITY_CHECK,
+  STATE_EBPF_ARTIFACTS,
+  STATE_IO_URING_ARTIFACTS,
+  STATE_CREDENTIALS,
+  STATE_KALLSYMS_SYMBOLS,
+  STATE_FIRMWARE_ACPI_HOOKS,
   // TODO: Add more state tasks as needed.
-  TASK_STATE_ID_MAX
+  STATE_TASK_ID_MAX
 };
 
 /**
  * @brief Task IDs for event tasks.
  */
 enum event_task_id {
-  EVENT_CR0_ACCESS,
+  EVENT_FTRACE_PATCHING,         ///< ftrace hook detection
+  EVENT_SYSCALL_TABLE_WRITE,     ///< syscall table write detection
+  EVENT_IDT_ENTRY_MODIFICATION,  ///< IDT hook detection
+  EVENT_CR0_WRITE,               ///< write access to control register
+  EVENT_PAGE_TABLE_MODIFICATION, ///< page table or memory mapping change
+  EVENT_NETFILTER_HOOK_WRITE,    ///< function pointer hook detection
+  EVENT_MSR_WRITE,               ///< MSR register access detection
+  EVENT_CODE_SECTION_MODIFY,     ///< kernel code integrity
+  EVENT_INTROSPECTION_INTEGRITY, ///< self-monitoring trap
+  EVENT_IO_URING_RING_WRITE,     ///< io_uring structure tampering
+  EVENT_EBPF_MAP_UPDATE,         ///< eBPF map or program overwrite
+  EVENT_KALLSYMS_TABLE_WRITE,    ///< kallsyms or symbol hijacking
   // TODO: Add more event tasks as needed.
-  EVENT_STATE_ID_MAX
+  EVENT_TASK_ID_MAX
 };
 
 // Type definitions for the dispatcher and task structures
@@ -40,10 +69,13 @@ struct dispatcher {
   vmi_instance_t vmi; ///< The LibVMI instance used by the dispatcher.
   GMutex vm_mutex;    ///< Mutex to handle callbacks and VMI pauses.
 
-  state_task_t *state_tasks[TASK_STATE_ID_MAX];  ///< Array of state tasks
-                                                 ///< indexed by their IDs.
-  event_task_t *event_tasks[EVENT_STATE_ID_MAX]; ///< Array of event tasks
-                                                 ///< indexed by their IDs.
+  state_task_t *state_tasks[STATE_TASK_ID_MAX]; ///< Array of state tasks
+                                                ///< indexed by their IDs.
+  event_task_t *event_tasks[EVENT_TASK_ID_MAX]; ///< Array of event tasks
+                                                ///< indexed by their IDs.
+
+  GThread *state_thread; ///< Thread running periodic state tasks.
+  GThread *event_thread; ///< Thread running the LibVMI event loop.
 };
 
 /**
@@ -56,9 +88,11 @@ struct event_ctx {
 };
 
 /**
- * @brief An event task is a LibVMI event that is triggered by the dispatcher.
- * The dispatcher loops over all registered event tasks and process them
- * sequentially.
+ * @brief An event task is a persistent LibVMI event registration.
+ *
+ * Each event task defines a callback that may be triggered multiple times
+ * throughout execution whenever the registered condition is met (e.g. memory
+ * write, CR register access, etc).
  */
 struct event_task {
   event_task_id_t id; ///< The ID of the event task.
@@ -67,6 +101,7 @@ struct event_task {
   void (*callback)(vmi_instance_t vmi, vmi_event_t *event,
                    void *context); ///< The callback function to execute when
                                    ///< the event is triggered.
+  int64_t event_count; ///< The number of times the event has been triggered.
 };
 
 /**
@@ -79,7 +114,7 @@ struct state_task {
                       ///< repeated.
   double last_invoked_time; ///< The last time the task was invoked (in
                             ///< miliseconds since epoch).
-  void *context; ///< The context to pass to the task callback.
+  void *context;            ///< The context to pass to the task callback.
   void (*callback)(vmi_instance_t vmi,
                    void *context); ///< The callback function to execute when
                                    ///< the task is triggered.
@@ -127,8 +162,9 @@ void dispatcher_free(dispatcher_t *dispatcher);
  * @param context The context to pass to the task callback.
  * @param callback The callback function to execute when the task is triggered.
  */
-void dispatcher_register_state_task(dispatcher_t *dispatcher, state_task_id_t id,
-                                    double interval_ms, void *context,
+void dispatcher_register_state_task(dispatcher_t *dispatcher,
+                                    state_task_id_t id, double interval_ms,
+                                    void *context,
                                     void (*callback)(vmi_instance_t, void *));
 
 // Register an event-driven task (handled sequentially by LibVMI)
@@ -141,9 +177,8 @@ void dispatcher_register_state_task(dispatcher_t *dispatcher, state_task_id_t id
  * @param context The context to pass to the task callback.
  * @param callback The callback function to execute when the event is triggered.
  */
-void dispatcher_register_event_task(dispatcher_t *dispatcher, event_task_id_t id,
-                                    vmi_event_t filter, void *context,
-                                    void (*callback)(vmi_instance_t,
-                                                     vmi_event_t *, void *));
+void dispatcher_register_event_task(
+    dispatcher_t *dispatcher, event_task_id_t id, vmi_event_t filter,
+    void *context, void (*callback)(vmi_instance_t, vmi_event_t *, void *));
 
 #endif // DISPATCHER_H
