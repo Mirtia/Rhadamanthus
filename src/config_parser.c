@@ -20,17 +20,17 @@ void config_free(config_t* config) {
   memset(config, 0, sizeof(config_t));
 }
 
-int dispatcher_initialize_from_config(const char* config_path) {
+dispatcher_t* dispatcher_initialize_from_config(const char* config_path) {
   if (!config_path) {
     log_error("Config path provided is NULL.");
-    return EXIT_FAILURE;
+    return NULL;
   }
 
   config_t config;
 
   if (parse_yaml_config(config_path, &config) != 0) {
     log_error("Failed to parse YAML configuration.");
-    return EXIT_FAILURE;
+    return NULL;
   }
 
   vmi_instance_t vmi = NULL;
@@ -42,7 +42,7 @@ int dispatcher_initialize_from_config(const char* config_path) {
     log_error("Failed to initialize LibVMI on domain '%s'.",
               config.domain_name);
     g_free(config.domain_name);
-    return EXIT_FAILURE;
+    return NULL;
   }
 
   dispatcher_t* dispatcher =
@@ -51,7 +51,7 @@ int dispatcher_initialize_from_config(const char* config_path) {
     log_error("Failed to allocate dispatcher.");
     vmi_destroy(vmi);
     g_free(config.domain_name);
-    return EXIT_FAILURE;
+    return NULL;
   }
 
   for (GList* list_iter = config.state_tasks; list_iter != NULL;
@@ -76,7 +76,7 @@ int dispatcher_initialize_from_config(const char* config_path) {
   g_list_free(config.event_tasks);
   g_free(config.domain_name);
 
-  return EXIT_SUCCESS;
+  return dispatcher;
 }
 
 static char* dup_scalar(yaml_event_t* event) {

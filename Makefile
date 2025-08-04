@@ -1,16 +1,11 @@
-CODE_DIR = src
-
-.PHONY: vmi clean build
-
-vmi:
-	$(MAKE) -C $(CODE_DIR)
-	cp $(CODE_DIR)/vmi ./
+.PHONY: vmi clean build test
 
 clean:
-# 	$(MAKE) -C $(CODE_DIR) clean
 	rm -rf build
 
 build:
 	conan install . --build=missing
 	conan build . 
 
+test: build
+	cd build && ctest --output-on-failure --verbose

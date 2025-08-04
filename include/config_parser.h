@@ -35,9 +35,9 @@ void config_free(config_t* config);
  * the dispatcher and its associated threads.
  *
  * @param config_path The absolute or relative path to the YAML configuration file.
- * @return int EXIT_SUCCESS on success, EXIT_FAILURE otherwise.
+ * @return dispatcher_t* Pointer to the initialized dispatcher on success,
  */
-int dispatcher_initialize_from_config(const char* config_path);
+dispatcher_t* dispatcher_initialize_from_config(const char* config_path);
 
 /**
  * @brief Parses a YAML configuration file and populates the `config_t` structure.

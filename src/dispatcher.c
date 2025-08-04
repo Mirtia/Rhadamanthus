@@ -111,6 +111,12 @@ dispatcher_t* dispatcher_initialize(vmi_instance_t vmi, uint32_t window_ms,
   // Contrast with g_malloc0(), which aborts the program on failure.
   // See: https://docs.gtk.org/glib/func.try_malloc0.html
   dispatcher_t* dispatcher = g_malloc0(sizeof(dispatcher_t));
+  
+  if (vmi == NULL) {
+    log_error("The provided VMI instance is NULL.");
+    g_free(dispatcher);
+    return NULL;
+  }
 
   dispatcher->vmi = vmi;
   g_mutex_init(&dispatcher->vm_mutex);
