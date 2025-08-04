@@ -4,6 +4,7 @@
 #include <log.h>
 #include <stdlib.h>
 #include <string.h>
+#include <yaml.h>
 #include "dispatcher.h"
 
 void config_free(config_t* config) {
@@ -74,6 +75,150 @@ int dispatcher_initialize_from_config(const char* config_path) {
   g_list_free(config.state_tasks);
   g_list_free(config.event_tasks);
   g_free(config.domain_name);
+
+  return EXIT_SUCCESS;
+}
+
+static char* dup_scalar(yaml_event_t* event) {
+  if (event->type != YAML_SCALAR_EVENT)
+    return NULL;
+  return g_strdup((const char*)event->data.scalar.value);
+}
+
+int parse_yaml_config(const char* path, config_t* config) {
+  if (!path || !config) {
+    log_error("Invalid input to parser.");
+    return EXIT_FAILURE;
+  }
+
+  FILE* file = fopen(path, "r");
+  if (!file) {
+    log_error("Could not open config file: %s", path);
+    return EXIT_FAILURE;
+  }
+
+  yaml_parser_t parser;
+  yaml_event_t event;
+  memset(config, 0, sizeof(config_t));
+
+  if (!yaml_parser_initialize(&parser)) {
+    log_error("Failed to initialize YAML parser.");
+    (void)fclose(file);
+    return EXIT_FAILURE;
+  }
+
+  yaml_parser_set_input_file(&parser, file);
+
+  enum {
+    NONE,
+    DOMAIN,
+    MONITOR,
+    MONITOR_KEY,
+    FEATURES,
+    STATE_LIST,
+    EVENT_LIST,
+    STATE_TASK,
+    EVENT_TASK
+  } context = NONE;
+
+  char* last_key = NULL;
+  while (yaml_parser_parse(&parser, &event)) {
+    switch (event.type) {
+      case YAML_SCALAR_EVENT: {
+        char* val = (char*)event.data.scalar.value;
+
+        if (context == NONE) {
+          if (strcmp(val, "domain_name") == 0)
+            context = DOMAIN;
+          else if (strcmp(val, "monitor") == 0)
+            context = MONITOR;
+          else if (strcmp(val, "features") == 0)
+            context = FEATURES;
+        } else if (context == DOMAIN) {
+          config->domain_name = g_strdup(val);
+          context = NONE;
+        } else if (context == MONITOR) {
+          if (strcmp(val, "window_ms") == 0 ||
+              strcmp(val, "state_sampling_ms") == 0)
+            last_key = g_strdup(val);
+          else {
+            if (last_key && strcmp(last_key, "window_ms") == 0)
+              config->window_ms = (uint32_t)atoi(val);
+            else if (last_key && strcmp(last_key, "state_sampling_ms") == 0)
+              config->state_sampling_ms = (uint32_t)atoi(val);
+            g_free(last_key);
+            last_key = NULL;
+          }
+        } else if (context == FEATURES) {
+          if (strcmp(val, "state") == 0)
+            context = STATE_LIST;
+          else if (strcmp(val, "event") == 0)
+            context = EVENT_LIST;
+        } else if (context == STATE_LIST || context == EVENT_LIST) {
+          if (strcmp(val, "id") == 0) {
+            context = (context == STATE_LIST) ? STATE_TASK : EVENT_TASK;
+          }
+        } else if (context == STATE_TASK) {
+          int task_id = state_task_id_from_str(val);
+          if (task_id >= 0) {
+            int* task_id_ptr = g_malloc(sizeof(int));
+            if (!task_id_ptr) {
+              log_error("Failed to allocate memory for state task ID.");
+              return EXIT_FAILURE;
+            }
+            *task_id_ptr = task_id;
+            config->state_tasks =
+                g_list_append(config->state_tasks, task_id_ptr);
+          } else {
+            log_warn("Unknown state task ID string: %s", val);
+          }
+          context = STATE_LIST;
+
+        } else if (context == EVENT_TASK) {
+          int task_id = event_task_id_from_str(val);
+          if (task_id >= 0) {
+            int* task_id_ptr = g_malloc(sizeof(int));
+            if (!task_id_ptr) {
+              log_error("Failed to allocate memory for event task ID.");
+              return EXIT_FAILURE;
+            }
+            *task_id_ptr = task_id;
+            config->event_tasks =
+                g_list_append(config->event_tasks, task_id_ptr);
+          } else {
+            log_warn("Unknown event task ID string: %s", val);
+          }
+          context = EVENT_LIST;
+        }
+        break;
+      }
+
+      case YAML_MAPPING_END_EVENT:
+        if (context == MONITOR || context == STATE_TASK ||
+            context == EVENT_TASK)
+          context = NONE;
+        break;
+
+      default:
+        break;
+    }
+
+    if (event.type != YAML_STREAM_END_EVENT)
+      yaml_event_delete(&event);
+    else
+      break;
+  }
+
+  yaml_event_delete(&event);
+  yaml_parser_delete(&parser);
+  (void)fclose(file);
+
+  if (!config->domain_name || config->window_ms == 0 ||
+      config->state_sampling_ms == 0) {
+    log_error("Missing required fields in configuration.");
+    config_free(config);
+    return EXIT_FAILURE;
+  }
 
   return EXIT_SUCCESS;
 }
