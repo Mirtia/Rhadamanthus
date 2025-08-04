@@ -10,8 +10,8 @@
  */
 #define EVENT_TASK_COUNT \
   100  // Maximum number of event tasks triggered during the time window.
-#define EVENT_LISTEN_TIMEOUT \
-  1000  // Timeout in milliseconds for the event loop to wait for events.
+#define STATE_TASK_TIMEOUT \
+  1000  // Timeout in milliseconds for busy waiting in state tasks.
 /**
  * @brief  Task IDs for state tasks.
  */
@@ -65,6 +65,7 @@ typedef struct event_task event_task_t;
 typedef struct state_task state_task_t;
 typedef enum state_task_id state_task_id_t;
 typedef enum event_task_id event_task_id_t;
+typedef struct callback_event_item_t callback_event_item_t;
 
 struct dispatcher {
   vmi_instance_t vmi;  ///< The LibVMI instance used by the dispatcher.
@@ -79,15 +80,15 @@ struct dispatcher {
   GThread* event_thread;  ///< Thread running the LibVMI event loop.
 
   bool vm_paused;  ///< Flag indicating if the VM is currently paused.
-};
 
-/**
- * @brief The event context is used to pass to the callback.
- */
-struct event_ctx {
-  dispatcher_t*
-      dispatcher;  ///< The dispatcher instance that manages the event tasks.
-  event_task_t* task;  ///<  The event task that is currently being processed.
+  GThread* event_worker_thread;  ///< Thread processing events from the queue.
+  GAsyncQueue*
+      event_queue;  ///< Queue for events to be processed by the event worker thread.
+
+  uint32_t
+      window_ms;  ///< The time window in milliseconds for event processing.
+  uint32_t
+      state_sampling_ms;  ///< The frequency in milliseconds for state tasks sampling.
 };
 
 /**
@@ -108,16 +109,24 @@ struct event_task {
 };
 
 /**
+ * @brief It holds a copy of the VMI event and the task that triggered a callback.
+ * Used for queueing events for processing in the event worker thread.
+ */
+struct callback_event_item_t {
+  dispatcher_t* dispatcher;  ///< Needed to access mutex and VMI instance.
+  event_task_t* task;        ///< The event task that triggered the callback.
+  vmi_event_t event;         ///< Copy of the event data.
+};
+
+/**
  * @brief A state task is a periodic task that runs in its own GThread and
  * triggered by the dispatcher.
  */
 struct state_task {
-  state_task_id_t id;  ///< The ID of the state task.
-  double interval_ms;  ///< The interval in miliseconds at which the task is
-                       ///< repeated.
-  double last_invoked_time;  ///< The last time the task was invoked (in
-                             ///< miliseconds since epoch).
-  void* context;             ///< The context to pass to the task callback.
+  state_task_id_t id;          ///< The ID of the state task.
+  uint64_t last_invoked_time;  ///< The last time the task was invoked (in
+                               ///< miliseconds since epoch).
+  void* context;               ///< The context to pass to the task callback.
   uint32_t (*callback)(
       vmi_instance_t vmi,
       void* context);  ///< The callback function to execute when
@@ -145,9 +154,12 @@ const char* event_task_id_to_str(event_task_id_t task_id);
  * state and event tasks.
  *
  * @param vmi The LibVMI instance to use for the dispatcher.
+ * @param window_ms The time window in milliseconds for event processing.
+ * @param state_sample_interval_ms The frequency in milliseconds for state tasks
  * @return dispatcher_t* The created dispatcher instance.
  */
-dispatcher_t* dispatcher_initialize(vmi_instance_t vmi);
+dispatcher_t* dispatcher_initialize(vmi_instance_t vmi, uint32_t window_ms,
+                                    uint32_t state_sample_interval_ms);
 
 /**
  * @brief Cleaning up and freeing the resources used by the dispatcher.
@@ -161,14 +173,13 @@ void dispatcher_free(dispatcher_t* dispatcher);
  *
  * @param dispatcher The dispatcher instance.
  * @param id The ID of the state task to register.
- * @param interval_s The interval in miliseconds at which the task should be
- * repeated.
  * @param context The context to pass to the task callback.
  * @param callback The callback function to execute when the task is triggered.
  */
-void dispatcher_register_state_task(
-    dispatcher_t* dispatcher, state_task_id_t task_id, double interval_ms,
-    void* context, uint32_t (*callback)(vmi_instance_t, void*));
+void dispatcher_register_state_task(dispatcher_t* dispatcher,
+                                    state_task_id_t task_id, void* context,
+                                    uint32_t (*callback)(vmi_instance_t,
+                                                         void*));
 
 // Register an event-driven task (handled sequentially by LibVMI)
 /**
@@ -200,6 +211,13 @@ void dispatcher_start_state_loop(dispatcher_t* dispatcher);
 void dispatcher_start_event_loop(dispatcher_t* dispatcher);
 
 /**
+ * @brief The dispatcher starts a thread that processes events from the queue.
+ * 
+ * @param dispatcher The dispatcher instance.
+ */
+void dispatcher_start_event_worker(dispatcher_t* dispatcher);
+
+/**
  * @brief The gthread function that runs the event loop and processes events.
  * 
  * @param data The data passed to the ghtread function, in this context, the dispatcher instance.
@@ -214,5 +232,13 @@ static gpointer event_loop_thread(gpointer data);
  * @return gpointer The result of the thread execution, typically NULL.
  */
 static gpointer state_loop_thread(gpointer data);
+
+/**
+ * @brief The gthread function that processes events from the queue.
+ *
+ * @param data The data passed to the ghtread function, in this context, the dispatcher instance.
+ * @return gpointer The result of the thread execution, typically NULL.
+ */
+static gpointer event_worker_thread(gpointer data);
 
 #endif  // DISPATCHER_H

@@ -77,7 +77,8 @@ const char* event_task_id_to_str(event_task_id_t task_id) {
   }
 }
 
-dispatcher_t* dispatcher_initialize(vmi_instance_t vmi) {
+dispatcher_t* dispatcher_initialize(vmi_instance_t vmi, uint32_t window_ms,
+                                    uint32_t state_sample_interval_ms) {
   // Note: Attempts to allocate n_bytes, initialized to 0’s, and returns NULL on failure.
   // Contrast with g_malloc0(), which aborts the program on failure.
   // See: https://docs.gtk.org/glib/func.try_malloc0.html
@@ -95,6 +96,9 @@ dispatcher_t* dispatcher_initialize(vmi_instance_t vmi) {
 
   dispatcher->state_thread = NULL;
   dispatcher->event_thread = NULL;
+
+  // Create new queue for event callbacks.
+  dispatcher->event_queue = g_async_queue_new();
 
   return dispatcher;
 }
@@ -129,9 +133,10 @@ void dispatcher_free(dispatcher_t* dispatcher) {
   g_free(dispatcher);
 }
 
-void dispatcher_register_state_task(
-    dispatcher_t* dispatcher, state_task_id_t task_id, double interval_ms,
-    void* context, uint32_t (*callback)(vmi_instance_t, void*)) {
+void dispatcher_register_state_task(dispatcher_t* dispatcher,
+                                    state_task_id_t task_id, void* context,
+                                    uint32_t (*callback)(vmi_instance_t,
+                                                         void*)) {
 
   // Top level checks
   if (!dispatcher) {
@@ -147,8 +152,7 @@ void dispatcher_register_state_task(
   state_task_t* task = g_malloc0(sizeof(state_task_t));
 
   task->id = task_id;
-  task->interval_ms = interval_ms;
-  task->last_invoked_time = 0.0;
+  task->last_invoked_time = 0;
   task->context = context;
   task->callback = callback;
 
@@ -209,6 +213,16 @@ void dispatcher_start_event_loop(dispatcher_t* dispatcher) {
       g_thread_new("event_loop", (GThreadFunc)event_loop_thread, dispatcher);
 }
 
+void dispatcher_start_event_worker(dispatcher_t* dispatcher) {
+  if (!dispatcher) {
+    log_error("The provided dispatcher is NULL.");
+    return;
+  }
+
+  dispatcher->event_worker_thread = g_thread_new(
+      "event_worker", (GThreadFunc)event_worker_thread, dispatcher);
+}
+
 static gpointer event_loop_thread(gpointer data) {
   if (!data) {
     log_error("The provided data to the event loop thread is NULL.");
@@ -218,9 +232,9 @@ static gpointer event_loop_thread(gpointer data) {
   dispatcher_t* dispatcher = (dispatcher_t*)data;
 
   while (true) {
-    // TODO: Think of locking logic. When there is an event callback the callback
-    // will attempt to acquire the mutex. It blocks until the mutex is available.
-    vmi_events_listen(dispatcher->vmi, EVENT_LISTEN_TIMEOUT);
+    // NOTE: LibVMI processes one event at a time, listen to total of time window_ms.
+    // The callback will be triggered, which will enqueue the item.
+    vmi_events_listen(dispatcher->vmi, dispatcher->window_ms);
   }
 
   return NULL;
@@ -228,11 +242,104 @@ static gpointer event_loop_thread(gpointer data) {
 
 static gpointer state_loop_thread(gpointer data) {
   if (!data) {
-    log_error("The provided data to the event loop thread is NULL.");
+    log_error("The provided data to the state loop thread is NULL.");
     return NULL;
   }
 
   dispatcher_t* dispatcher = (dispatcher_t*)data;
+
+  const uint64_t start_time_ms =
+      g_get_monotonic_time() / 1000;  // Start of window
+
+  while (true) {
+    const uint64_t loop_start_ms = g_get_monotonic_time() / 1000;
+
+    // Check if we exceeded the monitoring window duration
+    if ((loop_start_ms - start_time_ms) >= dispatcher->window_ms) {
+      log_info("State loop has completed its monitoring window (%u ms).",
+               dispatcher->window_ms);
+      break;
+    }
+
+    // Acquire the VM mutex once to ensure a consistent state across all callbacks.
+    g_mutex_lock(&dispatcher->vm_mutex);
+
+    for (int i = 0; i < STATE_TASK_ID_MAX; ++i) {
+      state_task_t* task = dispatcher->state_tasks[i];
+      if (!task)
+        continue;
+
+      task->callback(dispatcher->vmi, task->context);
+
+      // Optionally update last_invoked_time if needed (not used in fixed-rate logic)
+      task->last_invoked_time = loop_start_ms;
+    }
+
+    g_mutex_unlock(&dispatcher->vm_mutex);
+
+    // Compute how long the loop iteration took.
+    const uint64_t loop_end_ms = g_get_monotonic_time() / 1000;
+    const uint64_t elapsed_ms = loop_end_ms - loop_start_ms;
+
+    // Compute the remaining time to sleep to maintain fixed rate.
+    if (elapsed_ms < dispatcher->state_sampling_ms) {
+      const uint64_t sleep_ms = dispatcher->state_sampling_ms - elapsed_ms;
+      // Convert ms to µs
+      g_usleep(sleep_ms * 1000);
+    } else {
+      // This can happen when the lock is held for too long or the callback takes too long.
+      log_warn("State sampling loop overran its interval (%u ms).",
+               dispatcher->state_sampling_ms);
+    }
+  }
+
+  return NULL;
+}
+
+static gpointer event_worker_thread(gpointer data) {
+  if (!data) {
+    log_error("The provided data to the event worker thread is NULL.");
+    return NULL;
+  }
+
+  dispatcher_t* dispatcher = (dispatcher_t*)data;
+
+  while (true) {
+    // Block until an event item is available in the queue.
+    callback_event_item_t* item = g_async_queue_pop(dispatcher->event_queue);
+
+    if (!item || !item->task) {
+      log_error("Invalid callback event item.");
+      g_free(item);
+      continue;
+    }
+
+    // We restrain the number of runs for an event task to not overload logs.
+    if (item->task->event_count >= EVENT_TASK_COUNT) {
+      if (item->task->event_count == EVENT_TASK_COUNT) {
+        log_warn(
+            "Event task %s reached limit of runs, skipping further callbacks.",
+            event_task_id_to_str(item->task->id));
+      }
+
+      // Continue tracking how many times it would have been called.
+      item->task->event_count++;
+      g_free(item);
+      continue;
+    }
+
+    g_mutex_lock(&dispatcher->vm_mutex);
+
+    item->task->event_count++;
+
+    // Call the callback function with the VMI instance and event.
+    // There may be pausing logic here in the callback if needed.
+    item->task->callback(dispatcher->vmi, &item->event);
+
+    g_mutex_unlock(&dispatcher->vm_mutex);
+
+    g_free(item);
+  }
 
   return NULL;
 }
