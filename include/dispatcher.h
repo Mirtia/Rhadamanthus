@@ -137,7 +137,7 @@ struct state_task {
  * @brief Convert a state task ID to a string representation.
  *
  * @param task_id The state task ID to convert.
- * @return const char* The string representation of the task ID.
+ * @return const char* The string representation of the task ID else NULL.
  */
 const char* state_task_id_to_str(state_task_id_t task_id);
 
@@ -145,9 +145,23 @@ const char* state_task_id_to_str(state_task_id_t task_id);
  * @brief Convert a state task ID to a string representation.
  *
  * @param task_id The event task ID to convert.
- * @return const char* The string representation of the task ID.
+ * @return const char* The string representation of the task ID else NULL.
  */
 const char* event_task_id_to_str(event_task_id_t task_id);
+
+/**
+ * @brief Parse a string into a state_task_id_t.
+ * @param str The input string.
+ * @return Corresponding enum value, or -1 on failure.
+ */
+int state_task_id_from_str(const char* str);
+
+/**
+ * @brief Parse a string into an event_task_id_t.
+ * @param str The input string.
+ * @return Corresponding enum value, or -1 on failure.
+ */
+int event_task_id_from_str(const char* str);
 
 /**
  * @brief Creating and initializing the dispatcher is responsible for managing
