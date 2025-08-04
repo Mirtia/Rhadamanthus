@@ -36,9 +36,7 @@ function(add_vmi_example exe source)
     target_link_libraries(${exe} PRIVATE
         cjson::cjson
         yaml
-        log.c::log.c
         vmi_dispatcher
-        m
         ${GLIB2_LIBRARIES}
     )
 endfunction()
