@@ -41,7 +41,7 @@ const char* state_task_id_to_str(state_task_id_t task_id) {
       return "FIRMWARE_ACPI_HOOKS";
     default:
       log_error("Unknown state task with code: %d", task_id);
-      return "UNKNOWN_STATE_TASK";
+      return NULL;
   }
 }
 
@@ -73,8 +73,36 @@ const char* event_task_id_to_str(event_task_id_t task_id) {
       return "KALLSYMS_TABLE_WRITE";
     default:
       log_error("Unknown event task with code: %d", task_id);
-      return "UNKNOWN_EVENT_TASK";
+      return NULL;
   }
+}
+
+int state_task_id_from_str(const char* str) {
+  if (!str) {
+    log_error("The provided string to convert to state task ID is NULL.");
+    return -1;
+  }
+
+  for (int i = 0; i < STATE_TASK_ID_MAX; ++i) {
+    if (strcmp(str, state_task_id_to_str(i)) == 0)
+      return i;
+  }
+  log_error("Unknown state task ID string: %s", str);
+  return -1;
+}
+
+int event_task_id_from_str(const char* str) {
+  if (!str) {
+    log_error("The provided string to convert to event task ID is NULL.");
+    return -1;
+  }
+
+  for (int i = 0; i < EVENT_TASK_ID_MAX; ++i) {
+    if (strcmp(str, event_task_id_to_str(i)) == 0)
+      return i;
+  }
+  log_error("Unknown event task ID string: %s", str);
+  return -1;
 }
 
 dispatcher_t* dispatcher_initialize(vmi_instance_t vmi, uint32_t window_ms,
