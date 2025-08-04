@@ -46,7 +46,9 @@ target_link_libraries(introspector
 # Tests
 enable_testing()
 
-add_executable(test_dispatcher tests/test_dispatcher.c)
+add_executable(test_dispatcher
+    tests/test_dispatcher.c
+)
 
 target_link_libraries(test_dispatcher
     vmi_dispatcher
@@ -55,6 +57,20 @@ target_link_libraries(test_dispatcher
     cmocka::cmocka
 )
 
+add_executable(test_config_parser
+    tests/test_config_parser.c
+)
+
+target_link_libraries(test_config_parser
+    vmi_dispatcher
+    ${GLIB2_LIBRARIES}
+    log.c::log.c
+    cmocka::cmocka
+)
+
 add_test(NAME DispatcherTest COMMAND test_dispatcher)
+add_test(NAME ConfigParserTest COMMAND test_config_parser)
+
+add_compile_definitions(TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/data")
 
 install(TARGETS introspector DESTINATION bin)
