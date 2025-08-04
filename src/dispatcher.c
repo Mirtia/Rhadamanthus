@@ -129,10 +129,9 @@ void dispatcher_free(dispatcher_t* dispatcher) {
   g_free(dispatcher);
 }
 
-void dispatcher_register_state_task(dispatcher_t* dispatcher,
-                                    state_task_id_t task_id, double interval_ms,
-                                    void* context,
-                                    void (*callback)(vmi_instance_t, void*)) {
+void dispatcher_register_state_task(
+    dispatcher_t* dispatcher, state_task_id_t task_id, double interval_ms,
+    void* context, uint32_t (*callback)(vmi_instance_t, void*)) {
 
   // Top level checks
   if (!dispatcher) {
@@ -158,7 +157,7 @@ void dispatcher_register_state_task(dispatcher_t* dispatcher,
 
 void dispatcher_register_event_task(
     dispatcher_t* dispatcher, event_task_id_t task_id, vmi_event_t filter,
-    void* context, void (*callback)(vmi_instance_t, vmi_event_t*, void*)) {
+    event_response_t (*callback)(vmi_instance_t, vmi_event_t*)) {
 
   // Top level checks
   if (!dispatcher) {
@@ -175,14 +174,65 @@ void dispatcher_register_event_task(
 
   task->id = task_id;
   task->filter = filter;
-  task->context = context;
+  // Context is the event_task itself, which is passed to the vmi_event.
   task->callback = callback;
   task->event_count = 0;
 
-  // Set the callback in LibVMI event
+  // Set the callback and data in the LibVMI event struct.
   task->filter.callback = callback;
+  task->filter.data = task;
 
   dispatcher->event_tasks[task_id] = task;
 
   vmi_register_event(dispatcher->vmi, &task->filter);
+}
+
+void dispatcher_start_state_loop(dispatcher_t* dispatcher) {
+  if (!dispatcher) {
+    log_error("The provided dispatcher is NULL.");
+    return;
+  }
+
+  // Create and start the state loop thread.
+  dispatcher->state_thread =
+      g_thread_new("state_loop", (GThreadFunc)state_loop_thread, dispatcher);
+}
+
+void dispatcher_start_event_loop(dispatcher_t* dispatcher) {
+  if (!dispatcher) {
+    log_error("The provided dispatcher is NULL.");
+    return;
+  }
+
+  // Create and start the event loop thread.
+  dispatcher->event_thread =
+      g_thread_new("event_loop", (GThreadFunc)event_loop_thread, dispatcher);
+}
+
+static gpointer event_loop_thread(gpointer data) {
+  if (!data) {
+    log_error("The provided data to the event loop thread is NULL.");
+    return NULL;
+  }
+
+  dispatcher_t* dispatcher = (dispatcher_t*)data;
+
+  while (true) {
+    // TODO: Think of locking logic. When there is an event callback the callback
+    // will attempt to acquire the mutex. It blocks until the mutex is available.
+    vmi_events_listen(dispatcher->vmi, EVENT_LISTEN_TIMEOUT);
+  }
+
+  return NULL;
+}
+
+static gpointer state_loop_thread(gpointer data) {
+  if (!data) {
+    log_error("The provided data to the event loop thread is NULL.");
+    return NULL;
+  }
+
+  dispatcher_t* dispatcher = (dispatcher_t*)data;
+
+  return NULL;
 }
