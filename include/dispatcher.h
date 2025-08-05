@@ -12,6 +12,7 @@
   100  // Maximum number of event tasks triggered during the time window.
 #define STATE_TASK_TIMEOUT \
   1000  // Timeout in milliseconds for busy waiting in state tasks.
+
 /**
  * @brief  Task IDs for state tasks.
  */
