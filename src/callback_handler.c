@@ -1,6 +1,4 @@
 #include "callback_handler.h"
-
-// Example callback headers
 #include "state_callbacks/module_list.h"
 #include "event_callbacks/cr0_write.h"
 
