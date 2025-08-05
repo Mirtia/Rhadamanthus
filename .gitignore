@@ -76,3 +76,6 @@ TAGS
 # Ignore python bytecode (if you use scripts)
 __pycache__/
 *.pyc
+
+# Ignore .VSCodeCounter
+.VSCodeCounter/
