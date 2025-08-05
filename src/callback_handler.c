@@ -2,8 +2,8 @@
 #include "state_callbacks/module_list.h"
 #include "event_callbacks/cr0_write.h"
 
-state_task_callback_t get_state_task_callback(state_task_id_t id) {
-    switch (id) {
+state_task_callback_t get_state_task_callback(state_task_id_t task_id) {
+    switch (task_id) {
         case STATE_KERNEL_MODULE_LIST:
             return state_module_list_callback;
         default:
@@ -11,8 +11,8 @@ state_task_callback_t get_state_task_callback(state_task_id_t id) {
     }
 }
 
-event_task_callback_t get_event_task_callback(event_task_id_t id) {
-    switch (id) {
+event_task_callback_t get_event_task_callback(event_task_id_t task_id) {
+    switch (task_id) {
         case EVENT_CR0_WRITE:
             return event_cr0_write_callback;
         default:

@@ -8,4 +8,4 @@ build:
 	conan build . 
 
 test: build
-	cd build && ctest --output-on-failure --verbose
+	cd build && sudo -E ctest --output-on-failure --verbose

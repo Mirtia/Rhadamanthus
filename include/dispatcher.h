@@ -169,11 +169,11 @@ int event_task_id_from_str(const char* str);
  *
  * @param vmi The LibVMI instance to use for the dispatcher.
  * @param window_ms The time window in milliseconds for event processing.
- * @param state_sample_interval_ms The frequency in milliseconds for state tasks
+ * @param state_sampling_ms The frequency in milliseconds for state tasks
  * @return dispatcher_t* The created dispatcher instance.
  */
 dispatcher_t* dispatcher_initialize(vmi_instance_t vmi, uint32_t window_ms,
-                                    uint32_t state_sample_interval_ms);
+                                    uint32_t state_sampling_ms);
 
 /**
  * @brief Cleaning up and freeing the resources used by the dispatcher.

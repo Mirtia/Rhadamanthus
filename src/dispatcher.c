@@ -106,7 +106,7 @@ int event_task_id_from_str(const char* str) {
 }
 
 dispatcher_t* dispatcher_initialize(vmi_instance_t vmi, uint32_t window_ms,
-                                    uint32_t state_sample_interval_ms) {
+                                    uint32_t state_sampling_ms) {
   // Note: Attempts to allocate n_bytes, initialized to 0’s, and returns NULL on failure.
   // Contrast with g_malloc0(), which aborts the program on failure.
   // See: https://docs.gtk.org/glib/func.try_malloc0.html
@@ -117,8 +117,11 @@ dispatcher_t* dispatcher_initialize(vmi_instance_t vmi, uint32_t window_ms,
     g_free(dispatcher);
     return NULL;
   }
-
+  
+  dispatcher->window_ms = window_ms;
+  dispatcher->state_sampling_ms = state_sampling_ms;
   dispatcher->vmi = vmi;
+
   g_mutex_init(&dispatcher->vm_mutex);
 
   // Initialize with placeholder values.
