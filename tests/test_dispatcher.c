@@ -8,8 +8,9 @@
 void register_mock_tasks(dispatcher_t* dispatcher) {
   // This function registers some events and tasks.
   log_info("Mock tasks registered.");
-
+  // 
 }
+
 
 static void test_dispatcher_creation(void** state) {
   (void)state;

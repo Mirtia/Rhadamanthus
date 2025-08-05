@@ -23,7 +23,7 @@ enum state_task_id {
   STATE_IDT_TABLE,
   STATE_DIR_STRING_MATCHING,
   STATE_PROCESS_LIST,
-  // TODO: What is this?
+  // TODO: What is this? Some fields may be redundant. Object to change.
   STATE_PROCFS_ARTIFACTS,
   STATE_NETFILTER_HOOKS,
   STATE_KERNEL_THREADS,
@@ -92,6 +92,16 @@ struct dispatcher {
 };
 
 /**
+ * @brief It holds a copy of the VMI event and the task that triggered a callback.
+ * Used for queueing events for processing in the event worker thread.
+ */
+struct callback_event_item_t {
+  dispatcher_t* dispatcher;  ///< Needed to access mutex and VMI instance.
+  event_task_t* task;        ///< The event task that triggered the callback.
+  vmi_event_t event;         ///< Copy of the event data.
+};
+
+/**
  * @brief An event task is a persistent LibVMI event registration.
  *
  * Each event task defines a callback that may be triggered multiple times
@@ -101,21 +111,13 @@ struct dispatcher {
 struct event_task {
   event_task_id_t id;  ///< The ID of the event task.
   vmi_event_t filter;  ///< The LibVMI event filter that triggers the task.
-  event_response_t (*callback)(
-      vmi_instance_t vmi,
-      vmi_event_t* event);  ///< Keep - the callback function to execute when
-                            ///< the event is triggered (conform to LibVMI).
+  // TODO: Remove this, also consider using the data field of the vmi_event_t instead of creating a separate event_task
+  // and state_task structs. There is no danger with the data field as its ownership and lifecycle is managed by the caller.
+  // event_response_t (*callback)(
+  //     vmi_instance_t vmi,
+  //     vmi_event_t* event);  ///< Keep - the callback function to execute when
+  //                           ///< the event is triggered (conform to LibVMI).
   int64_t event_count;  ///< The number of times the event has been triggered.
-};
-
-/**
- * @brief It holds a copy of the VMI event and the task that triggered a callback.
- * Used for queueing events for processing in the event worker thread.
- */
-struct callback_event_item_t {
-  dispatcher_t* dispatcher;  ///< Needed to access mutex and VMI instance.
-  event_task_t* task;        ///< The event task that triggered the callback.
-  vmi_event_t event;         ///< Copy of the event data.
 };
 
 /**

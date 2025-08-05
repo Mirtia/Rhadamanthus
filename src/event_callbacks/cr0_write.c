@@ -3,6 +3,8 @@
 
 event_response_t event_cr0_write_callback(vmi_instance_t vmi,
                                           vmi_event_t* event) {
+  (void)vmi;
+  (void)event;
   log_info("EVENT_CR0_WRITE triggered.");
   return VMI_SUCCESS;
 }

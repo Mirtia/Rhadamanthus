@@ -117,7 +117,7 @@ dispatcher_t* dispatcher_initialize(vmi_instance_t vmi, uint32_t window_ms,
     g_free(dispatcher);
     return NULL;
   }
-  
+
   dispatcher->window_ms = window_ms;
   dispatcher->state_sampling_ms = state_sampling_ms;
   dispatcher->vmi = vmi;
@@ -193,6 +193,8 @@ void dispatcher_register_state_task(dispatcher_t* dispatcher,
   task->context = context;
   task->callback = callback;
 
+  // TODO: Each task_id should be associated with a specific callback? But is this what we want?
+  // Do we want flexibility? For example, at testing you would want to have a mock callback.
   dispatcher->state_tasks[task_id] = task;
 }
 
@@ -216,7 +218,7 @@ void dispatcher_register_event_task(
   task->id = task_id;
   task->filter = filter;
   // Context is the event_task itself, which is passed to the vmi_event.
-  task->callback = callback;
+  // task->callback = callback;
   task->event_count = 0;
 
   // Set the callback and data in the LibVMI event struct.
@@ -371,7 +373,17 @@ static gpointer event_worker_thread(gpointer data) {
 
     // Call the callback function with the VMI instance and event.
     // There may be pausing logic here in the callback if needed.
-    item->task->callback(dispatcher->vmi, &item->event);
+    // item->task->callback(dispatcher->vmi, &item->event);
+    event_response_t response =
+        item->task->filter.callback(dispatcher->vmi, &item->event);
+        
+    if (response != VMI_SUCCESS) {
+      log_error("Event task %s callback failed with response: %d",
+                event_task_id_to_str(item->task->id), response);
+    } else {
+      log_info("Event task %s callback executed successfully.",
+               event_task_id_to_str(item->task->id));
+    }
 
     g_mutex_unlock(&dispatcher->vm_mutex);
 
