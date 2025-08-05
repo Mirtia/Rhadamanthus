@@ -115,98 +115,170 @@ int parse_yaml_config(const char* path, config_t* config) {
     MONITOR,
     MONITOR_KEY,
     FEATURES,
-    STATE_LIST,
-    EVENT_LIST,
     STATE_TASK,
     EVENT_TASK
   } context = NONE;
 
+  enum {
+    FEATURES_NONE,
+    STATE_LIST,
+    EVENT_LIST
+  } features_context = FEATURES_NONE;
+
   char* last_key = NULL;
+  int in_sequence = 0;  // Track if we're inside a YAML sequence
+
   while (yaml_parser_parse(&parser, &event)) {
     switch (event.type) {
+      case YAML_SEQUENCE_START_EVENT:
+        in_sequence = 1;
+        break;
+
+      case YAML_SEQUENCE_END_EVENT:
+        in_sequence = 0;
+        // Reset task context when sequence ends
+        if (context == STATE_TASK || context == EVENT_TASK) {
+          context = FEATURES;
+        }
+        break;
+
       case YAML_SCALAR_EVENT: {
         char* val = (char*)event.data.scalar.value;
 
         if (context == NONE) {
-          if (strcmp(val, "domain_name") == 0)
+          if (strcmp(val, "domain_name") == 0) {
             context = DOMAIN;
-          else if (strcmp(val, "monitor") == 0)
+          } else if (strcmp(val, "monitor") == 0) {
             context = MONITOR;
-          else if (strcmp(val, "features") == 0)
+          } else if (strcmp(val, "features") == 0) {
             context = FEATURES;
+          }
         } else if (context == DOMAIN) {
           config->domain_name = g_strdup(val);
           context = NONE;
         } else if (context == MONITOR) {
           if (strcmp(val, "window_ms") == 0 ||
-              strcmp(val, "state_sampling_ms") == 0)
+              strcmp(val, "state_sampling_ms") == 0) {
+            // Free previous key if any
+            if (last_key) {
+              g_free(last_key);
+            }
             last_key = g_strdup(val);
-          else {
-            if (last_key && strcmp(last_key, "window_ms") == 0)
+          } else if (last_key) {
+            // This is a value for the last key
+            if (strcmp(last_key, "window_ms") == 0) {
               config->window_ms = (uint32_t)atoi(val);
-            else if (last_key && strcmp(last_key, "state_sampling_ms") == 0)
+            } else if (strcmp(last_key, "state_sampling_ms") == 0) {
               config->state_sampling_ms = (uint32_t)atoi(val);
+            }
             g_free(last_key);
             last_key = NULL;
           }
         } else if (context == FEATURES) {
-          if (strcmp(val, "state") == 0)
-            context = STATE_LIST;
-          else if (strcmp(val, "event") == 0)
-            context = EVENT_LIST;
-        } else if (context == STATE_LIST || context == EVENT_LIST) {
+          if (strcmp(val, "state") == 0) {
+            features_context = STATE_LIST;
+          } else if (strcmp(val, "event") == 0) {
+            features_context = EVENT_LIST;
+          }
+        } else if (context == STATE_TASK || context == EVENT_TASK) {
+          // Handle task parsing
           if (strcmp(val, "id") == 0) {
-            context = (context == STATE_LIST) ? STATE_TASK : EVENT_TASK;
-          }
-        } else if (context == STATE_TASK) {
-          int task_id = state_task_id_from_str(val);
-          if (task_id >= 0) {
-            int* task_id_ptr = g_malloc(sizeof(int));
-            if (!task_id_ptr) {
-              log_error("Failed to allocate memory for state task ID.");
-              return EXIT_FAILURE;
-            }
-            *task_id_ptr = task_id;
-            config->state_tasks =
-                g_list_append(config->state_tasks, task_id_ptr);
+            // Next scalar will be the task ID
+            // Context remains the same
           } else {
-            log_warn("Unknown state task ID string: %s", val);
-          }
-          context = STATE_LIST;
-
-        } else if (context == EVENT_TASK) {
-          int task_id = event_task_id_from_str(val);
-          if (task_id >= 0) {
-            int* task_id_ptr = g_malloc(sizeof(int));
-            if (!task_id_ptr) {
-              log_error("Failed to allocate memory for event task ID.");
-              return EXIT_FAILURE;
+            // This should be a task ID value
+            if (context == STATE_TASK) {
+              int task_id = state_task_id_from_str(val);
+              log_debug("Parsed state task ID: %s", val);
+              if (task_id >= 0) {
+                int* task_id_ptr = g_malloc(sizeof(int));
+                if (!task_id_ptr) {
+                  log_error("Failed to allocate memory for state task ID.");
+                  if (last_key)
+                    g_free(last_key);
+                  (void)fclose(file);
+                  yaml_parser_delete(&parser);
+                  return EXIT_FAILURE;
+                }
+                *task_id_ptr = task_id;
+                config->state_tasks =
+                    g_list_append(config->state_tasks, task_id_ptr);
+                log_debug("Added state task ID: %d", task_id);
+              } else {
+                log_warn("Unknown state task ID string: %s", val);
+              }
+            } else if (context == EVENT_TASK) {
+              int task_id = event_task_id_from_str(val);
+              log_debug("Parsed event task ID: %s", val);
+              if (task_id >= 0) {
+                int* task_id_ptr = g_malloc(sizeof(int));
+                if (!task_id_ptr) {
+                  log_error("Failed to allocate memory for event task ID.");
+                  if (last_key)
+                    g_free(last_key);
+                  (void)fclose(file);
+                  yaml_parser_delete(&parser);
+                  return EXIT_FAILURE;
+                }
+                *task_id_ptr = task_id;
+                config->event_tasks =
+                    g_list_append(config->event_tasks, task_id_ptr);
+                log_debug("Added event task ID: %d", task_id);
+              } else {
+                log_warn("Unknown event task ID string: %s", val);
+              }
             }
-            *task_id_ptr = task_id;
-            config->event_tasks =
-                g_list_append(config->event_tasks, task_id_ptr);
-          } else {
-            log_warn("Unknown event task ID string: %s", val);
           }
-          context = EVENT_LIST;
+        } else if (features_context == STATE_LIST && in_sequence) {
+          // We're in a state sequence item
+          if (strcmp(val, "id") == 0) {
+            context = STATE_TASK;
+          }
+        } else if (features_context == EVENT_LIST && in_sequence) {
+          // We're in an event sequence item
+          if (strcmp(val, "id") == 0) {
+            context = EVENT_TASK;
+          }
         }
+
         break;
       }
 
+      case YAML_MAPPING_START_EVENT:
+        // Handle mapping start - could be entering a task definition
+        if (features_context == STATE_LIST && in_sequence) {
+          context = STATE_TASK;
+        } else if (features_context == EVENT_LIST && in_sequence) {
+          context = EVENT_TASK;
+        }
+        break;
+
       case YAML_MAPPING_END_EVENT:
-        if (context == MONITOR || context == STATE_TASK ||
-            context == EVENT_TASK)
+        // Reset context when mapping ends
+        if (context == MONITOR) {
           context = NONE;
+        } else if (context == FEATURES) {
+          features_context = FEATURES_NONE;
+          context = NONE;
+        } else if (context == STATE_TASK || context == EVENT_TASK) {
+          // Stay in features context, but reset task context
+          context = FEATURES;
+        }
         break;
 
       default:
         break;
     }
 
-    if (event.type != YAML_STREAM_END_EVENT)
+    if (event.type != YAML_STREAM_END_EVENT) {
       yaml_event_delete(&event);
-    else
+    } else {
       break;
+    }
+  }
+
+  if (last_key) {
+    g_free(last_key);
   }
 
   yaml_event_delete(&event);

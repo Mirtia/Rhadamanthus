@@ -1,9 +1,9 @@
 # Which Xen domain (domain name) to attach to (LibVMI)
-domain_name: "ubuntu-20-04"
+domain_name: "test-domain"
 
 # How long the entire introspection window should last (in seconds)
 monitor:
-  window_ms: 3000
+  window_ms: 5000
   state_sampling_ms: 1000
 
 # Which detection services to dispatch.
@@ -18,4 +18,4 @@ features:
     - id: STATE_NETWORK_TRACE # Another state‐polling task
 
   event:
-    - id: EVENT_CR0_WRITE
+    - id: EVENT_CR0_WRITE # Event-driven task

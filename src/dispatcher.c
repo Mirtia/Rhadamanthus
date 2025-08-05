@@ -4,41 +4,41 @@
 const char* state_task_id_to_str(state_task_id_t task_id) {
   switch (task_id) {
     case STATE_KERNEL_MODULE_LIST:
-      return "KERNEL_MODULE_LIST";
+      return "STATE_KERNEL_MODULE_LIST";
     case STATE_FTRACE_HOOKS:
-      return "FTRACE_HOOKS";
+      return "STATE_FTRACE_HOOKS";
     case STATE_NETWORK_TRACE:
-      return "NETWORK_TRACE";
+      return "STATE_NETWORK_TRACE";
     case STATE_SYSCALL_TABLE:
-      return "SYSCALL_TABLE";
+      return "STATE_SYSCALL_TABLE";
     case STATE_IDT_TABLE:
-      return "IDT_TABLE";
+      return "STATE_IDT_TABLE";
     case STATE_DIR_STRING_MATCHING:
-      return "DIR_STRING_MATCHING";
+      return "STATE_DIR_STRING_MATCHING";
     case STATE_PROCESS_LIST:
-      return "PROCESS_LIST";
+      return "STATE_PROCESS_LIST";
     case STATE_PROCFS_ARTIFACTS:
-      return "PROCFS_ARTIFACTS";
+      return "STATE_PROCFS_ARTIFACTS";
     case STATE_NETFILTER_HOOKS:
-      return "NETFILTER_HOOKS";
+      return "STATE_NETFILTER_HOOKS";
     case STATE_KERNEL_THREADS:
-      return "KERNEL_THREADS";
+      return "STATE_KERNEL_THREADS";
     case STATE_KPROBES_JPROBES_KRETPROBES:
-      return "KPROBES_JPROBES_KRETPROBES";
+      return "STATE_KPROBES_JPROBES_KRETPROBES";
     case STATE_MSR_REGISTERS:
-      return "MSR_REGISTERS";
+      return "STATE_MSR_REGISTERS";
     case STATE_KERNEL_CODE_INTEGRITY_CHECK:
-      return "KERNEL_CODE_INTEGRITY_CHECK";
+      return "STATE_KERNEL_CODE_INTEGRITY_CHECK";
     case STATE_EBPF_ARTIFACTS:
-      return "EBPF_ARTIFACTS";
+      return "STATE_EBPF_ARTIFACTS";
     case STATE_IO_URING_ARTIFACTS:
-      return "IO_URING_ARTIFACTS";
+      return "STATE_IO_URING_ARTIFACTS";
     case STATE_CREDENTIALS:
-      return "CREDENTIALS";
+      return "STATE_CREDENTIALS";
     case STATE_KALLSYMS_SYMBOLS:
-      return "KALLSYMS_SYMBOLS";
+      return "STATE_KALLSYMS_SYMBOLS";
     case STATE_FIRMWARE_ACPI_HOOKS:
-      return "FIRMWARE_ACPI_HOOKS";
+      return "STATE_FIRMWARE_ACPI_HOOKS";
     default:
       log_error("Unknown state task with code: %d", task_id);
       return NULL;
@@ -48,29 +48,29 @@ const char* state_task_id_to_str(state_task_id_t task_id) {
 const char* event_task_id_to_str(event_task_id_t task_id) {
   switch (task_id) {
     case EVENT_FTRACE_PATCHING:
-      return "FTRACE_PATCHING";
+      return "EVENT_FTRACE_PATCHING";
     case EVENT_SYSCALL_TABLE_WRITE:
-      return "SYSCALL_TABLE_WRITE";
+      return "EVENT_SYSCALL_TABLE_WRITE";
     case EVENT_IDT_ENTRY_MODIFICATION:
-      return "IDT_ENTRY_MODIFICATION";
+      return "EVENT_IDT_ENTRY_MODIFICATION";
     case EVENT_CR0_WRITE:
-      return "CR0_WRITE";
+      return "EVENT_CR0_WRITE";
     case EVENT_PAGE_TABLE_MODIFICATION:
-      return "PAGE_TABLE_MODIFICATION";
+      return "EVENT_PAGE_TABLE_MODIFICATION";
     case EVENT_NETFILTER_HOOK_WRITE:
-      return "NETFILTER_HOOK_WRITE";
+      return "EVENT_NETFILTER_HOOK_WRITE";
     case EVENT_MSR_WRITE:
-      return "MSR_WRITE";
+      return "EVENT_MSR_WRITE";
     case EVENT_CODE_SECTION_MODIFY:
-      return "CODE_SECTION_MODIFY";
+      return "EVENT_CODE_SECTION_MODIFY";
     case EVENT_INTROSPECTION_INTEGRITY:
-      return "INTROSPECTION_INTEGRITY";
+      return "EVENT_INTROSPECTION_INTEGRITY";
     case EVENT_IO_URING_RING_WRITE:
-      return "IO_URING_RING_WRITE";
+      return "EVENT_IO_URING_RING_WRITE";
     case EVENT_EBPF_MAP_UPDATE:
-      return "EBPF_MAP_UPDATE";
+      return "EVENT_EBPF_MAP_UPDATE";
     case EVENT_KALLSYMS_TABLE_WRITE:
-      return "KALLSYMS_TABLE_WRITE";
+      return "EVENT_KALLSYMS_TABLE_WRITE";
     default:
       log_error("Unknown event task with code: %d", task_id);
       return NULL;
@@ -111,7 +111,7 @@ dispatcher_t* dispatcher_initialize(vmi_instance_t vmi, uint32_t window_ms,
   // Contrast with g_malloc0(), which aborts the program on failure.
   // See: https://docs.gtk.org/glib/func.try_malloc0.html
   dispatcher_t* dispatcher = g_malloc0(sizeof(dispatcher_t));
-  
+
   if (vmi == NULL) {
     log_error("The provided VMI instance is NULL.");
     g_free(dispatcher);
