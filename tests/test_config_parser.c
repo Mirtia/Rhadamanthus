@@ -24,11 +24,8 @@ static void test_parse_valid_config(void** state) {
   assert_int_equal(config.window_ms, 5000);
   assert_int_equal(config.state_sampling_ms, 1000);
 
-  // assert_non_null(config.state_tasks);
-  // assert_non_null(config.event_tasks);
-  log_debug("State tasks: %d, Event tasks: %d",
-            g_list_length(config.state_tasks),
-            g_list_length(config.event_tasks));
+  assert_non_null(config.state_tasks);
+  assert_non_null(config.event_tasks);
 
   assert_int_equal(g_list_length(config.state_tasks), 2);
   assert_int_equal(g_list_length(config.event_tasks), 1);
