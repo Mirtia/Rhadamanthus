@@ -18,6 +18,7 @@ add_library(vmi_dispatcher STATIC
     src/dispatcher.c
     src/config_parser.c
     src/serializer.c
+    src/callback_handler.c
     src/state_callbacks/module_list.c
     src/event_callbacks/cr0_write.c
 )
