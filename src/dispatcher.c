@@ -300,8 +300,16 @@ static gpointer state_loop_thread(gpointer data) {
       break;
     }
 
-    // Acquire the VM mutex once to ensure a consistent state across all callbacks.
+    // Acquire the VM mutex, the thread event loop will wait for the mutex before handling events.
     g_mutex_lock(&dispatcher->vm_mutex);
+    // After acquiring the mutex, we pause the VM to collect state features.
+    if (VMI_FAILURE == vmi_pause_vm(dispatcher->vmi)) {
+      // Under normal circumastances, it should not fail. If the domain is not in
+      // a state that can be paused, we log an error and exit.
+      log_error("Failed to pause the VM for state sampling.");
+      g_mutex_unlock(&dispatcher->vm_mutex);
+      exit(EXIT_FAILURE);
+    }
 
     for (int i = 0; i < STATE_TASK_ID_MAX; ++i) {
       state_task_t* task = dispatcher->state_tasks[i];
@@ -314,6 +322,12 @@ static gpointer state_loop_thread(gpointer data) {
       task->last_invoked_time = loop_start_ms;
     }
 
+    if (VMI_FAILURE == vmi_resume_vm(dispatcher->vmi)) {
+      // See: https://github.com/libvmi/libvmi/issues/621
+      log_error("Failed to resume the VM after state sampling.");
+      g_mutex_unlock(&dispatcher->vm_mutex);
+      exit(EXIT_FAILURE);
+    }
     g_mutex_unlock(&dispatcher->vm_mutex);
 
     // Compute how long the loop iteration took.
@@ -376,7 +390,7 @@ static gpointer event_worker_thread(gpointer data) {
     // item->task->callback(dispatcher->vmi, &item->event);
     event_response_t response =
         item->task->filter.callback(dispatcher->vmi, &item->event);
-        
+
     if (response != VMI_SUCCESS) {
       log_error("Event task %s callback failed with response: %d",
                 event_task_id_to_str(item->task->id), response);
