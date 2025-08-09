@@ -236,7 +236,6 @@ void dispatcher_start_state_loop(dispatcher_t* dispatcher) {
     return;
   }
 
-  // Create and start the state loop thread.
   dispatcher->state_thread =
       g_thread_new("state_loop", (GThreadFunc)state_loop_thread, dispatcher);
 }
@@ -247,7 +246,6 @@ void dispatcher_start_event_loop(dispatcher_t* dispatcher) {
     return;
   }
 
-  // Create and start the event loop thread.
   dispatcher->event_thread =
       g_thread_new("event_loop", (GThreadFunc)event_loop_thread, dispatcher);
 }
