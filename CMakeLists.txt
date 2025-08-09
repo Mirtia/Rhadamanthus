@@ -14,13 +14,17 @@ find_package(log.c REQUIRED)
 find_package(yaml REQUIRED)
 find_package(CMocka REQUIRED)
 
+file(GLOB STATE_CALLBACKS "src/state_callbacks/*.c")
+file(GLOB EVENT_CALLBACKS "src/event_callbacks/*.c")
+
 add_library(vmi_event_handler STATIC
     src/event_handler.c
     src/config_parser.c
     src/serializer.c
     src/callback_handler.c
-    src/state_callbacks/kernel_module_list.c
-    src/event_callbacks/cr0_write.c
+    src/state_task_map.c
+    ${STATE_CALLBACKS}
+    ${EVENT_CALLBACKS}
 )
 
 target_include_directories(vmi_event_handler PUBLIC

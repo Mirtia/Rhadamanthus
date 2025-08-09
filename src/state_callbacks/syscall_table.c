@@ -3,6 +3,12 @@
 #include <inttypes.h>
 #include <log.h>
 
+/**
+ * @brief Cleans up the syscall index array.
+ * 
+ * @param sys_index The syscall index array to clean up.  
+ * @param count The number of entries in the syscall index array.
+ */
 static void cleanup_sys_index(char** sys_index, size_t count) {
   for (size_t i = 0; i < count; ++i) {
     g_free(sys_index[i]);
@@ -10,6 +16,12 @@ static void cleanup_sys_index(char** sys_index, size_t count) {
   g_free(sys_index);
 }
 
+/**
+ * @brief Parses the syscall index file to extract syscall names and their indices.
+ * 
+ * @param out_count Pointer to store the number of syscalls parsed.
+ * @return char** An array of syscall names, or NULL on failure.
+ */
 static char** parse_syscall_index_file(size_t* out_count) {
   FILE* file = fopen(SYSCALL_INDEX_FILE, "r");
   if (!file) {
