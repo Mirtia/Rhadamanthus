@@ -85,18 +85,24 @@ uint32_t state_syscall_table_callback(vmi_instance_t vmi, void* context) {
   addr_t kernel_start = 0, kernel_end = 0;
   int syscall_hit_count = 0;
 
-  if (!vmi_translate_ksym2v(vmi, "sys_call_table", &sys_call_table_addr)) {
+  if (vmi_translate_ksym2v(vmi, "sys_call_table", &sys_call_table_addr) ==
+      VMI_FAILURE) {
     log_error("Failed to resolve sys_call_table.");
     cleanup_sys_index(sys_index, syscall_number);
     return VMI_FAILURE;
   }
 
-  if (!vmi_translate_ksym2v(vmi, "_stext", &kernel_start) ||
-      !vmi_translate_ksym2v(vmi, "_etext", &kernel_end)) {
+  log_info("sys_call_table address: 0x%" PRIx64, sys_call_table_addr);
+
+  if ((vmi_translate_ksym2v(vmi, "_stext", &kernel_start) == VMI_FAILURE ||
+       vmi_translate_ksym2v(vmi, "_etext", &kernel_end) == VMI_FAILURE)) {
     log_error("Failed to resolve kernel .text boundaries.");
     cleanup_sys_index(sys_index, syscall_number);
     return VMI_FAILURE;
   }
+
+  log_info("Kernel .text range: 0x%" PRIx64 " - 0x%" PRIx64, kernel_start,
+           kernel_end);
 
   for (size_t i = 0; i < syscall_number; ++i) {
     if (vmi_read_addr_va(vmi, sys_call_table_addr + i * sizeof(addr_t), 0,

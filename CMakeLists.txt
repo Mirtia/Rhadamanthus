@@ -73,10 +73,22 @@ target_link_libraries(test_config_parser
     cmocka::cmocka
 )
 
+add_executable(test_state_callbacks_syscall_table
+    tests/test_state_callbacks_syscall_table.c
+)
+
+target_link_libraries(test_state_callbacks_syscall_table
+    vmi_event_handler
+    ${GLIB2_LIBRARIES}
+    log.c::log.c
+    cmocka::cmocka
+)
+
 add_test(NAME ConfigParserTest COMMAND test_config_parser)
 add_test(NAME EventHandlerTest COMMAND test_event_handler)
+add_test(NAME StateCallbacksSyscallTableTest COMMAND test_state_callbacks_syscall_table)
 
 add_compile_definitions(TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/data")
-add_compile_definitions(SYSCALL_INDEX_FILE="${CMAKE_CURRENT_SOURCE_DIR}/tests/data/syscall_index.linux")
+add_compile_definitions(SYSCALL_INDEX_FILE="${CMAKE_CURRENT_SOURCE_DIR}/data/syscall_index.linux")
 
 install(TARGETS introspector DESTINATION bin)
