@@ -67,7 +67,7 @@ event_handler_t* event_handler_initialize_from_config(const char* config_path) {
     event_task_id_t task_id = GPOINTER_TO_INT(list_iter->data);
     // TODO: actual event filter
     // Mapping from task_id to a filter should be done here.
-    vmi_event_t* event = g_malloc0(sizeof(vmi_event_t));
+    vmi_event_t* event = g_new0(vmi_event_t, 1);
     event_handler_register_event_task(event_handler, task_id, event, NULL);
   }
 

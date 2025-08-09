@@ -118,7 +118,7 @@ event_handler_t* event_handler_initialize(vmi_instance_t vmi,
   // Note: Attempts to allocate n_bytes, initialized to 0’s, and returns NULL on failure.
   // Contrast with g_malloc0(), which aborts the program on failure.
   // See: https://docs.gtk.org/glib/func.try_malloc0.html
-  event_handler_t* event_handler = g_malloc0(sizeof(event_handler_t));
+  event_handler_t* event_handler = g_new0(event_handler_t, 1);
 
   event_handler->window_ms = window_ms;
   event_handler->state_sampling_ms = state_sampling_ms;
@@ -154,7 +154,7 @@ void event_handler_free(event_handler_t* event_handler) {
   for (int i = 0; i < EVENT_TASK_ID_MAX; ++i) {
     event_task_t* task = event_handler->event_tasks[i];
     if (task) {
-      vmi_clear_event(event_handler->vmi, task->event, NULL);
+      vmi_clear_event(event_handler->vmi, &task->event, NULL);
       // Note: The event is removed from hashtables internal to LibVMI,
       // but the memory related to the vmi_event_t is not freed
       // Memory management remains the responsibility of the caller.
@@ -181,7 +181,7 @@ void event_handler_register_state_task(event_handler_t* event_handler,
     return;
   }
 
-  state_task_t* task = g_malloc0(sizeof(state_task_t));
+  state_task_t* task = g_new0(state_task_t, 1);
 
   task->id = task_id;
   task->functor = functor;
@@ -211,7 +211,7 @@ void event_handler_register_event_task(
     return;
   }
 
-  event_task_t* task = g_malloc0(sizeof(event_task_t));
+  event_task_t* task = g_new0(event_task_t, 1);
 
   task->id = task_id;
   task->event = event;
