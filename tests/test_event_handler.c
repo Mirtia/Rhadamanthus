@@ -20,6 +20,7 @@ static void test_event_handler_creation_invalid(void** state) {
       event_handler_initialize(NULL, 1000, 100);
   // Since the vmi instance passed is null, so is the return value of the `event_handler_initialize` function.
   assert_null(event_handler_invalid);
+  event_handler_free(event_handler_invalid);
 }
 
 static void test_event_handler_creation_valid(void** state) {
@@ -53,6 +54,7 @@ static void test_event_handler_creation_valid(void** state) {
   }
 
   assert_null(event_handler_valid->event_thread);
+  event_handler_free(event_handler_valid);
 }
 
 int main(void) {
