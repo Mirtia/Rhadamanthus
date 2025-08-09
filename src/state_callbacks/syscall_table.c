@@ -3,7 +3,7 @@
 #include <inttypes.h>
 #include <log.h>
 
-static inline void cleanup_sys_index(char** sys_index, size_t count) {
+static void cleanup_sys_index(char** sys_index, size_t count) {
   for (size_t i = 0; i < count; ++i) {
     g_free(sys_index[i]);
   }
