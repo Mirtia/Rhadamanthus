@@ -12,7 +12,6 @@ class VMIExamplesConan(ConanFile):
     generators = "CMakeDeps", "CMakeToolchain"
     requires = (
         "cjson/1.7.18",
-        "glib/2.81.0",
         "log.c/cci.20200620",
         "libyaml/0.2.5",
         "cmocka/1.1.8"
