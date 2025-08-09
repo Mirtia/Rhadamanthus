@@ -30,7 +30,7 @@ static void test_parse_valid_config(void** state) {
   assert_int_equal(g_list_length(config.state_tasks), 2);
   assert_int_equal(g_list_length(config.event_tasks), 1);
 
-  // config_free(&config);
+  config_free(&config);
 }
 
 int main(void) {

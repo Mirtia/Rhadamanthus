@@ -1,4 +1,4 @@
-.PHONY: vmi clean build test
+.PHONY: vmi clean build test single_test
 
 clean:
 	rm -rf build
@@ -9,3 +9,7 @@ build:
 
 test: build
 	cd build && sudo -E ctest --output-on-failure --verbose
+
+single_test: build
+	# e.g. DispatcherTest
+	cd build && sudo -E ctest --output-on-failure --verbose -R '$(TEST)'

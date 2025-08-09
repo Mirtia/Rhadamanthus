@@ -14,21 +14,21 @@ find_package(log.c REQUIRED)
 find_package(yaml REQUIRED)
 find_package(CMocka REQUIRED)
 
-add_library(vmi_dispatcher STATIC
-    src/dispatcher.c
+add_library(vmi_event_handler STATIC
+    src/event_handler.c
     src/config_parser.c
     src/serializer.c
     src/callback_handler.c
-    src/state_callbacks/module_list.c
+    src/state_callbacks/kernel_module_list.c
     src/event_callbacks/cr0_write.c
 )
 
-target_include_directories(vmi_dispatcher PUBLIC
+target_include_directories(vmi_event_handler PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
     ${GLIB2_INCLUDE_DIRS}
 )
 
-target_link_libraries(vmi_dispatcher
+target_link_libraries(vmi_event_handler
     ${GLIB2_LIBRARIES}
     yaml
     cjson::cjson
@@ -36,23 +36,23 @@ target_link_libraries(vmi_dispatcher
     vmi
 )
 
-target_compile_options(vmi_dispatcher PRIVATE ${GLIB2_CFLAGS_OTHER})
+target_compile_options(vmi_event_handler PRIVATE ${GLIB2_CFLAGS_OTHER})
 
 add_executable(introspector src/main.c)
 
 target_link_libraries(introspector
-    vmi_dispatcher
+    vmi_event_handler
 )
 
 # Tests
 enable_testing()
 
-add_executable(test_dispatcher
-    tests/test_dispatcher.c
+add_executable(test_event_handler
+    tests/test_event_handler.c
 )
 
-target_link_libraries(test_dispatcher
-    vmi_dispatcher
+target_link_libraries(test_event_handler
+    vmi_event_handler
     ${GLIB2_LIBRARIES}
     log.c::log.c
     cmocka::cmocka
@@ -63,14 +63,14 @@ add_executable(test_config_parser
 )
 
 target_link_libraries(test_config_parser
-    vmi_dispatcher
+    vmi_event_handler
     ${GLIB2_LIBRARIES}
     log.c::log.c
     cmocka::cmocka
 )
 
-add_test(NAME DispatcherTest COMMAND test_dispatcher)
 add_test(NAME ConfigParserTest COMMAND test_config_parser)
+add_test(NAME EventHandlerTest COMMAND test_event_handler)
 
 add_compile_definitions(TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/data")
 

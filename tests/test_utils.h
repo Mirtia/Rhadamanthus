@@ -7,7 +7,7 @@
 #define TEST_UTILS_H
 #include <libvmi/events.h>
 #include <libvmi/libvmi.h>
-#include "dispatcher.h"
+#include "event_handler.h"
 
 /**
  * @brief 
@@ -38,10 +38,10 @@ void mock_task_callback_event_task(vmi_instance_t vmi, vmi_event_t* event);
 void mock_task_callback_state_task(vmi_instance_t vmi, vmi_event_t* event);
 
 /**
- * @brief This function is responsible for registering the mock tasks at the dispatcher.
+ * @brief This function is responsible for registering the mock tasks at the event_handler.
  * 
- * @param dispatcher The dispatcher instance where the mock tasks will be registered.
+ * @param event_handler The event_handler instance where the mock tasks will be registered.
  */
-void register_mock_tasks(dispatcher_t* dispatcher);
+void register_mock_tasks(event_handler_t* event_handler);
 
 #endif  // TEST_UTILS_H

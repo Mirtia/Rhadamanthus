@@ -1,7 +1,7 @@
 #ifndef CALLBACK_HANDLER_H
 #define CALLBACK_HANDLER_H
 
-#include "dispatcher.h"
+#include "event_handler.h"
 
 // Type definitions for state and event task IDs.
 typedef uint32_t (*state_task_callback_t)(vmi_instance_t, void*);

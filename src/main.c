@@ -3,7 +3,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include "dispatcher.h"
+#include "event_handler.h"
 #include "config_parser.h"
 
 /**
@@ -44,27 +44,18 @@ int main(int argc, char** argv) {
     return EXIT_FAILURE;
   }
 
-  dispatcher_t* dispatcher = dispatcher_initialize_from_config(config_path);
-  if (!dispatcher) {
-    log_error("Failed to initialize dispatcher from config file.");
+  event_handler_t* event_handler = event_handler_initialize_from_config(config_path);
+  if (!event_handler) {
+    log_error("Failed to initialize event_handler from config file.");
     return EXIT_FAILURE;
   }
 
-  dispatcher_start_event_loop(dispatcher);
-  dispatcher_start_event_worker(dispatcher);
-  dispatcher_start_state_loop(dispatcher);
+  event_handler_start_event_loop(event_handler);
 
-  // Join all threads to ensure they complete before exiting.
-  if (dispatcher->state_thread) {
-    g_thread_join(dispatcher->state_thread);
-  }
-  if (dispatcher->event_thread) {
-    g_thread_join(dispatcher->event_thread);
-  }
-  if (dispatcher->event_worker_thread) {
-    g_thread_join(dispatcher->event_worker_thread);
+  if (event_handler->event_thread) {
+    g_thread_join(event_handler->event_thread);
   }
 
-  dispatcher_free(dispatcher);
+  event_handler_free(event_handler);
   return EXIT_SUCCESS;
 }

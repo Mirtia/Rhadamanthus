@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <yaml.h>
-#include "dispatcher.h"
+#include "event_handler.h"
 
 void config_free(config_t* config) {
   if (!config) {
@@ -20,7 +20,7 @@ void config_free(config_t* config) {
   memset(config, 0, sizeof(config_t));
 }
 
-dispatcher_t* dispatcher_initialize_from_config(const char* config_path) {
+event_handler_t* event_handler_initialize_from_config(const char* config_path) {
   if (!config_path) {
     log_error("Config path provided is NULL.");
     return NULL;
@@ -45,10 +45,10 @@ dispatcher_t* dispatcher_initialize_from_config(const char* config_path) {
     return NULL;
   }
 
-  dispatcher_t* dispatcher =
-      dispatcher_initialize(vmi, config.window_ms, config.state_sampling_ms);
-  if (!dispatcher) {
-    log_error("Failed to allocate dispatcher.");
+  event_handler_t* event_handler =
+      event_handler_initialize(vmi, config.window_ms, config.state_sampling_ms);
+  if (!event_handler) {
+    log_error("Failed to allocate event_handler.");
     vmi_destroy(vmi);
     g_free(config.domain_name);
     return NULL;
@@ -57,9 +57,9 @@ dispatcher_t* dispatcher_initialize_from_config(const char* config_path) {
   for (GList* list_iter = config.state_tasks; list_iter != NULL;
        list_iter = list_iter->next) {
     state_task_id_t task_id = GPOINTER_TO_INT(list_iter->data);
-    // TODO: real callback
+    // TODO: real functor assignment, map from task_id to functor.
     // Mapping from task_id to a callback function should be done here.
-    dispatcher_register_state_task(dispatcher, task_id, NULL, NULL);
+    event_handler_register_state_task(event_handler, task_id, NULL);
   }
 
   for (GList* list_iter = config.event_tasks; list_iter != NULL;
@@ -67,8 +67,8 @@ dispatcher_t* dispatcher_initialize_from_config(const char* config_path) {
     event_task_id_t task_id = GPOINTER_TO_INT(list_iter->data);
     // TODO: actual event filter
     // Mapping from task_id to a filter should be done here.
-    vmi_event_t filter = {0};
-    dispatcher_register_event_task(dispatcher, task_id, filter, NULL);
+    vmi_event_t* event = g_malloc0(sizeof(vmi_event_t));
+    event_handler_register_event_task(event_handler, task_id, event, NULL);
   }
 
   // Free config resources.
@@ -76,7 +76,7 @@ dispatcher_t* dispatcher_initialize_from_config(const char* config_path) {
   g_list_free(config.event_tasks);
   g_free(config.domain_name);
 
-  return dispatcher;
+  return event_handler;
 }
 
 static char* dup_scalar(yaml_event_t* event) {

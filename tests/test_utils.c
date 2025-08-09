@@ -1,8 +1,8 @@
 #include "test_utils.h"
 #include <log.h>
-#include "dispatcher.h"
+#include "event_handler.h"
 
-void register_mock_tasks(dispatcher_t* dispatcher) {
+void register_mock_tasks(event_handler_t* event_handler) {
   // This function registers some events and tasks.
   log_info("Mock tasks registered.");
   // The state task can be simply mocked as it does not require a trigger mechanism like events.

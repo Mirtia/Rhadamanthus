@@ -3,7 +3,7 @@
 
 #include <glib.h>
 #include <stdint.h>
-#include "dispatcher.h"
+#include "event_handler.h"
 
 /**
  * @brief Configuration structure for storing values from configuration file.
@@ -28,16 +28,16 @@ typedef struct config_t config_t;
 void config_free(config_t* config);
 
 /**
- * @brief Initializes the dispatcher with configuration settings from a YAML file.
+ * @brief Initializes the event_handler with configuration settings from a YAML file.
  *
  * This function parses a YAML configuration file to set up the LibVMI domain,
  * introspection window, and the registered state/event tasks. It initializes
- * the dispatcher and its associated threads.
+ * the event_handler and its associated threads.
  *
  * @param config_path The absolute or relative path to the YAML configuration file.
- * @return dispatcher_t* Pointer to the initialized dispatcher on success,
+ * @return event_handler_t* Pointer to the initialized event_handler on success,
  */
-dispatcher_t* dispatcher_initialize_from_config(const char* config_path);
+event_handler_t* event_handler_initialize_from_config(const char* config_path);
 
 /**
  * @brief Parses a YAML configuration file and populates the `config_t` structure.
