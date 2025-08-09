@@ -65,8 +65,8 @@ event_handler_t* event_handler_initialize_from_config(const char* config_path) {
   for (GList* list_iter = config.event_tasks; list_iter != NULL;
        list_iter = list_iter->next) {
     event_task_id_t task_id = GPOINTER_TO_INT(list_iter->data);
-    // TODO: actual event filter
-    // Mapping from task_id to a filter should be done here.
+    // TODO: actual event callback.
+    // Mapping from task_id to a callback should be done here.
     vmi_event_t* event = g_new0(vmi_event_t, 1);
     event_handler_register_event_task(event_handler, task_id, event, NULL);
   }

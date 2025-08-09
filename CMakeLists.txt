@@ -73,5 +73,6 @@ add_test(NAME ConfigParserTest COMMAND test_config_parser)
 add_test(NAME EventHandlerTest COMMAND test_event_handler)
 
 add_compile_definitions(TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/data")
+add_compile_definitions(SYSCALL_INDEX_FILE="${CMAKE_CURRENT_SOURCE_DIR}/tests/data/syscall_index.linux")
 
 install(TARGETS introspector DESTINATION bin)

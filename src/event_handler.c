@@ -154,9 +154,8 @@ void event_handler_free(event_handler_t* event_handler) {
     if (task) {
       vmi_clear_event(event_handler->vmi, task->event, NULL);
       // Note: The event is removed from hashtables internal to LibVMI,
-      // but the memory related to the vmi_event_t is not freed
+      // but the memory related to the vmi_event_t is not freed.
       // Memory management remains the responsibility of the caller.
-      // TODO: Free nested resources.
       g_free(task->event);
       g_free(task);
     }
@@ -275,7 +274,7 @@ void sample_state_tasks(event_handler_t* event_handler) {
     return;
   }
 
-  // TODO: State sampling if accessing separate kernel data structures could be split to threads.
+  // TODO (improvement): State sampling if accessing separate kernel data structures could be split to threads.
   // This would definitely be a performance issue.
   for (int i = 0; i < STATE_TASK_ID_MAX; ++i) {
     state_task_t* task = event_handler->state_tasks[i];

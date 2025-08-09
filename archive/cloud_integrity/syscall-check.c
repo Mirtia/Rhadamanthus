@@ -14,7 +14,7 @@ int introspect_syscall_check(const char *domain_name) {
   int _index[256];
 
   FILE *_file;
-  // TODO(mirtia): Check that the syscall index is correct.
+  // TODO: Check that the syscall index is correct.
   _file = fopen("data/syscall_index.linux", "r");
   if (!_file) {
     printf("Failed to open file.\n");
