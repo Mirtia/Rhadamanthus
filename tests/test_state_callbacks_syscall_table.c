@@ -10,7 +10,7 @@
 static void test_syscall_table_callback(void** state) {
   (void)state;
 
-  const char* domain_name = "ubuntu-20-04";
+  const char* domain_name = "ubuntu-20-04-dbg";
   vmi_instance_t vmi = {0};
 
   if (VMI_FAILURE == vmi_init_complete(&vmi, domain_name, VMI_INIT_DOMAINNAME,

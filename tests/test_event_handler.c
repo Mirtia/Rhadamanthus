@@ -28,7 +28,7 @@ static void test_event_handler_creation_valid(void** state) {
   // Create a valid vmi instance, domain_name should already be defined in the test setup.
   // TODO: Have a setup script for setting up XEN vms and snapshots.
   vmi_instance_t vmi = {0};
-  const char* domain_name = "ubuntu-20-04";
+  const char* domain_name = "ubuntu-20-04-dbg";
   if (VMI_FAILURE == vmi_init_complete(&vmi, domain_name, VMI_INIT_DOMAINNAME,
                                        NULL, VMI_CONFIG_GLOBAL_FILE_ENTRY, NULL,
                                        NULL)) {

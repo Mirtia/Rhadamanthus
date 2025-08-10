@@ -1,16 +1,16 @@
-#include <cmocka.h>
-#include <libvmi/libvmi.h>
-#include <log.h>
 #include <setjmp.h>
 #include <stdarg.h>
 #include <stddef.h>
+#include <cmocka.h>
+#include <libvmi/libvmi.h>
+#include <log.h>
 
 #include "state_callbacks/kernel_module_list.h"
 
 static void test_kernel_module_list_callback(void** state) {
   (void)state;
 
-  const char* domain_name = "ubuntu-20-04";
+  const char* domain_name = "ubuntu-20-04-dbg";
   vmi_instance_t vmi = {0};
 
   if (VMI_FAILURE == vmi_init_complete(&vmi, domain_name, VMI_INIT_DOMAINNAME,

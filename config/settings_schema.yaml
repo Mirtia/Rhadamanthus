@@ -1,5 +1,5 @@
 # Which Xen domain (domain name) to attach to (LibVMI)
-domain_name: "ubuntu-20-04"
+domain_name: "ubuntu-20-04-dbg"
 
 # How long the entire introspection window should last (in seconds)
 monitor:
