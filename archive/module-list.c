@@ -1,114 +1,103 @@
-/* The LibVMI Library is an introspection library that simplifies access to
- * memory in a target virtual machine or in a file containing a dump of
- * a system's physical memory.  LibVMI is based on the XenAccess Library.
- *
- * Copyright 2011 Sandia Corporation. Under the terms of Contract
- * DE-AC04-94AL85000 with Sandia Corporation, the U.S. Government
- * retains certain rights in this software.
- *
- * Author: Bryan D. Payne (bdpayne@acm.org)
- *
- * This file is part of LibVMI.
- *
- * LibVMI is free software: you can redistribute it and/or modify it under
- * the terms of the GNU Lesser General Public License as published by the
- * Free Software Foundation, either version 3 of the License, or (at your
- * option) any later version.
- *
- * LibVMI is distributed in the hope that it will be useful, but WITHOUT
- * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
- * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU Lesser General Public
- * License for more details.
- *
- * You should have received a copy of the GNU Lesser General Public License
- * along with LibVMI.  If not, see <http://www.gnu.org/licenses/>.
- */
-
+#include <libvmi/libvmi.h>
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/mman.h>
 
-#include <libvmi/libvmi.h>
+#define MODULE_LIST_OFF        0x08
+#define MODULE_NAME_OFF        0x18
+#define MODULE_NAME_LEN        56
+#define MODULE_CORELAYOUT_OFF  0x140
+#define MODL_BASE_OFF          0x00
+#define MODL_SIZE_OFF          0x08
+
+static int post_clean_up(vmi_instance_t vmi, int retcode) {
+    vmi_resume_vm(vmi);
+    vmi_destroy(vmi);
+    return retcode;
+}
+
+int introspect_module_list(const char *domain_name) {
+    vmi_instance_t vmi = {0};
+    addr_t list_head = 0;
+    addr_t cur_link = 0;
+
+    if (vmi_init_complete(&vmi, domain_name, VMI_INIT_DOMAINNAME, NULL,
+                          VMI_CONFIG_GLOBAL_FILE_ENTRY, NULL, NULL) == VMI_FAILURE) {
+        fprintf(stderr, "Failed to init LibVMI.\n");
+        return 1;
+    }
+
+    if (vmi_pause_vm(vmi) == VMI_FAILURE) {
+        fprintf(stderr, "Failed to pause VM.\n");
+        return post_clean_up(vmi, 1);
+    }
+
+    if (vmi_get_ostype(vmi) != VMI_OS_LINUX) {
+        fprintf(stderr, "Unsupported OS. Only Linux supported.\n");
+        return post_clean_up(vmi, 1);
+    }
+
+    // addr_t list_head = 0xffffffff8b9ce640;
+
+    if (vmi_translate_ksym2v(vmi, "modules", &list_head) == VMI_FAILURE) {
+        fprintf(stderr, "Failed to resolve address of 'modules'.\n");
+        return post_clean_up(vmi, 1);
+    }
+
+    printf("[+] modules list_head address: 0x%016" PRIx64 "\n", list_head);
+
+    cur_link = list_head;
+    size_t mod_index = 0;
+    size_t max_modules = 512;
+
+    while (mod_index++ < max_modules) {
+        addr_t next_link = 0;
+
+        if (vmi_read_addr_va(vmi, cur_link, 0, &next_link) == VMI_FAILURE) {
+            fprintf(stderr, "Failed to read next pointer at 0x%" PRIx64 ".\n", cur_link);
+            break;
+        }
+
+        if (next_link == list_head)
+            break;
+
+        addr_t mod_base = next_link - MODULE_LIST_OFF;
+        addr_t name_addr = mod_base + MODULE_NAME_OFF;
+        addr_t layout_addr = mod_base + MODULE_CORELAYOUT_OFF;
+
+        char namebuf[MODULE_NAME_LEN + 1] = {0};
+        size_t nread = 0;
+        if (vmi_read_va(vmi, name_addr, 0, MODULE_NAME_LEN, namebuf, &nread) == VMI_FAILURE || nread == 0) {
+            strncpy(namebuf, "<unreadable>", MODULE_NAME_LEN);
+        } else {
+            namebuf[MODULE_NAME_LEN] = '\0';
+        }
+
+        addr_t base = 0;
+        uint32_t size = 0;
+
+        if (vmi_read_addr_va(vmi, layout_addr + MODL_BASE_OFF, 0, &base) == VMI_FAILURE) {
+            fprintf(stderr, "Warning: could not read base of module @ 0x%" PRIx64 "\n", layout_addr);
+        }
+
+        if (vmi_read_32_va(vmi, layout_addr + MODL_SIZE_OFF, 0, &size) == VMI_FAILURE) {
+            fprintf(stderr, "Warning: could not read size of module @ 0x%" PRIx64 "\n", layout_addr);
+        }
+
+        printf("Module %3zu: %-20s  Base: 0x%016" PRIx64 "  Size: %u (0x%x)\n",
+               mod_index, namebuf[0] ? namebuf : "<noname>", base, size, size);
+
+        cur_link = next_link;
+    }
+
+    return post_clean_up(vmi, 0);
+}
 
 int main(int argc, char **argv) {
-  vmi_instance_t vmi = {0};
-  addr_t next_module = 0;
-  addr_t list_head = 0;
-  int retcode = 1;
-
-  if (argc < 2) {
-    fprintf(stderr, "Usage: %s <domain_name>", argv[0]);
-    return retcode;
-  }
-
-  // This is the VM or file that we are looking at.
-  char *name = argv[1];
-
-  // Initialize the libvmi library.
-  if (VMI_FAILURE == vmi_init_complete(&vmi, name, VMI_INIT_DOMAINNAME, NULL,
-                                       VMI_CONFIG_GLOBAL_FILE_ENTRY, NULL,
-                                       NULL)) {
-    printf("Failed to init LibVMI library.\n");
-    goto error_exit;
-  }
-
-  // Pause the vm for consistent memory access.
-  if (vmi_pause_vm(vmi) != VMI_SUCCESS) {
-    printf("Failed to pause VM.\n");
-    goto error_exit;
-  }
-
-  os_t os = vmi_get_ostype(vmi);
-  if (VMI_OS_LINUX != os) {
-    fprintf(stderr, "Unsupported OS. Only Linux supported.\n");
-    goto error_exit;
-  }
-
-  if (vmi_read_addr_ksym(vmi, "modules", &next_module) == VMI_FAILURE) {
-    fprintf(stderr, "Failed to read kernel symbol `modules`.\n");
-    goto error_exit;
-  }
-
-  list_head = next_module;
-
-  // Walk the module list.
-  while (1) {
-
-    // Follow the next pointer.
-    addr_t tmp_next = 0;
-
-    vmi_read_addr_va(vmi, next_module, 0, &tmp_next);
-
-    // If we are back at the list head, we are done.
-    if (list_head == tmp_next) {
-      break;
+    if (argc != 2) {
+        fprintf(stderr, "Usage: %s <vm_name>\n", argv[0]);
+        return 1;
     }
-
-    /* Note: the module struct that we are looking at has a string
-     * directly following the next / prev pointers.  This is why you
-     * can just add the length of 2 address fields to get the name.
-     * See include/linux/module.h for mode details
-     */
-    char *modname = NULL;
-    // 64-bit paging
-    if (VMI_PM_IA32E == vmi_get_page_mode(vmi, 0)) {
-      modname = vmi_read_str_va(vmi, next_module + 16, 0);
-    } else {
-      modname = vmi_read_str_va(vmi, next_module + 8, 0);
-    }
-    printf("%s\n", modname);
-    free(modname);
-    next_module = tmp_next;
-  }
-
-  retcode = 0;
-error_exit:
-  // Resume the vm.
-  vmi_resume_vm(vmi);
-
-  // Cleanup any memory associated with the libvmi instance.
-  vmi_destroy(vmi);
-
-  return retcode;
+    return introspect_module_list(argv[1]);
 }

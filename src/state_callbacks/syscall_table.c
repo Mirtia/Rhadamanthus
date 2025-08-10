@@ -101,7 +101,7 @@ uint32_t state_syscall_table_callback(vmi_instance_t vmi, void* context) {
     return VMI_FAILURE;
   }
 
-  log_info("Kernel .text range: 0x%" PRIx64 " - 0x%" PRIx64, kernel_start,
+  log_info(".text range: 0x%" PRIx64 " - 0x%" PRIx64, kernel_start,
            kernel_end);
 
   for (size_t i = 0; i < syscall_number; ++i) {

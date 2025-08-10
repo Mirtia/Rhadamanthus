@@ -79,3 +79,6 @@ __pycache__/
 
 # Ignore .VSCodeCounter
 .VSCodeCounter/
+
+# Ignore logs
+logs/
