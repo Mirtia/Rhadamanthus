@@ -96,13 +96,28 @@ target_link_libraries(test_state_callbacks_kernel_module_list
     cmocka::cmocka
 )
 
+
+add_executable(test_state_callbacks_idt_table
+    tests/test_state_callbacks_idt_table.c
+)
+
+target_link_libraries(test_state_callbacks_idt_table
+    vmi_event_handler
+    ${GLIB2_LIBRARIES}
+    log.c::log.c
+    cmocka::cmocka
+)
+
 add_test(NAME ConfigParserTest COMMAND test_config_parser)
 add_test(NAME EventHandlerTest COMMAND test_event_handler)
 add_test(NAME StateCallbacksSyscallTableTest COMMAND test_state_callbacks_syscall_table)
 add_test(NAME StateCallbacksKernelModuleListTest COMMAND test_state_callbacks_kernel_module_list)
+add_test(NAME StateCallbacksIdtTableTest COMMAND test_state_callbacks_idt_table)
 
 add_compile_definitions(TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/data")
 # TODO: Check that the syscall index is appropriate (matches the linux kernel version).
 add_compile_definitions(SYSCALL_INDEX_FILE="${CMAKE_CURRENT_SOURCE_DIR}/data/syscall_index.linux")
+# TODO: Check that the interrupt index is appropriate (matches the linux kernel version).
+add_compile_definitions(INTERRUPT_INDEX_FILE="${CMAKE_CURRENT_SOURCE_DIR}/data/interrupt_index.linux")
 
 install(TARGETS introspector DESTINATION bin)
