@@ -162,8 +162,10 @@ static GPtrArray* load_interrupt_index_table(const char* path) {
  */
 static bool read_idt_entry_addr_ia32e(vmi_instance_t vmi, addr_t idt_base,
                                       uint16_t vector, addr_t* out) {
-  if (!out)
+  if (!out) {
+    log_error("Output pointer is NULL in read_idt_entry_addr_ia32e.");
     return false;
+  }
 
   uint16_t off_low = 0, off_mid = 0;
   uint32_t off_high = 0;
