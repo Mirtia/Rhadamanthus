@@ -18,14 +18,6 @@ const char* state_task_id_to_str(state_task_id_t task_id) {
       return "STATE_DIR_STRING_MATCHING";
     case STATE_PROCESS_LIST:
       return "STATE_PROCESS_LIST";
-    case STATE_PROCFS_ARTIFACTS:
-      return "STATE_PROCFS_ARTIFACTS";
-    case STATE_NETFILTER_HOOKS:
-      return "STATE_NETFILTER_HOOKS";
-    case STATE_KERNEL_THREADS:
-      return "STATE_KERNEL_THREADS";
-    case STATE_KPROBES_JPROBES_KRETPROBES:
-      return "STATE_KPROBES_JPROBES_KRETPROBES";
     case STATE_MSR_REGISTERS:
       return "STATE_MSR_REGISTERS";
     case STATE_KERNEL_CODE_INTEGRITY_CHECK:
@@ -34,8 +26,6 @@ const char* state_task_id_to_str(state_task_id_t task_id) {
       return "STATE_EBPF_ARTIFACTS";
     case STATE_IO_URING_ARTIFACTS:
       return "STATE_IO_URING_ARTIFACTS";
-    case STATE_CREDENTIALS:
-      return "STATE_CREDENTIALS";
     case STATE_KALLSYMS_SYMBOLS:
       return "STATE_KALLSYMS_SYMBOLS";
     case STATE_FIRMWARE_ACPI_HOOKS:

@@ -3,6 +3,8 @@
 #include <inttypes.h>
 #include <log.h>
 
+// TODO: process_state.h (process_list.h + credentials.h + kernel_threads.h; exclude procfs_artifacts.h)
+
 uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
   (void)context;
 

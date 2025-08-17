@@ -23,15 +23,10 @@ enum state_task_id {
   STATE_DIR_STRING_MATCHING,
   STATE_PROCESS_LIST,
   // TODO: What is this? Some fields may be redundant. Object to change.
-  STATE_PROCFS_ARTIFACTS,
-  STATE_NETFILTER_HOOKS,
-  STATE_KERNEL_THREADS,
-  STATE_KPROBES_JPROBES_KRETPROBES,
   STATE_MSR_REGISTERS,
   STATE_KERNEL_CODE_INTEGRITY_CHECK,
   STATE_EBPF_ARTIFACTS,
   STATE_IO_URING_ARTIFACTS,
-  STATE_CREDENTIALS,
   STATE_KALLSYMS_SYMBOLS,
   STATE_FIRMWARE_ACPI_HOOKS,
   // TODO: Add more state tasks as needed.
@@ -40,6 +35,7 @@ enum state_task_id {
 
 /**
  * @brief Task IDs for event tasks.
+ * TODO: Remove some of those.
  */
 enum event_task_id {
   EVENT_FTRACE_PATCHING,          ///< ftrace hook detection
