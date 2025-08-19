@@ -6,6 +6,7 @@
 #include <string.h>
 #include <yaml.h>
 #include "event_handler.h"
+#include "state_task_map.h"
 
 void config_free(config_t* config) {
   if (!config) {

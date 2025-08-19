@@ -15,22 +15,20 @@
  * @brief  Task IDs for state tasks.
  */
 enum state_task_id {
-  STATE_KERNEL_MODULE_LIST,
-  STATE_FTRACE_HOOKS,
-  STATE_NETWORK_TRACE,
-  STATE_SYSCALL_TABLE,
-  STATE_IDT_TABLE,
-  STATE_DIR_STRING_MATCHING,
-  STATE_PROCESS_LIST,
-  // TODO: What is this? Some fields may be redundant. Object to change.
-  STATE_MSR_REGISTERS,
-  STATE_KERNEL_CODE_INTEGRITY_CHECK,
-  STATE_EBPF_ARTIFACTS,
-  STATE_IO_URING_ARTIFACTS,
-  STATE_KALLSYMS_SYMBOLS,
-  STATE_FIRMWARE_ACPI_HOOKS,
-  // TODO: Add more state tasks as needed.
-  STATE_TASK_ID_MAX
+  STATE_KERNEL_MODULE_LIST,   ///< List of kernel modules.
+  STATE_FTRACE_HOOKS,         ///< List of ftrace hooks.
+  STATE_NETWORK_TRACE,        ///< Network state information.
+  STATE_SYSCALL_TABLE,        ///< Syscall table information.
+  STATE_IDT_TABLE,            ///< IDT table state check (are there any hooks?).
+  STATE_DIR_STRING_MATCHING,  ///< Check directories and files of interest.
+  STATE_PROCESS_LIST,         ///< List of processes.
+  STATE_MSR_REGISTERS,  ///< MSR register state check (are there any hooks?).
+  STATE_KERNEL_CODE_INTEGRITY_CHECK,  ///< Check kernel code integrity.
+  STATE_EBPF_ARTIFACTS,               ///< eBPF programs and maps state check.
+  STATE_IO_URING_ARTIFACTS,           ///< io_uring structures state check.,
+  STATE_KALLSYMS_SYMBOLS,             ///< kallsyms symbols state check.
+  STATE_FIRMWARE_ACPI_HOOKS,  ///< ACPI hooks state check (maybe remove).
+  STATE_TASK_ID_MAX           ///< Maximum number of state tasks.
 };
 
 /**
@@ -46,12 +44,12 @@ enum event_task_id {
   EVENT_NETFILTER_HOOK_WRITE,     ///< function pointer hook detection
   EVENT_MSR_WRITE,                ///< MSR register access detection
   EVENT_CODE_SECTION_MODIFY,      ///< kernel code integrity
-  EVENT_INTROSPECTION_INTEGRITY,  ///< self-monitoring trap
+  EVENT_INTROSPECTION_INTEGRITY,  ///< self-monitoring trap (maybe remove).
   EVENT_IO_URING_RING_WRITE,      ///< io_uring structure tampering
   EVENT_EBPF_MAP_UPDATE,          ///< eBPF map or program overwrite
   EVENT_KALLSYMS_TABLE_WRITE,     ///< kallsyms or symbol hijacking
   // TODO: Add more event tasks as needed.
-  EVENT_TASK_ID_MAX
+  EVENT_TASK_ID_MAX  ///< Maximum number of event tasks.
 };
 
 // Type definitions for the event_handler and task structures

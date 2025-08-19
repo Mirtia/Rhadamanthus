@@ -6,7 +6,7 @@
  * @date 2025-08-10
  * 
  * @copyright GNU Lesser General Public License v2.1
- * @remark The implementation of this file is closely replicating the behavior of idt-check by https://github.com/tianweiz07/Cloud_Integrity 
+ * @remark The implementation of this file is closely replicating the behavior of system call table check by https://github.com/tianweiz07/Cloud_Integrity 
  * (https://github.com/tianweiz07/Cloud_Integrity/blob/master/src/syscall-check.c)
  */
 #ifndef SYSCALL_TABLE_H
