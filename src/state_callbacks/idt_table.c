@@ -13,9 +13,9 @@
  * The function consumes leading ASCII whitespace, then parses consecutive decimal digits.
  * It stops at the first non-digit and writes that position to @p *endptr (never NULL).
  *
- * @param[in]  str        Input C-string (must be non-NULL).
- * @param[out] out_value  Parsed value on success.
- * @param[out] endptr     Pointer to the first unconsumed character in @p str.
+ * @param str        Input C-string (must be non-NULL).
+ * @param out_value  Parsed value on success.
+ * @param endptr     Pointer to the first unconsumed character in @p str.
  * @return true if a valid integer in [0,255] was parsed; false otherwise.
  */
 static bool parse_uint8_dec(const char* str, uint8_t* out_value,
@@ -66,7 +66,7 @@ static bool parse_uint8_dec(const char* str, uint8_t* out_value,
  * # comment
  * @endcode
  *
- * @param[in] path  Filesystem path to the index file.
+ * @param path  Filesystem path to the index file.
  * @return A GPtrArray* of length 256 with gchar* names (owned by the array). Defaults to "unknown".
  */
 
@@ -109,13 +109,13 @@ static GPtrArray* load_interrupt_index_table(const char* path) {
       continue;  // Not a valid index; ignore line
     }
 
-    // Skip whitespace after index
     while (g_ascii_isspace(*after_idx))
       after_idx++;
 
     // Optionally, capture the next token as the name; stop at whitespace or '#'
+    // No name provided; leave as "unknown"
     if (*after_idx == '\0' || *after_idx == '#') {
-      continue;  // No name provided; leave as "unknown"
+      continue;
     }
 
     const char* name_start = after_idx;
@@ -214,7 +214,72 @@ static bool read_idt_entry_addr_ia32(vmi_instance_t vmi, addr_t idt_base,
   return true;
 }
 
-// NOLINTNEXTLINE
+/**
+ * @brief Check IDT handlers for a specific vCPU
+ *
+ * @param vmi LibVMI instance
+ * @param vcpu_id vCPU identifier
+ * @param kernel_start Start of kernel text section
+ * @param kernel_end End of kernel text section
+ * @param vec_names Array of interrupt vector names
+ * @return Number of hooked handlers detected
+ */
+static int check_idt_for_vcpu(vmi_instance_t vmi,
+                              //NOLINTNEXTLINE
+                              unsigned int vcpu_id, addr_t kernel_start,
+                              addr_t kernel_end, GPtrArray* vec_names) {
+  // Read IDTR base from specific vCPU
+  addr_t idt_base = 0;
+  if (vmi_get_vcpureg(vmi, &idt_base, IDTR_BASE, vcpu_id) != VMI_SUCCESS) {
+    log_error("Failed to read IDTR base from vCPU %u.", vcpu_id);
+    return -1;
+  }
+
+  log_info("IDTR base (vCPU %u): 0x%" PRIx64, vcpu_id, (uint64_t)idt_base);
+
+  const bool ia32e = (vmi_get_page_mode(vmi, vcpu_id) == VMI_PM_IA32E);
+  const uint16_t gate_size = ia32e ? 16 : 8;
+  const uint16_t max_vectors = 256;
+
+  int hooked = 0;
+  for (uint16_t vec = 0; vec < max_vectors; vec++) {
+    addr_t handler = 0;
+    const bool result =
+        ia32e ? read_idt_entry_addr_ia32e(vmi, idt_base, vec, &handler)
+              : read_idt_entry_addr_ia32(vmi, idt_base, vec, &handler);
+
+    if (!result) {
+      log_warn("Failed to read IDT entry %u at 0x%" PRIx64 " (vCPU %u)", vec,
+               (uint64_t)(idt_base + (addr_t)vec * gate_size), vcpu_id);
+      continue;
+    }
+
+    const char* name = (vec_names && vec < vec_names->len)
+                           ? (const char*)g_ptr_array_index(vec_names, vec)
+                           : "unknown";
+    if (!name)
+      name = "unknown";
+
+    // Only report named (non-"unknown") vectors
+    if (strcmp(name, "unknown") != 0) {
+      const bool outside_text =
+          (handler < kernel_start) || (handler > kernel_end);
+      if (outside_text) {
+        log_info(
+            "vCPU %u: Interrupt handler %s (vector %u) address changed to "
+            "0x%" PRIx64,
+            vcpu_id, name, vec, (uint64_t)handler);
+        hooked++;
+      } else {
+        log_info("vCPU %u: Vector %u (%s) handler at 0x%" PRIx64, vcpu_id, vec,
+                 name, (uint64_t)handler);
+      }
+    }
+  }
+
+  return hooked;
+}
+
 uint32_t state_idt_table_callback(vmi_instance_t vmi, void* context) {
   (void)context;
 
@@ -239,14 +304,14 @@ uint32_t state_idt_table_callback(vmi_instance_t vmi, void* context) {
   log_info("Kernel text range: [0x%" PRIx64 ", 0x%" PRIx64 "]",
            (uint64_t)kernel_start, (uint64_t)kernel_end);
 
-  // Read IDTR base from vCPU 0 (adjust if you carry per-vCPU context)
-  addr_t idt_base = 0;
-  if (vmi_get_vcpureg(vmi, &idt_base, IDTR_BASE, 0) != VMI_SUCCESS) {
-    log_error("Failed to read IDTR base from vCPU 0.");
+  // Get number of vCPUs
+  unsigned int num_vcpus = vmi_get_num_vcpus(vmi);
+  if (num_vcpus == 0) {
+    log_error("Failed to get number of vCPUs or no vCPUs available.");
     return VMI_FAILURE;
   }
 
-  log_info("IDTR base (vCPU 0): 0x%" PRIx64, (uint64_t)idt_base);
+  log_info("Checking IDT on %u vCPU(s).", num_vcpus);
 
   // Load vector names (never NULL; defaults to "unknown")
   GPtrArray* vec_names = load_interrupt_index_table(INTERRUPT_INDEX_FILE);
@@ -257,54 +322,48 @@ uint32_t state_idt_table_callback(vmi_instance_t vmi, void* context) {
         "best-effort.");
   }
 
-  const bool ia32e = (vmi_get_page_mode(vmi, 0) == VMI_PM_IA32E);
-  const uint16_t gate_size = ia32e ? 16 : 8;
-  const uint16_t max_vectors = 256;
+  int total_hooked = 0;
+  bool vcpu_inconsistency = false;
+  addr_t first_idt_base = 0;
 
-  log_info("Page mode: %s; gate size: %u; scanning %u vectors.",
-           ia32e ? "IA-32e (x86_64)" : "IA-32 (x86)", gate_size, max_vectors);
+  // Check IDT on each vCPU
+  for (unsigned int cpu = 0; cpu < num_vcpus; cpu++) {
+    int hooked =
+        check_idt_for_vcpu(vmi, cpu, kernel_start, kernel_end, vec_names);
 
-  int hooked = 0;
-  for (uint16_t vec = 0; vec < max_vectors; vec++) {
-    addr_t handler = 0;
-    const bool result =
-        ia32e ? read_idt_entry_addr_ia32e(vmi, idt_base, vec, &handler)
-              : read_idt_entry_addr_ia32(vmi, idt_base, vec, &handler);
-
-    if (!result) {
-      log_warn("Failed to read IDT entry %u at 0x%" PRIx64, vec,
-               (uint64_t)(idt_base + (addr_t)vec * gate_size));
+    if (hooked < 0) {
+      log_warn("Skipping vCPU %u due to IDT read failure.", cpu);
       continue;
     }
 
-    const char* name = (vec_names && vec < vec_names->len)
-                           ? (const char*)g_ptr_array_index(vec_names, vec)
-                           : "unknown";
-    if (!name)
-      name = "unknown";
+    total_hooked += hooked;
 
-    if (strcmp(name, "unknown") != 0) {
-      log_info("Vector %u (%s) handler at 0x%" PRIx64, vec, name,
-               (uint64_t)handler);
-    }
-
-    // Only report named (non-"unknown") vectors
-    if (strcmp(name, "unknown") != 0) {
-      const bool outside_text =
-          (handler < kernel_start) || (handler > kernel_end);
-      if (outside_text) {
-        log_info(
-            "Interrupt handler %s (vector %u) address changed to 0x%" PRIx64,
-            name, vec, (uint64_t)handler);
-        hooked++;
+    // Check for IDT base consistency across vCPUs
+    addr_t current_idt_base = 0;
+    if (vmi_get_vcpureg(vmi, &current_idt_base, IDTR_BASE, cpu) ==
+        VMI_SUCCESS) {
+      if (cpu == 0) {
+        first_idt_base = current_idt_base;
+      } else if (current_idt_base != first_idt_base) {
+        log_warn("IDT base inconsistency: vCPU %u (0x%" PRIx64
+                 ") differs from vCPU 0 (0x%" PRIx64 ")",
+                 cpu, (uint64_t)current_idt_base, (uint64_t)first_idt_base);
+        vcpu_inconsistency = true;
       }
     }
   }
 
-  if (hooked == 0) {
+  // Report findings
+  if (total_hooked == 0) {
     log_info("No unexpected interrupt handler addresses detected.");
   } else {
-    log_info("Total interrupt handlers flagged: %d", hooked);
+    log_info("Total interrupt handlers flagged across all vCPUs: %d",
+             total_hooked);
+  }
+
+  if (vcpu_inconsistency) {
+    log_warn(
+        "IDT inconsistency detected across vCPUs - possible targeted attack.");
   }
 
   if (vec_names)

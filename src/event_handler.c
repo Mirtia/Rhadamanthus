@@ -28,8 +28,6 @@ const char* state_task_id_to_str(state_task_id_t task_id) {
       return "STATE_IO_URING_ARTIFACTS";
     case STATE_KALLSYMS_SYMBOLS:
       return "STATE_KALLSYMS_SYMBOLS";
-    case STATE_FIRMWARE_ACPI_HOOKS:
-      return "STATE_FIRMWARE_ACPI_HOOKS";
     default:
       log_error("Unknown state task with code: %d", task_id);
       return NULL;

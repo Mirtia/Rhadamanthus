@@ -27,7 +27,6 @@ enum state_task_id {
   STATE_EBPF_ARTIFACTS,               ///< eBPF programs and maps state check.
   STATE_IO_URING_ARTIFACTS,           ///< io_uring structures state check.,
   STATE_KALLSYMS_SYMBOLS,             ///< kallsyms symbols state check.
-  STATE_FIRMWARE_ACPI_HOOKS,  ///< ACPI hooks state check (maybe remove).
   STATE_TASK_ID_MAX           ///< Maximum number of state tasks.
 };
 

@@ -3,6 +3,7 @@
 #include <linux/syscalls.h>
 #include <linux/percpu.h>
 #include <asm/msr.h>
+#include <asm/processor.h>
 
 #include "constants.h"
 
@@ -13,8 +14,6 @@ MODULE_LICENSE("GPL");
 /* Declare per-CPU variable to hold saved user RSP */
 DEFINE_PER_CPU(unsigned long, saved_user_rsp);
 
-/* Provided by vmlinux — validate manually beforehand */
-extern unsigned long __percpu *cpu_current_top_of_stack;
 
 void (*syscall_orig)(void) = NULL;
 void (*syscall_after_swapgs)(void);
@@ -29,19 +28,19 @@ void update_lstar(void* addr) {
     wrmsrl(MSR_LSTAR, (unsigned long)addr);
 }
 
-/* Print GS-relative offsets for assembly use */
 static void print_gs_offsets(void) {
     unsigned long gs_base;
     unsigned long rsp_offset, stack_offset;
 
     rdmsrl(MSR_GS_BASE, gs_base);
-    rsp_offset   = (unsigned long)this_cpu_ptr(&saved_user_rsp) - gs_base;
-    stack_offset = (unsigned long)this_cpu_ptr(cpu_current_top_of_stack) - gs_base;
+    rsp_offset   = (unsigned long)per_cpu(saved_user_rsp, smp_processor_id()) - gs_base;
+    stack_offset = (unsigned long)per_cpu(cpu_current_top_of_stack, smp_processor_id()) - gs_base;
 
     printk(KERN_INFO "Update constants.S with the following offsets:\n");
     printk(KERN_INFO "#define OLD_RSP      0x%lx\n", rsp_offset);
     printk(KERN_INFO "#define KERNEL_STACK 0x%lx\n", stack_offset);
 }
+
 
 int intercept_syscalls_init(void) {
     uint64_t value;

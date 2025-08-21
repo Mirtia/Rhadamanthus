@@ -1,6 +1,6 @@
 # Using MSR_LSTAR to hook system calls in Linux (Intel 64-bit only)
 
-The code is replicated by the post provided by Victor van der Veen.
+The [code](https://vvdveen.com/data/lstar.txt) is replicated by the post provided by Victor van der Veen.
 
 This Linux kernel module hooks the MSR SYSENTER/SYSCALL. As stated in the Concept:
 

@@ -22,8 +22,6 @@ uint32_t (*get_state_task_functor(state_task_id_t task_id))(vmi_instance_t,
       return state_dir_string_matching_callback;
     case STATE_EBPF_ARTIFACTS:
       return state_ebpf_artifacts_callback;
-    case STATE_FIRMWARE_ACPI_HOOKS:
-      return state_firmware_acpi_hooks_callback;
     case STATE_FTRACE_HOOKS:
       return state_ftrace_hooks_callback;
     case STATE_IDT_TABLE:
