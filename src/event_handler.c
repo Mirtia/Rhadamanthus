@@ -36,12 +36,12 @@ const char* state_task_id_to_str(state_task_id_t task_id) {
 
 const char* event_task_id_to_str(event_task_id_t task_id) {
   switch (task_id) {
-    case EVENT_FTRACE_PATCHING:
-      return "EVENT_FTRACE_PATCHING";
+    case EVENT_FTRACE_HOOK:
+      return "EVENT_FTRACE_HOOK";
     case EVENT_SYSCALL_TABLE_WRITE:
       return "EVENT_SYSCALL_TABLE_WRITE";
-    case EVENT_IDT_ENTRY_MODIFICATION:
-      return "EVENT_IDT_ENTRY_MODIFICATION";
+    case EVENT_IDT_WRITE:
+      return "EVENT_IDT_WRITE";
     case EVENT_CR0_WRITE:
       return "EVENT_CR0_WRITE";
     case EVENT_PAGE_TABLE_MODIFICATION:
@@ -52,8 +52,6 @@ const char* event_task_id_to_str(event_task_id_t task_id) {
       return "EVENT_MSR_WRITE";
     case EVENT_CODE_SECTION_MODIFY:
       return "EVENT_CODE_SECTION_MODIFY";
-    case EVENT_INTROSPECTION_INTEGRITY:
-      return "EVENT_INTROSPECTION_INTEGRITY";
     case EVENT_IO_URING_RING_WRITE:
       return "EVENT_IO_URING_RING_WRITE";
     case EVENT_EBPF_MAP_UPDATE:

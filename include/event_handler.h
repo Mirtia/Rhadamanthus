@@ -27,7 +27,7 @@ enum state_task_id {
   STATE_EBPF_ARTIFACTS,               ///< eBPF programs and maps state check.
   STATE_IO_URING_ARTIFACTS,           ///< io_uring structures state check.,
   STATE_KALLSYMS_SYMBOLS,             ///< kallsyms symbols state check.
-  STATE_TASK_ID_MAX           ///< Maximum number of state tasks.
+  STATE_TASK_ID_MAX                   ///< Maximum number of state tasks.
 };
 
 /**
@@ -35,15 +35,14 @@ enum state_task_id {
  * TODO: Remove some of those.
  */
 enum event_task_id {
-  EVENT_FTRACE_PATCHING,          ///< ftrace hook detection
+  EVENT_FTRACE_HOOK,              ///< ftrace hook detection
   EVENT_SYSCALL_TABLE_WRITE,      ///< syscall table write detection
-  EVENT_IDT_ENTRY_MODIFICATION,   ///< IDT hook detection
+  EVENT_IDT_WRITE,                ///< IDT hook detection
   EVENT_CR0_WRITE,                ///< write access to control register
   EVENT_PAGE_TABLE_MODIFICATION,  ///< page table or memory mapping change
   EVENT_NETFILTER_HOOK_WRITE,     ///< function pointer hook detection
   EVENT_MSR_WRITE,                ///< MSR register access detection
   EVENT_CODE_SECTION_MODIFY,      ///< kernel code integrity
-  EVENT_INTROSPECTION_INTEGRITY,  ///< self-monitoring trap (maybe remove).
   EVENT_IO_URING_RING_WRITE,      ///< io_uring structure tampering
   EVENT_EBPF_MAP_UPDATE,          ///< eBPF map or program overwrite
   EVENT_KALLSYMS_TABLE_WRITE,     ///< kallsyms or symbol hijacking

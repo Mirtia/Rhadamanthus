@@ -24,6 +24,6 @@ state_tasks=(
 
 # Create header and source files for each
 for task in "${state_tasks[@]}"; do
-  touch "include/state_callbacks/${task}.h"
-  touch "src/state_callbacks/${task}.c"
+  touch "../include/state_callbacks/${task}.h"
+  touch "../src/state_callbacks/${task}.c"
 done

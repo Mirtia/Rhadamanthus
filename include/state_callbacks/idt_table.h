@@ -22,8 +22,8 @@
  * reads the IDTR base of vCPU 0, loads vector names from disk, walks all 256 vectors,
  * and logs any named handlers whose addresses fall outside `[_stext, _etext]`.
  *
- * @param vmi      LibVMI instance.
- * @param context  Opaque pointer (unused).
+ * @param vmi      The LibVMI instance.
+ * @param context  User-defined context [unused].
  * @return VMI_SUCCESS on successful inspection else VMI_FAILURE.
  */
 uint32_t state_idt_table_callback(vmi_instance_t vmi, void* context);
