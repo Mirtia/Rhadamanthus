@@ -1,34 +1,34 @@
-#include "vmi.h"
 #include <libvmi/libvmi.h>
+#include "vmi.h"
 
-int introspect_idt_check(const char *domain_name) {
+int introspect_idt_check(const char* domain_name) {
   vmi_instance_t vmi;
   addr_t idt_addr, int_addr, kernel_start, kernel_end;
   int count_int = 0;
 
   uint64_t interrupt_number = 0;
-  char **interrupt_index_table = NULL;
+  char** interrupt_index_table = NULL;
 
   char line[256];
   char name[256];
   int index[256];
 
-  FILE *file;
+  FILE* file;
   file = fopen("data/interrupt_index.linux", "r");
   if (!file) {
-    fprintf(stderr, "Failed to open file.");
+    (void)fprintf(stderr, "Failed to open file.");
     return 1;
   }
   while (fgets(line, sizeof(line), file) != NULL) {
-    sscanf(line, "%d\t%s", index, name);
+    (void)sscanf(line, "%d\t%s", index, name);
     interrupt_index_table =
-        realloc(interrupt_index_table, sizeof(char *) * ++interrupt_number);
-    interrupt_index_table[interrupt_number - 1] = (char *)malloc(256);
+        realloc(interrupt_index_table, sizeof(char*) * ++interrupt_number);
+    interrupt_index_table[interrupt_number - 1] = (char*)malloc(256);
     strcpy(interrupt_index_table[interrupt_number - 1], name);
   }
-  fclose(file);
+  (void)fclose(file);
 
-  vmi_init_data_t *init_data = NULL;
+  vmi_init_data_t* init_data = NULL;
   /* initialize the libvmi library */
   if (VMI_FAILURE == vmi_init_complete(&vmi, domain_name, VMI_INIT_DOMAINNAME,
                                        init_data, VMI_CONFIG_GLOBAL_FILE_ENTRY,
@@ -54,7 +54,7 @@ int introspect_idt_check(const char *domain_name) {
     int_addr = ((addr_t)addr3 << 32) + ((addr_t)addr2 << 16) + ((addr_t)addr1);
 
     if ((int_addr < kernel_start || int_addr > kernel_end) &&
-        (strcmp(interrupt_index_table[i], "unknown"))) {
+        (strcmp(interrupt_index_table[i], "unknown") != 0)) {
       printf("interrupt handler %s address changed to 0x%" PRIx64 "\n",
              interrupt_index_table[i], int_addr);
       count_int++;
