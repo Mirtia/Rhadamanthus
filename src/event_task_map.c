@@ -1,5 +1,6 @@
 #include "event_task_map.h"
 #include <log.h>
+#include <stddef.h>
 #include "event_callbacks/code_section_modify.h"
 #include "event_callbacks/cr0_write.h"
 #include "event_callbacks/ebpf_map_update.h"
@@ -28,7 +29,7 @@ static vmi_event_t* create_event_kallsyms_table_write(vmi_instance_t vmi);
 // Helper functions for event setup
 static vmi_event_t* setup_memory_event(
     addr_t addr, vmi_mem_access_t access_type,
-    event_response_t (*callback)(vmi_instance_t, vmi_event_t*), size_t size);
+    event_response_t (*callback)(vmi_instance_t, vmi_event_t*));
 static vmi_event_t* setup_register_event(
     reg_t reg, vmi_reg_access_t access_type,
     event_response_t (*callback)(vmi_instance_t, vmi_event_t*));
@@ -91,18 +92,17 @@ static const event_task_map_entry_t event_task_map[] = {
 static const size_t event_task_map_size =
     sizeof(event_task_map) / sizeof(event_task_map[0]);
 
-// Helper function implementations
-
 static vmi_event_t* setup_memory_event(
+    //NOLINTNEXTLINE
     addr_t addr, vmi_mem_access_t access_type,
-    event_response_t (*callback)(vmi_instance_t, vmi_event_t*), size_t size) {
+    event_response_t (*callback)(vmi_instance_t, vmi_event_t*)) {
   vmi_event_t* event = g_malloc0(sizeof(vmi_event_t));
 
   event->version = VMI_EVENTS_VERSION;
   event->type = VMI_EVENT_MEMORY;
-  event->mem_event.physical_address = addr;
-  event->mem_event.npages = (size + VMI_PS_4KB - 1) / VMI_PS_4KB;
-  event->mem_event.granularity = VMI_MEMEVENT_PAGE;
+  event->mem_event.gfn =
+      addr >> 12;                // Convert address to GFN (Guest Frame Number)
+  event->mem_event.generic = 0;  // Not using generic events
   event->mem_event.in_access = access_type;
   event->callback = callback;
 
@@ -110,6 +110,7 @@ static vmi_event_t* setup_memory_event(
 }
 
 static vmi_event_t* setup_register_event(
+    // NOLINTNEXTLINE
     reg_t reg, vmi_reg_access_t access_type,
     event_response_t (*callback)(vmi_instance_t, vmi_event_t*)) {
   vmi_event_t* event = g_malloc0(sizeof(vmi_event_t));
@@ -137,7 +138,7 @@ static vmi_event_t* create_event_ftrace_hook(vmi_instance_t vmi) {
   }
 
   return setup_memory_event(ftrace_ops_addr, VMI_MEMACCESS_W,
-                            event_ftrace_hook_callback, 1);
+                            event_ftrace_hook_callback);
 }
 
 static vmi_event_t* create_event_syscall_table_write(vmi_instance_t vmi) {
@@ -151,8 +152,7 @@ static vmi_event_t* create_event_syscall_table_write(vmi_instance_t vmi) {
   // Monitor entire syscall table (assume 512 syscalls * 8 bytes each)
   size_t syscall_table_size = 512 * sizeof(addr_t);
   return setup_memory_event(sys_call_table, VMI_MEMACCESS_W,
-                            event_syscall_table_write_callback,
-                            syscall_table_size);
+                            event_syscall_table_write_callback);
 }
 
 static vmi_event_t* create_event_idt_write(vmi_instance_t vmi) {
@@ -171,9 +171,9 @@ static vmi_event_t* create_event_idt_write(vmi_instance_t vmi) {
   }
 
   // IDT has 256 entries, each 16 bytes
-  size_t idt_size = 256 * 16;
+  size_t idt_size = (size_t)(256) * 16;
   return setup_memory_event(idtr_base, VMI_MEMACCESS_W,
-                            event_idt_write_callback, idt_size);
+                            event_idt_write_callback);
 }
 
 static vmi_event_t* create_event_cr0_write(vmi_instance_t vmi) {
@@ -192,7 +192,7 @@ static vmi_event_t* create_event_page_table_modification(vmi_instance_t vmi) {
   // Monitor page table area (approximate)
   size_t pt_size = 0x1000;  // 4KB page
   return setup_memory_event(cr3, VMI_MEMACCESS_W,
-                            event_page_table_modification_callback, pt_size);
+                            event_page_table_modification_callback);
 }
 
 static vmi_event_t* create_event_netfilter_hook_write(vmi_instance_t vmi) {
@@ -203,16 +203,16 @@ static vmi_event_t* create_event_netfilter_hook_write(vmi_instance_t vmi) {
     // Try alternative symbol
     if (vmi_translate_ksym2v(vmi, "nf_hook_entries", &nf_hooks) !=
         VMI_SUCCESS) {
-      log_error("Failed to resolve netfilter hooks symbol");
+      log_error("Failed to repsolve netfilter hooks symbol");
       return NULL;
     }
   }
 
   // Monitor netfilter hooks area
-  size_t nf_hooks_size =
-      13 * 5 * sizeof(addr_t);  // 13 protocol families * 5 hook points
+  // TODO: Confirm 13 protocol families * 5 hook points
+  size_t nf_hooks_size = 13UL * 5 * sizeof(addr_t);
   return setup_memory_event(nf_hooks, VMI_MEMACCESS_W,
-                            event_netfilter_hook_write_callback, nf_hooks_size);
+                            event_netfilter_hook_write_callback);
 }
 
 static vmi_event_t* create_event_msr_write(vmi_instance_t vmi) {
@@ -231,10 +231,11 @@ static vmi_event_t* create_event_code_section_modify(vmi_instance_t vmi) {
 
   size_t text_size = text_end - text_start;
   return setup_memory_event(text_start, VMI_MEMACCESS_W,
-                            event_code_section_modify_callback, text_size);
+                            event_code_section_modify_callback);
 }
 
 static vmi_event_t* create_event_io_uring_ring_write(vmi_instance_t vmi) {
+  (void)vmi;
   // Monitor io_uring operations - this is complex as it's per-process
   // For now, we'll monitor common io_uring structures
   // This would need more sophisticated implementation in practice
@@ -254,22 +255,6 @@ static vmi_event_t* create_event_ebpf_map_update(vmi_instance_t vmi) {
   return NULL;
 }
 
-static vmi_event_t* create_event_kallsyms_table_write(vmi_instance_t vmi) {
-  addr_t kallsyms_addresses = 0;
-  if (vmi_translate_ksym2v(vmi, "kallsyms_addresses", &kallsyms_addresses) !=
-      VMI_SUCCESS) {
-    log_error("Failed to resolve kallsyms_addresses symbol");
-    return NULL;
-  }
-
-  // Monitor kallsyms tables (approximate size)
-  size_t kallsyms_size = 0x100000;  // 1MB approximate
-  return setup_memory_event(kallsyms_addresses, VMI_MEMACCESS_W,
-                            event_kallsyms_table_write_callback, kallsyms_size);
-}
-
-// Public API functions
-
 int register_all_event_tasks(event_handler_t* event_handler) {
   if (!event_handler) {
     log_error("Event handler is NULL");
@@ -318,10 +303,10 @@ int register_event_task_by_id(event_handler_t* event_handler,
                                           entry->callback);
         log_info("Successfully registered: %s", entry->description);
         return 1;
-      } else {
-        log_error("Failed to create event for: %s", entry->description);
-        return -1;
       }
+
+      log_error("Failed to create event for: %s", entry->description);
+      return -1;
     }
   }
 
@@ -337,9 +322,6 @@ void list_available_event_tasks(void) {
     log_info("  %d: %s - %s", entry->task_id,
              event_task_id_to_str(entry->task_id), entry->description);
   }
-}
-_free(event);
-return NULL;
 }
 
 static vmi_event_t* create_event_kallsyms_table_write(vmi_instance_t vmi) {
@@ -358,75 +340,4 @@ static vmi_event_t* create_event_kallsyms_table_write(vmi_instance_t vmi) {
   SETUP_MEM_EVENT(event, kallsyms_addresses, VMI_MEMACCESS_W,
                   event_kallsyms_table_write_callback, kallsyms_size);
   return event;
-}
-
-// Public API functions
-
-int register_all_event_tasks(event_handler_t* event_handler) {
-  if (!event_handler) {
-    log_error("Event handler is NULL");
-    return -1;
-  }
-
-  int registered_count = 0;
-
-  for (size_t i = 0; i < event_task_map_size; i++) {
-    const event_task_map_entry_t* entry = &event_task_map[i];
-
-    log_info("Registering event task: %s", entry->description);
-
-    vmi_event_t* event = entry->create_func(event_handler->vmi);
-    if (event) {
-      event_handler_register_event_task(event_handler, entry->task_id, event,
-                                        entry->callback);
-      registered_count++;
-      log_info("Successfully registered: %s", entry->description);
-    } else {
-      log_warn("Failed to create event for: %s", entry->description);
-    }
-  }
-
-  log_info("Registered %d out of %zu event tasks", registered_count,
-           event_task_map_size);
-  return registered_count;
-}
-
-int register_event_task_by_id(event_handler_t* event_handler,
-                              event_task_id_t task_id) {
-  if (!event_handler) {
-    log_error("Event handler is NULL");
-    return -1;
-  }
-
-  for (size_t i = 0; i < event_task_map_size; i++) {
-    const event_task_map_entry_t* entry = &event_task_map[i];
-
-    if (entry->task_id == task_id) {
-      log_info("Registering specific event task: %s", entry->description);
-
-      vmi_event_t* event = entry->create_func(event_handler->vmi);
-      if (event) {
-        event_handler_register_event_task(event_handler, entry->task_id, event,
-                                          entry->callback);
-        log_info("Successfully registered: %s", entry->description);
-        return 1;
-      } else {
-        log_error("Failed to create event for: %s", entry->description);
-        return -1;
-      }
-    }
-  }
-
-  log_error("Event task ID %d not found in mapping table", task_id);
-  return -1;
-}
-
-void list_available_event_tasks(void) {
-  log_info("Available event tasks:");
-
-  for (size_t i = 0; i < event_task_map_size; i++) {
-    const event_task_map_entry_t* entry = &event_task_map[i];
-    log_info("  %d: %s - %s", entry->task_id,
-             event_task_id_to_str(entry->task_id), entry->description);
-  }
 }

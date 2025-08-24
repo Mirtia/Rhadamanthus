@@ -93,6 +93,7 @@ int event_task_id_from_str(const char* str) {
 }
 
 event_handler_t* event_handler_initialize(vmi_instance_t vmi,
+                                          // NOLINTNEXTLINE
                                           uint32_t window_ms,
                                           uint32_t state_sampling_ms) {
 
