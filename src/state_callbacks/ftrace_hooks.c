@@ -178,9 +178,9 @@ static int check_commonly_hooked_syscalls(vmi_instance_t vmi) {
       log_info("Found syscall %s at 0x%" PRIx64, commonly_hooked_syscalls[i],
                (uint64_t)syscall_addr);
 
-      // TODO: Check if this specific function has ftrace enabled
+      // TODO: Check if this specific function has ftrace enabled.
       // This would require walking the ftrace filter hash tables, which is complex
-      // For now, we just log that we found these common targets
+      // For now, we just log that we found these common targets.
     }
   }
 

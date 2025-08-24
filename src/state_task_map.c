@@ -3,7 +3,6 @@
 
 #include "state_callbacks/dir_string_matching.h"
 #include "state_callbacks/ebpf_artifacts.h"
-#include "state_callbacks/firmware_acpi_hooks.h"
 #include "state_callbacks/ftrace_hooks.h"
 #include "state_callbacks/idt_table.h"
 #include "state_callbacks/io_uring_artifacts.h"

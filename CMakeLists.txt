@@ -117,7 +117,7 @@ add_test(NAME StateCallbacksIdtTableTest COMMAND test_state_callbacks_idt_table)
 add_compile_definitions(TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/data")
 # TODO: Check that the syscall index is appropriate (matches the linux kernel version).
 add_compile_definitions(SYSCALL_INDEX_FILE="${CMAKE_CURRENT_SOURCE_DIR}/data/syscall_index.linux")
-# TODO: Check that the interrupt index is appropriate (matches the linux kernel version).
 add_compile_definitions(INTERRUPT_INDEX_FILE="${CMAKE_CURRENT_SOURCE_DIR}/data/interrupt_index.linux")
+add_compile_definitions(BASELINE_HASH_FILE="${CMAKE_CURRENT_SOURCE_DIR}/data/baseline_hash.bin")
 
 install(TARGETS introspector DESTINATION bin)
