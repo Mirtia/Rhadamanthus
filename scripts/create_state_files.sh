@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # List of all state task names
+# Note: Some of the tasks have been removed due to being determined out of scope / no PoC existing for the analysis.
 state_tasks=(
   kernel_module_list
   ftrace_hooks

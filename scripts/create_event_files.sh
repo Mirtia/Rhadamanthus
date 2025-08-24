@@ -1,6 +1,7 @@
 #!/bin/bash
 
 # List of all event task names
+# Note: Some of the tasks have been removed due to being determined out of scope / no PoC existing for the analysis.
 event_tasks=(
   ftrace_hook
   syscall_table_write

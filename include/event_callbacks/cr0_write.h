@@ -2,7 +2,6 @@
 #define CR0_WRITE_H
 
 #include <libvmi/events.h>
-#include <libvmi/libvmi.h>
 
 /**
  * @brief Callback function for handling CR0 write events.

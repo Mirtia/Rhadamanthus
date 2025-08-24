@@ -4,6 +4,7 @@
 #include <log.h>
 
 // TODO: Is this valid? Can't a kernel module be detached from the list?
+// https://phrack.org/issues/71/12
 uint32_t state_kernel_module_list_callback(vmi_instance_t vmi, void* context) {
   (void)context;
 
