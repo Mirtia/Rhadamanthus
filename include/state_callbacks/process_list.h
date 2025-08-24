@@ -5,7 +5,7 @@
  * @version 0.0
  * @date 2025-08-10
  * 
- * @copyright Copyright (c) 2025
+ * @copyright GNU Lesser General Public License v2.1
  * @remark The implementation is almost identical to the example process-list provided by LibVMI 
  * (https://github.com/libvmi/libvmi/blob/master/examples/process-list.c)
  */

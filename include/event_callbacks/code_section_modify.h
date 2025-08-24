@@ -1,3 +1,13 @@
+/**
+ * @file code_section_modify.h
+ * @author Myrsini Gkolemi
+ * @brief 
+ * @version 0.0
+ * @date 2025-08-24
+ * 
+ * @copyright GNU Lesser General Public License v2.1
+ * 
+ */
 #ifndef CODE_SECTION_MODIFY_H
 #define CODE_SECTION_MODIFY_H
 

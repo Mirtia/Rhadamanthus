@@ -1,3 +1,13 @@
+/**
+ * @file idt_write.h
+ * @author Myrsini Gkolemi
+ * @brief 
+ * @version 0.0
+ * @date 2025-08-24
+ * 
+ * @copyright GNU Lesser General Public License v2.1
+ * 
+ */
 #ifndef IDT_WRITE_H
 #define IDT_WRITE_H
 
@@ -12,4 +22,4 @@
  */
 event_response_t event_idt_write_callback(vmi_instance_t vmi,
                                           vmi_event_t* event);
-                                          #endif // IDT_WRITE_H
+#endif  // IDT_WRITE_H

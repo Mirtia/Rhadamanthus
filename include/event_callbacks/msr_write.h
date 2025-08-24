@@ -1,12 +1,12 @@
 /**
  * @file msr_write.h
- * @author your name (you@domain.com)
- * @brief 
- * @version 0.1
+ * @author Myrsini Gkolemi
+ * @brief
+ * @version 0.0
  * @date 2025-08-24
- * 
- * @copyright Copyright (c) 2025
- * 
+ *
+ * @copyright GNU Lesser General Public License v2.1
+ *
  */
 #ifndef MSR_WRITE_H
 #define MSR_WRITE_H
@@ -16,7 +16,7 @@
 /**
  * @brief Callback function for handling MSR write events.
  *
- * @param vmi The VMI instance.
+ * @param vmi The VMI instance.P
  * @param event The event that triggered the callback.
  * @return event_response_t VMI_EVENT_RESPONSE_NONE (general monitoring).
  */

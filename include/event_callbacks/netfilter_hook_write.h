@@ -1,11 +1,11 @@
 /**
  * @file netfilter_hook_write.h
- * @author your name (you@domain.com)
+ * @author Myrsini Gkolemi
  * @brief
- * @version 0.1
+ * @version 0.0
  * @date 2025-08-24
  *
- * @copyright Copyright (c) 2025
+ * @copyright GNU Lesser General Public License v2.1
  *
  */
 #ifndef NETFILTER_HOOK_WRITE_H

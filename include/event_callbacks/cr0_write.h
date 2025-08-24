@@ -1,3 +1,13 @@
+/**
+ * @file cr0_write.h
+ * @author Myrsini Gkolemi
+ * @brief
+ * @version 0.0
+ * @date 2025-08-24
+ *
+ * @copyright GNU Lesser General Public License v2.1
+ *
+ */
 #ifndef CR0_WRITE_H
 #define CR0_WRITE_H
 

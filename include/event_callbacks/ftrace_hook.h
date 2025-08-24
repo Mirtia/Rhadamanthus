@@ -1,3 +1,13 @@
+/**
+ * @file ftrace_hook.h
+ * @author Myrsini Gkolemi
+ * @brief 
+ * @version 0.0
+ * @date 2025-08-24
+ * 
+ * @copyright GNU Lesser General Public License v2.1
+ * 
+ */
 #ifndef FTRACE_HOOK_H
 #define FTRACE_HOOK_H
 
