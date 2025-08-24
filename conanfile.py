@@ -14,7 +14,8 @@ class VMIExamplesConan(ConanFile):
         "cjson/1.7.18",
         "log.c/cci.20200620",
         "libyaml/0.2.5",
-        "cmocka/1.1.8"
+        "cmocka/1.1.8",
+        "openssl/3.2.1",
     )
 
     def layout(self):

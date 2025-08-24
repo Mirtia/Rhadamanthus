@@ -13,6 +13,7 @@ find_package(cJSON REQUIRED)
 find_package(log.c REQUIRED)
 find_package(yaml REQUIRED)
 find_package(CMocka REQUIRED)
+find_package(OpenSSL REQUIRED)
 
 file(GLOB STATE_CALLBACKS "src/state_callbacks/*.c")
 file(GLOB EVENT_CALLBACKS "src/event_callbacks/*.c")
@@ -38,13 +39,14 @@ target_link_libraries(vmi_event_handler
     cjson::cjson
     log.c::log.c
     vmi
+    OpenSSL::Crypto
 )
 
 target_compile_options(vmi_event_handler PRIVATE ${GLIB2_CFLAGS_OTHER})
 
 add_executable(introspector src/main.c)
 
-target_link_libraries(introspector
+target_link_libraries(introspector OpenSSL::Crypto
     vmi_event_handler
 )
 
@@ -116,8 +118,8 @@ add_test(NAME StateCallbacksIdtTableTest COMMAND test_state_callbacks_idt_table)
 
 add_compile_definitions(TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/data")
 # TODO: Check that the syscall index is appropriate (matches the linux kernel version).
-add_compile_definitions(SYSCALL_INDEX_FILE="${CMAKE_CURRENT_SOURCE_DIR}/data/syscall_index.linux")
+add_compile_definitions(SYSCALL_INDEX_FILE="$q{CMAKE_CURRENT_SOURCE_DIR}/data/syscall_index.linux")
 add_compile_definitions(INTERRUPT_INDEX_FILE="${CMAKE_CURRENT_SOURCE_DIR}/data/interrupt_index.linux")
-add_compile_definitions(BASELINE_HASH_FILE="${CMAKE_CURRENT_SOURCE_DIR}/data/baseline_hash.bin")
+add_compile_definitions(BASELINE_HASH_FILE="${CMAKE_CURRENT_SOURCE_DIR}/data/ubuntu-20-04-new-kernel-clean.bin")
 
 install(TARGETS introspector DESTINATION bin)

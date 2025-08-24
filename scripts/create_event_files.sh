@@ -13,7 +13,6 @@ event_tasks=(
   io_uring_ring_write
   ebpf_map_update
   kallsyms_table_write
-  task_id_max
 )
 
 # Create header and source files for each

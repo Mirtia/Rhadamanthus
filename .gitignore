@@ -82,3 +82,6 @@ __pycache__/
 
 # Ignore logs
 logs/
+
+# Scripts
+scripts/calculate_hash_kernel
