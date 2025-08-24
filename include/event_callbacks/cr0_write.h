@@ -3,8 +3,14 @@
 
 #include <libvmi/events.h>
 #include <libvmi/libvmi.h>
-#include <stdint.h>
 
+/**
+ * @brief Callback function for handling CR0 write events.
+ *
+ * @param vmi The VMI instance.
+ * @param event The event that triggered the callback.
+ * @return event_response_t VMI_EVENT_RESPONSE_NONE (general monitoring).
+ */
 event_response_t event_cr0_write_callback(vmi_instance_t vmi,
                                           vmi_event_t* event);
 
