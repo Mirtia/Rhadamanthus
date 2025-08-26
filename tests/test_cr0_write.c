@@ -5,9 +5,9 @@
 #include <libvmi/libvmi.h>
 #include <log.h>
 
-#include "state_callbacks/idt_table.h"
+#include "event_callbacks/cr0_write.h"
 
-static void test_idt_table_callback(void** state) {
+static void test_cr0_write_callback(void** state) {
   (void)state;
 
   const char* domain_name = "ubuntu-20-04-dbg";
@@ -18,16 +18,16 @@ static void test_idt_table_callback(void** state) {
                                        NULL)) {
     fail_msg("Failed to initialize LibVMI for test domain: %s", domain_name);
   }
+  
 
-  uint32_t result = state_idt_table_callback(vmi, NULL);
-  // Load the poc/idt_hook example and check that the modification is detected.
+  uint32_t result = event_cr0_write_callback(vmi, NULL);
   assert_int_equal(result, VMI_SUCCESS);
   vmi_destroy(vmi);
 }
 
 int main(void) {
   const struct CMUnitTest tests[] = {
-      cmocka_unit_test(test_idt_table_callback),
+      cmocka_unit_test(test_cr0_write_callback),
   };
 
   return cmocka_run_group_tests(tests, NULL, NULL);

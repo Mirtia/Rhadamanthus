@@ -147,7 +147,11 @@ void event_handler_free(event_handler_t* event_handler) {
       g_free(task);
     }
   }
-
+   
+  if (event_handler->vmi) {
+    vmi_destroy(event_handler->vmi);
+  }
+  
   g_free(event_handler);
 }
 
@@ -232,14 +236,13 @@ static gpointer event_loop_thread(gpointer data) {
   sample_state_tasks(event_handler);
   log_info("Starting event loop thread with window size: %u ms",
            event_handler->window_ms);
-  while (true) {
-    // NOTE: LibVMI processes one event at a time, listen to total of time window_ms.
-    // The callback will be triggered, which will enqueue the item.
-    vmi_events_listen(event_handler->vmi, event_handler->window_ms);
-  }
+  // NOTE: LibVMI processes one event at a time, listen to total of time window_ms.
+  // The callback will be triggered, which will enqueue the item.
+  vmi_events_listen(event_handler->vmi, event_handler->window_ms);
   log_info("Event loop thread has finished processing events, exiting...");
   log_info(
       "Post-sampling state tasks after the event loop thread has started...");
+  sample_state_tasks(event_handler);
   return NULL;
 }
 
@@ -266,7 +269,10 @@ void sample_state_tasks(event_handler_t* event_handler) {
   for (int i = 0; i < STATE_TASK_ID_MAX; ++i) {
     state_task_t* task = event_handler->state_tasks[i];
     if (task && task->functor) {
+      log_info("Sampling state task: %s", state_task_id_to_str(task->id));
       task->functor(event_handler->vmi, NULL);
+    } else {
+      log_info("No registered state task for ID: %d", i);
     }
   }
 

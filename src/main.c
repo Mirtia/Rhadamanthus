@@ -3,8 +3,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include "event_handler.h"
 #include "config_parser.h"
+#include "event_handler.h"
 
 /**
  * @brief Prints the usage information for the program.
@@ -12,7 +12,7 @@
  * @param program_name The name of the program, used in the usage message.
  */
 static void print_usage(const char* program_name) {
-  log_info(
+  printf(
       "Usage: %s -c <config.yaml>\n"
       "Options:\n"
       "  -c <file>   Path to the YAML configuration file (required)\n"
@@ -44,7 +44,8 @@ int main(int argc, char** argv) {
     return EXIT_FAILURE;
   }
 
-  event_handler_t* event_handler = event_handler_initialize_from_config(config_path);
+  event_handler_t* event_handler =
+      event_handler_initialize_from_config(config_path);
   if (!event_handler) {
     log_error("Failed to initialize event_handler from config file.");
     return EXIT_FAILURE;
@@ -55,7 +56,7 @@ int main(int argc, char** argv) {
   if (event_handler->event_thread) {
     g_thread_join(event_handler->event_thread);
   }
-
   event_handler_free(event_handler);
+
   return EXIT_SUCCESS;
 }

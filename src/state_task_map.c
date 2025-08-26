@@ -42,7 +42,7 @@ uint32_t (*get_state_task_functor(state_task_id_t task_id))(vmi_instance_t,
     case STATE_SYSCALL_TABLE:
       return state_syscall_table_callback;
     default:
-      log_warn("Unknown state task ID: %d", task_id);
+      log_error("Unknown state task ID: %d", task_id);
       return NULL;
   }
 }

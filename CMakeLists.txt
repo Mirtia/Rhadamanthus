@@ -24,6 +24,7 @@ add_library(vmi_event_handler STATIC
     src/serializer.c
     src/callback_handler.c
     src/state_task_map.c
+    src/event_task_map.c
     ${STATE_CALLBACKS}
     ${EVENT_CALLBACKS}
 )
@@ -118,7 +119,7 @@ add_test(NAME StateCallbacksIdtTableTest COMMAND test_state_callbacks_idt_table)
 
 add_compile_definitions(TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/data")
 # TODO: Check that the syscall index is appropriate (matches the linux kernel version).
-add_compile_definitions(SYSCALL_INDEX_FILE="$q{CMAKE_CURRENT_SOURCE_DIR}/data/syscall_index.linux")
+add_compile_definitions(SYSCALL_INDEX_FILE="${CMAKE_CURRENT_SOURCE_DIR}/data/syscall_index.linux")
 add_compile_definitions(INTERRUPT_INDEX_FILE="${CMAKE_CURRENT_SOURCE_DIR}/data/interrupt_index.linux")
 add_compile_definitions(BASELINE_HASH_FILE="${CMAKE_CURRENT_SOURCE_DIR}/data/ubuntu-20-04-new-kernel-clean.bin")
 

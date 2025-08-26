@@ -48,7 +48,7 @@ event_response_t event_cr0_write_callback(vmi_instance_t vmi,
   if (!(cr0_value & CR0_PG)) {
     log_warn("Paging disabled.");
   }
-  // TODO: Find PoC for this case.
+  // TODO: Find PoC for this case.(??)
   if (cr0_value & CR0_CD) {
     log_warn("CPU cache disabled.");
   }

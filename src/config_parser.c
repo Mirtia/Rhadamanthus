@@ -57,11 +57,11 @@ event_handler_t* event_handler_initialize_from_config(const char* config_path) {
 
   for (GList* list_iter = config.state_tasks; list_iter != NULL;
        list_iter = list_iter->next) {
-    state_task_id_t task_id = GPOINTER_TO_INT(list_iter->data);
+    state_task_id_t task_id = (state_task_id_t)GPOINTER_TO_INT(list_iter->data);
     // TODO: real functor assignment, map from task_id to functor.
     // Mapping from task_id to a callback function should be done here.
-    void *functor = get_state_task_functor(task_id);
-    event_handler_register_state_task(event_handler, task_id, NULL);
+    void* functor = get_state_task_functor(task_id);
+    event_handler_register_state_task(event_handler, task_id, functor);
   }
 
   for (GList* list_iter = config.event_tasks; list_iter != NULL;
@@ -193,18 +193,8 @@ int parse_yaml_config(const char* path, config_t* config) {
               int task_id = state_task_id_from_str(val);
               log_debug("Parsed state task ID: %s", val);
               if (task_id >= 0) {
-                int* task_id_ptr = g_malloc(sizeof(int));
-                if (!task_id_ptr) {
-                  log_error("Failed to allocate memory for state task ID.");
-                  if (last_key)
-                    g_free(last_key);
-                  (void)fclose(file);
-                  yaml_parser_delete(&parser);
-                  return EXIT_FAILURE;
-                }
-                *task_id_ptr = task_id;
-                config->state_tasks =
-                    g_list_append(config->state_tasks, task_id_ptr);
+                config->state_tasks = g_list_append(config->state_tasks,
+                                                    GINT_TO_POINTER(task_id));
                 log_debug("Added state task ID: %d", task_id);
               } else {
                 log_warn("Unknown state task ID string: %s", val);
@@ -213,18 +203,8 @@ int parse_yaml_config(const char* path, config_t* config) {
               int task_id = event_task_id_from_str(val);
               log_debug("Parsed event task ID: %s", val);
               if (task_id >= 0) {
-                int* task_id_ptr = g_malloc(sizeof(int));
-                if (!task_id_ptr) {
-                  log_error("Failed to allocate memory for event task ID.");
-                  if (last_key)
-                    g_free(last_key);
-                  (void)fclose(file);
-                  yaml_parser_delete(&parser);
-                  return EXIT_FAILURE;
-                }
-                *task_id_ptr = task_id;
-                config->event_tasks =
-                    g_list_append(config->event_tasks, task_id_ptr);
+                config->event_tasks = g_list_append(config->event_tasks,
+                                                    (GINT_TO_POINTER(task_id)));
                 log_debug("Added event task ID: %d", task_id);
               } else {
                 log_warn("Unknown event task ID string: %s", val);

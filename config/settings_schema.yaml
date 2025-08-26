@@ -1,9 +1,9 @@
 # Which Xen domain (domain name) to attach to (LibVMI)
-domain_name: "ubuntu-20-04-dbg"
+domain_name: "ubuntu-20-04-new-kernel"
 
-# How long the entire introspection window should last (in seconds)
+# How long the entire introspection window should last (in miliseconds)
 monitor:
-  window_ms: 3000
+  window_ms: 1000
   state_sampling_ms: 1000
 
 # Which detection services to dispatch.
@@ -15,7 +15,7 @@ features:
     - id: STATE_KERNEL_MODULE_LIST # Enum key matching state_task_id_t
     # TODO: Other options may be placed here, unique to the task.
     # parameters:
-    - id: STATE_NETWORK_TRACE # Another state‐polling task
+    - id: STATE_PROCESS_LIST
 
-  event:
-    - id: EVENT_CR0_WRITE
+  # event:
+  #   - id: EVENT_CR0_WRITE

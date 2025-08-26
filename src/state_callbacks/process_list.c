@@ -17,6 +17,20 @@ typedef struct {
   addr_t mm_addr;  ///<  Memory management struct
 } process_info_t;
 
+// Offsets retrieved with pahole - TODO: Decide on layout (defines or constants?)
+
+const size_t state_offset = 24;    // unsigned int __state
+const size_t tasks_offset = 2232;  // struct list_head tasks
+const size_t mm_offset = 2312;     // struct mm_struct *mm
+const size_t pid_offset = 2496;    // pid_t pid
+const size_t cred_offset = 2984;   // const struct cred *cred
+const size_t name_offset = 3000;   // char comm[16]
+
+const unsigned long uid_offset = 4;
+const unsigned long gid_offset = 8;
+const unsigned long euid_offset = 20;
+const unsigned long egid_offset = 24;
+
 /**
  * @brief Check if a task_struct represents a kernel thread.
  *
@@ -45,17 +59,6 @@ static bool read_process_credentials(vmi_instance_t vmi, addr_t task_struct,
                                      unsigned long cred_offset,
                                      process_info_t* proc_info) {
   addr_t cred_addr = 0;
-  unsigned long uid_offset = 0, gid_offset = 0, euid_offset = 0,
-                egid_offset = 0;
-
-  // Get credential structure offsets
-  if (vmi_get_offset(vmi, "linux_cred_uid", &uid_offset) != VMI_SUCCESS ||
-      vmi_get_offset(vmi, "linux_cred_gid", &gid_offset) != VMI_SUCCESS ||
-      vmi_get_offset(vmi, "linux_cred_euid", &euid_offset) != VMI_SUCCESS ||
-      vmi_get_offset(vmi, "linux_cred_egid", &egid_offset) != VMI_SUCCESS) {
-    log_warn("Failed to get credential offsets");
-    return false;
-  }
 
   // Read credential structure pointer
   if (vmi_read_addr_va(vmi, task_struct + cred_offset, 0, &cred_addr) !=
@@ -140,22 +143,7 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
   addr_t current_process = 0;
   process_info_t proc_info = {0};
 
-  // Required offsets
-  unsigned long tasks_offset = 0, pid_offset = 0, name_offset = 0;
-  unsigned long cred_offset = 0, state_offset = 0, mm_offset = 0;
-
   uint32_t total_processes = 0, kernel_threads = 0, user_processes = 0;
-
-  // Get all required offsets
-  if (vmi_get_offset(vmi, "linux_tasks", &tasks_offset) != VMI_SUCCESS ||
-      vmi_get_offset(vmi, "linux_name", &name_offset) != VMI_SUCCESS ||
-      vmi_get_offset(vmi, "linux_pid", &pid_offset) != VMI_SUCCESS ||
-      vmi_get_offset(vmi, "linux_cred", &cred_offset) != VMI_SUCCESS ||
-      vmi_get_offset(vmi, "linux_state", &state_offset) != VMI_SUCCESS ||
-      vmi_get_offset(vmi, "linux_mm", &mm_offset) != VMI_SUCCESS) {
-    log_error("Failed to retrieve required offsets");
-    return VMI_FAILURE;
-  }
 
   // Get init_task address
   if (vmi_translate_ksym2v(vmi, "init_task", &list_head) != VMI_SUCCESS) {
