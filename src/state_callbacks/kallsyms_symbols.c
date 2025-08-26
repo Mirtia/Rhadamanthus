@@ -105,6 +105,7 @@ uint32_t state_kallsyms_symbols_callback(vmi_instance_t vmi, void* context) {
   // Stats.
   uint32_t total = 0, reachable = 0, zero_addr = 0, name_fail = 0,
            addr_fail = 0;
+  // TODO: Investigate outside_text further, on its own it's not a clear indicator.    
   uint32_t in_text = 0, outside_text = 0;
   const bool have_text = (ktext_s && ktext_e && ktext_e > ktext_s);
 
@@ -115,7 +116,6 @@ uint32_t state_kallsyms_symbols_callback(vmi_instance_t vmi, void* context) {
   uint32_t logged = 0;
 
   for (uint32_t i = 0; i < num_syms; i++) {
-    // --- Decompress one name from (len, code...).
     uint8_t comp_len = 0;
     if (vmi_read_8_va(vmi, names_cursor, 0, &comp_len) != VMI_SUCCESS) {
       name_fail++;

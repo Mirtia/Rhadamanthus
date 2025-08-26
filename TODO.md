@@ -32,3 +32,5 @@
 - [ ] Test cr0 write with idt_hook or any other rootkit
 
 ## TODO 22/08/2025 - 23/08/2025
+
+- [ ] Kernel code integrity is a stupid approach. It will only make sense when you compare at same alive boot. Compare along time window.

@@ -128,8 +128,8 @@ static GPtrArray* load_interrupt_index_table(const char* path) {
       // Replace entry
       g_free(g_ptr_array_index(table, (guint)idx8));
       g_ptr_array_index(table, (guint)idx8) = name;
-      log_info("Interrupt index loaded: vector=%u name=%s", (unsigned)idx8,
-               name);
+      // log_debug("Interrupt index loaded: vector=%u name=%s", (unsigned)idx8,
+      //          name);
       names_set++;
     }
   }

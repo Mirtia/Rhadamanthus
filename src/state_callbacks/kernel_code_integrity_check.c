@@ -108,10 +108,10 @@ static gboolean load_baseline_hash(unsigned char* out_hash,
   char line[2 * EVP_MAX_MD_SIZE + 8] = {0};
   if (!fgets(line, sizeof(line), f)) {
     log_error("Failed to read baseline hash from: %s", BASELINE_HASH_FILE);
-    fclose(f);
+    (void)fclose(f);
     return FALSE;
   }
-  fclose(f);
+  (void)fclose(f);
 
   size_t hexlen = strcspn(line, "\r\n");
   if (hexlen % 2 != 0 || hexlen == 0 || hexlen / 2 > EVP_MAX_MD_SIZE) {
@@ -122,6 +122,7 @@ static gboolean load_baseline_hash(unsigned char* out_hash,
   *out_len = (unsigned int)(hexlen / 2);
   for (size_t i = 0; i < *out_len; ++i) {
     unsigned int byte = 0;
+    // TODO: Replace with strtoul. tidy nags again :(.
     if (sscanf(&line[2 * i], "%2x", &byte) != 1) {
       log_error("Invalid hex at position %zu in %s", i, BASELINE_HASH_FILE);
       return FALSE;

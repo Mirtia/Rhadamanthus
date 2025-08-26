@@ -70,6 +70,7 @@ event_handler_t* event_handler_initialize_from_config(const char* config_path) {
     // TODO: actual event callback.
     // Mapping from task_id to a callback should be done here.
     vmi_event_t* event = g_new0(vmi_event_t, 1);
+    // TODO: Initialize event! Where?
     event_handler_register_event_task(event_handler, task_id, event, NULL);
   }
 
