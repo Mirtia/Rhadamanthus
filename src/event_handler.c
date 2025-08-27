@@ -102,10 +102,12 @@ event_handler_t* event_handler_initialize(vmi_instance_t vmi,
     return NULL;
   }
 
-  // Note: Attempts to allocate n_bytes, initialized to 0’s, and returns NULL on failure.
-  // Contrast with g_malloc0(), which aborts the program on failure.
-  // See: https://docs.gtk.org/glib/func.try_malloc0.html
+  // See: https://docs.gtk.org/glib/func.new0.html
   event_handler_t* event_handler = g_new0(event_handler_t, 1);
+  if (event_handler == NULL) {
+    log_error("Failed to allocate memory for event_handler.");
+    return NULL;
+  }
 
   event_handler->window_ms = window_ms;
   event_handler->state_sampling_ms = state_sampling_ms;

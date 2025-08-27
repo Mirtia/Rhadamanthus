@@ -1,4 +1,5 @@
 #include "event_task_map.h"
+#include <inttypes.h>
 #include <log.h>
 #include <stddef.h>
 #include "event_callbacks/code_section_modify.h"
@@ -96,13 +97,16 @@ static vmi_event_t* setup_memory_event(
     addr_t addr, vmi_mem_access_t access_type,
     event_response_t (*callback)(vmi_instance_t, vmi_event_t*)) {
   vmi_event_t* event = g_malloc0(sizeof(vmi_event_t));
+  if (event == NULL) {
+    log_error("Failed to allocate memory for vmi_event_t");
+    return NULL;
+  }
 
   // TODO: Confirm correctness
   event->version = VMI_EVENTS_VERSION;
   event->type = VMI_EVENT_MEMORY;
-  event->mem_event.gfn =
-      addr >> 12;                
-  event->mem_event.generic = 0;  
+  event->mem_event.gfn = addr >> 12;
+  event->mem_event.generic = 0;
   event->mem_event.in_access = access_type;
   event->callback = callback;
 
@@ -114,6 +118,10 @@ static vmi_event_t* setup_register_event(
     reg_t reg, vmi_reg_access_t access_type,
     event_response_t (*callback)(vmi_instance_t, vmi_event_t*)) {
   vmi_event_t* event = g_malloc0(sizeof(vmi_event_t));
+  if (event == NULL) {
+    log_error("Failed to allocate memory for vmi_event_t");
+    return NULL;
+  }
 
   event->version = VMI_EVENTS_VERSION;
   event->type = VMI_EVENT_REGISTER;
@@ -321,6 +329,10 @@ void list_available_event_tasks(void) {
 
 static vmi_event_t* create_event_kallsyms_table_write(vmi_instance_t vmi) {
   vmi_event_t* event = g_malloc0(sizeof(vmi_event_t));
+  if (event == NULL) {
+    log_error("Failed to allocate memory for vmi_event_t");
+    return NULL;
+  }
 
   addr_t kallsyms_addresses = 0;
   if (vmi_translate_ksym2v(vmi, "kallsyms_addresses", &kallsyms_addresses) !=
@@ -330,9 +342,35 @@ static vmi_event_t* create_event_kallsyms_table_write(vmi_instance_t vmi) {
     return NULL;
   }
 
-  // Monitor kallsyms tables (approximate size)
-  size_t kallsyms_size = 0x100000;  // 1MB approximate
+  size_t kallsyms_size = 0;
+
+  addr_t kallsyms_num_syms = 0;
+  if (vmi_translate_ksym2v(vmi, "kallsyms_num_syms", &kallsyms_num_syms) ==
+      VMI_SUCCESS) {
+    uint32_t num_syms = 0;
+    if (vmi_read_va(vmi, kallsyms_num_syms, 0, sizeof(uint32_t), &num_syms,
+                    NULL) == VMI_SUCCESS &&
+        num_syms > 0) {
+      kallsyms_size = num_syms * sizeof(addr_t);
+      log_info("Resolved %u kallsyms entries (total size: %zu bytes)", num_syms,
+               kallsyms_size);
+    } else {
+      log_warn(
+          "Failed to read kallsyms_num_syms, falling back to default size.");
+    }
+  } else {
+    log_warn(
+        "Could not resolve kallsyms_num_syms, falling back to default size.");
+  }
+
+  if (kallsyms_size == 0) {
+    // Placeholder size
+    kallsyms_size = 0x100000;
+    log_info("Using default kallsyms_addresses size: %zu bytes", kallsyms_size);
+  }
+
   SETUP_MEM_EVENT(event, kallsyms_addresses, VMI_MEMACCESS_W,
                   event_kallsyms_table_write_callback, kallsyms_size);
+
   return event;
 }

@@ -12,6 +12,12 @@
 
 event_response_t event_cr0_write_callback(vmi_instance_t vmi,
                                           vmi_event_t* event) {
+
+  if (!vmi || !event) {
+    log_error("Invalid arguments to CR0 write callback.");
+    return VMI_EVENT_INVALID;
+  }
+
   uint64_t cr0_value = event->reg_event.value;
   uint32_t vcpu_id = event->vcpu_id;
 
@@ -30,27 +36,22 @@ event_response_t event_cr0_write_callback(vmi_instance_t vmi,
 
   vmi_pid_t pid = 0;
   // Note: Use of vmi_dtb_to_pid is discouraged in events.
-  // TODO: Find another way to access pid, or remove completely.
-  if (vmi_dtb_to_pid(vmi, cr3, &pid) == VMI_SUCCESS) {
-    log_info("PE=%s PG=%s WP=%s CD=%s AM=%s PID=%d", protection_enabled,
-             paging_enabled, write_protect, cache_disabled, alignment_mask,
-             pid);
-  } else {
-    log_warn("Failed to resolve PID from CR3: 0x%" PRIx64, cr3);
-    log_warn("PE=%s PG=%s WP=%s CD=%s AM=%s PID=unknown", protection_enabled,
-             paging_enabled, write_protect, cache_disabled, alignment_mask);
-  }
+  // Pid does not make sense on this context, module is the one modifying the WP bit. (See Notes)
+  log_info("CR0 WRITE Event: PE=%s PG=%s WP=%s CD=%s AM=%s PID=unknown",
+           protection_enabled, paging_enabled, write_protect, cache_disabled,
+           alignment_mask);
 
+  // TODO: Investigate
   if (!(cr0_value & CR0_PE)) {
-    log_warn("Protection mode disabled.");
+    log_debug("Protection mode disabled.");
   }
 
   if (!(cr0_value & CR0_PG)) {
-    log_warn("Paging disabled.");
+    log_debug("Paging disabled.");
   }
   // TODO: Find PoC for this case.(??)
   if (cr0_value & CR0_CD) {
-    log_warn("CPU cache disabled.");
+    log_debug("CPU cache disabled.");
   }
 
   return VMI_EVENT_RESPONSE_NONE;
