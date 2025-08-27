@@ -147,11 +147,11 @@ void event_handler_free(event_handler_t* event_handler) {
       g_free(task);
     }
   }
-   
+
   if (event_handler->vmi) {
     vmi_destroy(event_handler->vmi);
   }
-  
+
   g_free(event_handler);
 }
 
@@ -238,12 +238,56 @@ static gpointer event_loop_thread(gpointer data) {
            event_handler->window_ms);
   // NOTE: LibVMI processes one event at a time, listen to total of time window_ms.
   // The callback will be triggered, which will enqueue the item.
-  vmi_events_listen(event_handler->vmi, event_handler->window_ms);
+  while (!g_atomic_int_get(&event_handler->stop_signal)) {
+    if (vmi_events_listen(event_handler->vmi, event_handler->window_ms) ==
+        VMI_FAILURE) {
+      log_error("vmi_events_listen failed.");
+    }
+  }
   log_info("Event loop thread has finished processing events, exiting...");
   log_info(
       "Post-sampling state tasks after the event loop thread has started...");
   sample_state_tasks(event_handler);
   return NULL;
+}
+
+static gpointer event_window(gpointer data) {
+  if (!data) {
+    log_error("event_window: received NULL data pointer.");
+    return NULL;
+  }
+
+  event_handler_t* event_handler = (event_handler_t*)data;
+
+  // microseconds
+  g_usleep((gulong)event_handler->window_ms * 1000);
+
+  // Signal the event loop to stop
+  g_atomic_int_set(&event_handler->stop_signal, 1);
+
+  log_info("event_window: Signaled event loop to stop after %u ms.",
+           event_handler->window_ms);
+
+  return NULL;
+}
+
+void event_handler_start_event_window(event_handler_t* event_handler) {
+  if (!event_handler) {
+    log_error("event_handler_start_event_window: NULL handler.");
+    return;
+  }
+
+  g_atomic_int_set(&event_handler->stop_signal, 0);
+
+  // Launch the timer thread
+  event_handler->signal_event_thread =
+      g_thread_new("event_window", event_window, event_handler);
+  if (!event_handler->signal_event_thread) {
+    log_error("event_handler_start_event_window: Failed to create thread.");
+  } else {
+    log_info("Started event window thread to run for %u ms.",
+             event_handler->window_ms);
+  }
 }
 
 void sample_state_tasks(event_handler_t* event_handler) {
@@ -271,9 +315,10 @@ void sample_state_tasks(event_handler_t* event_handler) {
     if (task && task->functor) {
       log_info("Sampling state task: %s", state_task_id_to_str(task->id));
       task->functor(event_handler->vmi, NULL);
-    } else {
-      log_info("No registered state task for ID: %d", i);
     }
+    // else {
+    //   debug_info("No registered state task for ID: %d", i);
+    // }
   }
 
   event_handler->latest_state_sampling_ms = current_time_ms;

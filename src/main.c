@@ -51,6 +51,8 @@ int main(int argc, char** argv) {
     return EXIT_FAILURE;
   }
 
+  // Start the timer and event loop
+  event_handler_start_event_window(event_handler);
   event_handler_start_event_loop(event_handler);
 
   if (event_handler->event_thread) {

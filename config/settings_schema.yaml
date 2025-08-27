@@ -3,7 +3,7 @@ domain_name: "ubuntu-20-04-new-kernel"
 
 # How long the entire introspection window should last (in miliseconds)
 monitor:
-  window_ms: 10000
+  window_ms: 100000
   state_sampling_ms: 1000
 
 # Which detection services to dispatch.
