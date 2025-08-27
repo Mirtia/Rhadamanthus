@@ -13,7 +13,7 @@
 #include "event_callbacks/page_table_modification.h"
 #include "event_callbacks/syscall_table_write.h"
 
-// Event creation functions
+// Event creation functions, early declarations for map.
 static vmi_event_t* create_event_ftrace_hook(vmi_instance_t vmi);
 static vmi_event_t* create_event_syscall_table_write(vmi_instance_t vmi);
 static vmi_event_t* create_event_idt_write(vmi_instance_t vmi);
@@ -26,7 +26,6 @@ static vmi_event_t* create_event_io_uring_ring_write(vmi_instance_t vmi);
 static vmi_event_t* create_event_ebpf_map_update(vmi_instance_t vmi);
 static vmi_event_t* create_event_kallsyms_table_write(vmi_instance_t vmi);
 
-// Helper functions for event setup
 static vmi_event_t* setup_memory_event(
     addr_t addr, vmi_mem_access_t access_type,
     event_response_t (*callback)(vmi_instance_t, vmi_event_t*));
@@ -98,11 +97,12 @@ static vmi_event_t* setup_memory_event(
     event_response_t (*callback)(vmi_instance_t, vmi_event_t*)) {
   vmi_event_t* event = g_malloc0(sizeof(vmi_event_t));
 
+  // TODO: Confirm correctness
   event->version = VMI_EVENTS_VERSION;
   event->type = VMI_EVENT_MEMORY;
   event->mem_event.gfn =
-      addr >> 12;                // Convert address to GFN (Guest Frame Number)
-  event->mem_event.generic = 0;  // Not using generic events
+      addr >> 12;                
+  event->mem_event.generic = 0;  
   event->mem_event.in_access = access_type;
   event->callback = callback;
 
@@ -123,8 +123,6 @@ static vmi_event_t* setup_register_event(
 
   return event;
 }
-
-// Event creation implementations
 
 static vmi_event_t* create_event_ftrace_hook(vmi_instance_t vmi) {
   // Monitor writes to ftrace_ops structures
@@ -149,14 +147,12 @@ static vmi_event_t* create_event_syscall_table_write(vmi_instance_t vmi) {
     return NULL;
   }
 
-  // Monitor entire syscall table (assume 512 syscalls * 8 bytes each)
   size_t syscall_table_size = 512 * sizeof(addr_t);
   return setup_memory_event(sys_call_table, VMI_MEMACCESS_W,
                             event_syscall_table_write_callback);
 }
 
 static vmi_event_t* create_event_idt_write(vmi_instance_t vmi) {
-  // Monitor IDT table - get IDTR base address
   uint64_t idtr_base = 0;
   uint32_t vcpu_count = vmi_get_num_vcpus(vmi);
 
@@ -170,7 +166,6 @@ static vmi_event_t* create_event_idt_write(vmi_instance_t vmi) {
     return NULL;
   }
 
-  // IDT has 256 entries, each 16 bytes
   size_t idt_size = (size_t)(256) * 16;
   return setup_memory_event(idtr_base, VMI_MEMACCESS_W,
                             event_idt_write_callback);

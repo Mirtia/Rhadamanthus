@@ -6,6 +6,7 @@
 #include <string.h>
 #include <yaml.h>
 #include "event_handler.h"
+#include "event_task_map.h"
 #include "state_task_map.h"
 
 void config_free(config_t* config) {
@@ -64,14 +65,11 @@ event_handler_t* event_handler_initialize_from_config(const char* config_path) {
     event_handler_register_state_task(event_handler, task_id, functor);
   }
 
-  for (GList* list_iter = config.event_tasks; list_iter != NULL;
-       list_iter = list_iter->next) {
-    event_task_id_t task_id = GPOINTER_TO_INT(list_iter->data);
-    // TODO: actual event callback.
-    // Mapping from task_id to a callback should be done here.
-    vmi_event_t* event = g_new0(vmi_event_t, 1);
-    // TODO: Initialize event! Where?
-    event_handler_register_event_task(event_handler, task_id, event, NULL);
+  for (GList* it = config.event_tasks; it != NULL; it = it->next) {
+    event_task_id_t task_id = GPOINTER_TO_INT(it->data);
+    if (register_event_task_by_id(event_handler, task_id) < 0) {
+      log_error("Failed to register event task id=%d", task_id);
+    }
   }
 
   // Free config resources.
