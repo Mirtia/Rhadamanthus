@@ -14,6 +14,8 @@
 #include "event_callbacks/page_table_modification.h"
 #include "event_callbacks/syscall_table_write.h"
 
+#define PAGE_SIZE 4096  ///< X86_64 page size
+
 // Event creation functions, early declarations for map.
 static vmi_event_t* create_event_ftrace_hook(vmi_instance_t vmi);
 static vmi_event_t* create_event_syscall_table_write(vmi_instance_t vmi);
@@ -233,8 +235,26 @@ static vmi_event_t* create_event_code_section_modify(vmi_instance_t vmi) {
   }
 
   size_t text_size = text_end - text_start;
-  return setup_memory_event(text_start, VMI_MEMACCESS_W,
-                            event_code_section_modify_callback);
+  size_t page_count = (text_size + PAGE_SIZE - 1) / PAGE_SIZE;
+
+  for (size_t i = 0; i < page_count; i++) {
+    addr_t page_addr = text_start + i * PAGE_SIZE;
+    vmi_event_t* event = setup_memory_event(page_addr, VMI_MEMACCESS_W,
+                                            event_code_section_modify_callback);
+
+    if (!event || vmi_register_event(vmi, event) != VMI_SUCCESS) {
+      log_error("Failed to register code section modify event at 0x%" PRIx64,
+                page_addr);
+      if (event)
+        g_free(event);
+    }
+  }
+
+  log_info("Registered write monitoring on %zu pages of kernel .text section",
+           page_count);
+
+  // You can return NULL here if nothing else needs to hold the event object
+  return NULL;
 }
 
 static vmi_event_t* create_event_io_uring_ring_write(vmi_instance_t vmi) {
@@ -364,7 +384,7 @@ static vmi_event_t* create_event_kallsyms_table_write(vmi_instance_t vmi) {
   }
 
   if (kallsyms_size == 0) {
-    // Placeholder size
+    // Note: This is a constant out of ass.
     kallsyms_size = 0x100000;
     log_info("Using default kallsyms_addresses size: %zu bytes", kallsyms_size);
   }

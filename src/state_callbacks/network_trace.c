@@ -364,10 +364,6 @@ uint32_t state_network_trace_callback(vmi_instance_t vmi, void* context) {
     result = VMI_FAILURE;
   }
 
-  // 3. Compare with /proc/net/* view (would need separate implementation)
-  // This would involve reading the guest's /proc/net/tcp and comparing
-  // with what we found in kernel structures
-
   // Report findings
   if (det_ctx.suspicious_count > 0) {
     log_warn(

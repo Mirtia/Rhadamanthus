@@ -28,6 +28,7 @@
 
 /**
  * @brief Common syscalls that are frequently hooked (from the PoC)
+ * TODO: Expand list according to the dataset samples.
  */
 static const char* commonly_hooked_syscalls[] = {
     "__x64_sys_clone",       // From the PoC

@@ -211,18 +211,15 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
         kernel_threads++;
       }
 
-      // Print process information
       print_process_info(&proc_info);
       total_processes++;
     }
 
-    // Cleanup process name
     if (proc_info.name) {
       g_free(proc_info.name);
       proc_info.name = NULL;
     }
 
-    // Read next task pointer
     if (vmi_read_addr_va(vmi, cur_list_entry, 0, &next_list_entry) !=
         VMI_SUCCESS) {
       log_error("Failed to read next task pointer at 0x%" PRIx64,
