@@ -23,5 +23,6 @@ features:
     # # This approach needs modification.
     # - id: STATE_KERNEL_CODE_INTEGRITY_CHECK
     - id: STATE_IO_URING_ARTIFACTS
+    - id: STATE_NETWORK_TRACE
   event:
     - id: EVENT_CR0_WRITE
