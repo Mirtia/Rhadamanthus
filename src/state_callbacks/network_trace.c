@@ -106,6 +106,7 @@ static const char* tcp_state_to_string(tcp_state_t state) {
   }
 }
 
+
 /**
  * @brief Check if a port is suspicious based on known rootkit patterns.
  * 
@@ -517,6 +518,7 @@ static uint32_t check_netfilter_hooks(vmi_instance_t vmi,
         bool is_suspicious = false;
 
         // 1. Check if hook function is in kernel text section
+        // TODO: Fix, this is atrocious! Move to general function (helper or utils file) so that multiple other events can access it.
         if (hook_func < 0xffffffff80000000ULL) {
           log_warn(
               "SUSPICIOUS: Hook function in user space: PF=%d HOOK=%d "
@@ -526,6 +528,7 @@ static uint32_t check_netfilter_hooks(vmi_instance_t vmi,
         }
 
         // 2. Check for common rootkit signature addresses
+        // TODO: ??? There should be references here.
         uint16_t func_low_bits = hook_func & 0xFFFF;
         if (func_low_bits == 0x666 || func_low_bits == 0x1337 ||
             func_low_bits == 0xdead || func_low_bits == 0xbeef) {
@@ -537,6 +540,7 @@ static uint32_t check_netfilter_hooks(vmi_instance_t vmi,
         }
 
         // 3. Check for hooks in unusual memory regions (heap, stack, etc.)
+        // TODO: Hardcoded addresses is smelly code, there is no way this will work.
         if ((hook_func >= 0xffff888000000000ULL &&
              hook_func < 0xffffc87fffffffffULL)) {
           log_warn(

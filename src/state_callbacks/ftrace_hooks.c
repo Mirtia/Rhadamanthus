@@ -38,6 +38,7 @@ static const char* commonly_hooked_syscalls[] = {
     "__x64_sys_write",       // File operations
     "__x64_sys_getdents64",  // Directory hiding
     "__x64_sys_kill",        // Process hiding
+    //  TODO: add more, maybe whole list?
     "sys_clone",             // Legacy naming
     "sys_execve",            // Legacy naming
     NULL};
