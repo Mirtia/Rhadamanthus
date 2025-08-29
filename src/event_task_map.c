@@ -203,6 +203,7 @@ static vmi_event_t* create_event_page_table_modification(vmi_instance_t vmi) {
 static vmi_event_t* create_event_netfilter_hook_write(vmi_instance_t vmi) {
   // Monitor netfilter hook registration
   addr_t nf_hooks = 0;
+  // nf_hooks is deprecated for newer kernels.
   if (vmi_translate_ksym2v(vmi, "nf_hooks", &nf_hooks) != VMI_SUCCESS) {
     log_warn("Failed to resolve nf_hooks symbol");
     // Try alternative symbol
@@ -258,15 +259,67 @@ static vmi_event_t* create_event_code_section_modify(vmi_instance_t vmi) {
 }
 
 static vmi_event_t* create_event_io_uring_ring_write(vmi_instance_t vmi) {
-  (void)vmi;
-  // Monitor io_uring operations - this is complex as it's per-process
-  // For now, we'll monitor common io_uring structures
-  // This would need more sophisticated implementation in practice
-  log_warn(
-      "io_uring monitoring requires process-specific ring buffer tracking");
+  addr_t kaddr = 0;
+  const char* chosen_sym = NULL;
 
-  // Placeholder - would need to track io_uring_setup syscalls and monitor created rings
-  return NULL;
+  /* Try common symbol names: x86_64 first, then generic. */
+  const char* candidates[] = {
+      "__x64_sys_io_uring_enter",
+      "io_uring_enter",
+  };
+
+  for (size_t i = 0; i < sizeof(candidates) / sizeof(candidates[0]); i++) {
+    if (vmi_translate_ksym2v(vmi, candidates[i], &kaddr) == VMI_SUCCESS &&
+        kaddr) {
+      chosen_sym = candidates[i];
+      break;
+    }
+  }
+  if (!chosen_sym) {
+    log_warn(
+        "io_uring: could not resolve io_uring_enter symbol on this kernel; "
+        "skipping.");
+    return NULL;
+  }
+
+  vmi_event_t* event = g_malloc0(sizeof(*event));
+  if (!event) {
+    log_error("io_uring: failed to allocate vmi_event_t");
+    return NULL;
+  }
+
+  io_uring_bp_ctx_t* ctx = g_malloc0(sizeof(*ctx));
+  if (!ctx) {
+    log_error("io_uring: failed to allocate breakpoint context");
+    g_free(event);
+    return NULL;
+  }
+  ctx->kaddr = kaddr;
+  ctx->symname = chosen_sym;
+
+  // Save original first byte and patch INT3 (0xCC).
+  if (vmi_read_8_va(vmi, kaddr, 0, &ctx->orig) != VMI_SUCCESS) {
+    log_error("io_uring: failed to read original byte @0x%" PRIx64,
+              (uint64_t)kaddr);
+    g_free(ctx);
+    g_free(event);
+    return NULL;
+  }
+  uint8_t int3 = 0xCC;
+  if (vmi_write_8_va(vmi, kaddr, 0, &int3) != VMI_SUCCESS) {
+    log_error("io_uring: failed to write INT3 @0x%" PRIx64
+              " (text may be write-protected).",
+              (uint64_t)kaddr);
+    g_free(ctx);
+    g_free(event);
+    return NULL;
+  }
+
+  event->version = VMI_EVENTS_VERSION;
+  event->type = VMI_EVENT_SINGLESTEP;
+  event->data = ctx;
+
+  return event;
 }
 
 static vmi_event_t* create_event_ebpf_map_update(vmi_instance_t vmi) {

@@ -4,16 +4,6 @@
 #include <log.h>
 
 /**
- * @brief Context structure for io_uring enter syscall breakpoint handling.
- */
-typedef struct io_uring_bp_ctx {
-  addr_t kaddr;         ///< kernel VA of __x64_sys_io_uring_enter */
-  uint8_t orig;         ///< original first byte (before 0xCC) */
-  vmi_event_t ss_evt;   ///< one-shot SINGLESTEP event, registered from BP cb */
-  const char* symname;  ///< for logs */
-} io_uring_bp_ctx_t;
-
-/**
  * @brief Placeholder event free function that does nothing.
  */
 static void vmi_event_free_noop() {}
@@ -60,10 +50,10 @@ event_response_t event_io_uring_ring_write_ss_callback(vmi_instance_t vmi,
 event_response_t event_io_uring_ring_write_callback(vmi_instance_t vmi,
                                                     vmi_event_t* event) {
   /* Entry breakpoint handler:
-  *   1) Restore original byte (so the real first instruction can run),
-  *   2) Enable single-step (TF=1) and rewind RIP by 1 (INT3 advanced it),
-  *   3) Register a one-shot SINGLESTEP event to re-arm INT3 and clear TF,
-  *   4) (Optional) Log the syscall arguments for visibility/classification.
+  *  - Restore original byte (so the real first instruction can run),
+  *  - Enable single-step (TF=1) and rewind RIP by 1 (INT3 advanced it),
+  *  - Register a one-shot SINGLESTEP event to re-arm INT3 and clear TF,
+  *  - (Optional) Log the syscall arguments for visibility/classification.
   */
   io_uring_bp_ctx_t* ctx = (io_uring_bp_ctx_t*)event->data;
 

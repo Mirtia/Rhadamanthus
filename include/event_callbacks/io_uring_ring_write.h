@@ -3,6 +3,16 @@
 #include <libvmi/events.h>
 
 /**
+ * @brief Context structure for io_uring enter syscall breakpoint handling.
+ */
+typedef struct io_uring_bp_ctx {
+  addr_t kaddr;         ///< kernel VA of __x64_sys_io_uring_enter */
+  uint8_t orig;         ///< original first byte (before 0xCC) */
+  vmi_event_t ss_evt;   ///< one-shot SINGLESTEP event, registered from BP cb */
+  const char* symname;  ///< for logs */
+} io_uring_bp_ctx_t;
+
+/**
  * @brief Callback to detect io_uring events.
  * 
  * @param vmi The vmi instance.
