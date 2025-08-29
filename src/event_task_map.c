@@ -186,18 +186,44 @@ static vmi_event_t* create_event_cr0_write(vmi_instance_t vmi) {
 }
 
 static vmi_event_t* create_event_page_table_modification(vmi_instance_t vmi) {
-  // This is complex - we need to monitor page table writes
-  // For now, monitor writes to the current CR3 (page directory)
+  // Hypervisor shit
+  /* Get current CR3 (kernel CR3 on vCPU 0 is fine for a single baseline). */
   uint64_t cr3 = 0;
   if (vmi_get_vcpureg(vmi, &cr3, CR3, 0) != VMI_SUCCESS) {
-    log_error("Failed to get CR3 register");
+    log_error("PT watch: failed to read CR3");
     return NULL;
   }
+  addr_t pml4_pa = (addr_t)(cr3 & ~0xFFFULL);
 
-  // Monitor page table area (approximate)
-  size_t pt_size = 0x1000;  // 4KB page
-  return setup_memory_event(cr3, VMI_MEMACCESS_W,
-                            event_page_table_modification_callback);
+  /* Create the memory write event on the PML4 page (GFN = PA >> 12). */
+  vmi_event_t* event = setup_memory_event(
+      pml4_pa, VMI_MEMACCESS_W, event_page_table_modification_callback);
+  if (!event)
+    return NULL;
+
+  /* Allocate and seed the context with an initial snapshot (if possible). */
+  pt_watch_ctx_t* ctx = g_malloc0(sizeof(*ctx));
+  if (!ctx) {
+    log_error("PT watch: failed to allocate context");
+    g_free(event);
+    return NULL;
+  }
+  ctx->pml4_pa = pml4_pa;
+  if (vmi_read_pa(vmi, ctx->pml4_pa, sizeof(ctx->shadow), ctx->shadow, NULL) ==
+      VMI_SUCCESS) {
+    ctx->shadow_valid = 1;
+    log_info("PT watch: initial PML4 snapshot taken @0x%lx",
+             (unsigned long)ctx->pml4_pa);
+  } else {
+    log_warn(
+        "PT watch: could not snapshot PML4 @0x%lx now; will prime on first "
+        "write",
+        (unsigned long)ctx->pml4_pa);
+  }
+
+  /* Attach context so the callback can diff. */
+  event->data = ctx;
+  return event;
 }
 
 static vmi_event_t* create_event_netfilter_hook_write(vmi_instance_t vmi) {

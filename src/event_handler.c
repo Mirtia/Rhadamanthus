@@ -112,18 +112,18 @@ event_handler_t* event_handler_initialize(vmi_instance_t vmi,
   event_handler->window_ms = window_ms;
   event_handler->state_sampling_ms = state_sampling_ms;
   event_handler->vmi = vmi;
+  event_handler->stop_signal = 0;
+  event_handler->is_paused = false;
   // Initialize with timestamp when the first task state sampling is performed.
   // 0 is a placeholder value, indicating that no state sampling has been performed yet.
   event_handler->latest_state_sampling_ms = 0;
 
-  // Initialize with placeholder values.
   for (int i = 0; i < STATE_TASK_ID_MAX; ++i)
     event_handler->state_tasks[i] = NULL;
 
   for (int i = 0; i < EVENT_TASK_ID_MAX; ++i)
     event_handler->event_tasks[i] = NULL;
 
-  // Create new queue for event callbacks.
   return event_handler;
 }
 

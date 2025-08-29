@@ -2,15 +2,16 @@
 #include <glib-2.0/glib.h>
 #include <inttypes.h>
 #include <log.h>
-
+#include "event_handler.h"
+#include "utils.h"
 /**
- * @brief Cleans up the syscall index array.
+ * @brief Frees the syscall index array.
  * 
  * @param sys_index The syscall index array to clean up.  
- * @param count The number of entries in the syscall index array.
+ * @param size The number of entries in the syscall index array.
  */
-static void cleanup_sys_index(char** sys_index, size_t count) {
-  for (size_t i = 0; i < count; ++i) {
+static void cleanup_sys_index(char** sys_index, size_t size) {
+  for (size_t i = 0; i < size; ++i) {
     g_free(sys_index[i]);
   }
   g_free(sys_index);
@@ -19,10 +20,10 @@ static void cleanup_sys_index(char** sys_index, size_t count) {
 /**
  * @brief Parses the syscall index file to extract syscall names and their indices.
  * 
- * @param out_count Pointer to store the number of syscalls parsed.
+ * @param count_dst Pointer to store the number of syscalls parsed.
  * @return char** An array of syscall names, or NULL on failure.
  */
-static char** parse_syscall_index_file(size_t* out_count) {
+static char** parse_syscall_index_file(size_t* count_dst) {
   FILE* file = fopen(SYSCALL_INDEX_FILE, "r");
   if (!file) {
     log_error("Failed to open syscall index file: %s", SYSCALL_INDEX_FILE);
@@ -62,20 +63,36 @@ static char** parse_syscall_index_file(size_t* out_count) {
     }
 
     name[strcspn(name, "\r\n")] = '\0';
-    // Note: We know that count >=0 here, so no need to check for g_realloc returning NULL.
     char** temp = g_realloc(sys_index, sizeof(char*) * (count + 1));
+    if (!temp) {
+      log_error("Realloc failed while expanding syscall index array.");
+      g_free(name);
+      (void)fclose(file);
+      cleanup_sys_index(sys_index, count);
+      return NULL;
+    }
+
     sys_index = temp;
     sys_index[count++] = name;
   }
 
   (void)fclose(file);
-  *out_count = count;
+  *count_dst = count;
   return sys_index;
 }
 
 uint32_t state_syscall_table_callback(vmi_instance_t vmi, void* context) {
   (void)context;
+  // Check if vm is paused by checking the context (event_handler).
+  event_handler_t* event_handler = (event_handler_t*)context;
+  // Note: By not having a paused VM we risk inconsistent state between information gathering (reads).
+  if (!event_handler || !event_handler->is_paused) {
+    log_error("STATE_SYSCALL_TABLE: Callback requires a paused VM.");
+    return VMI_FAILURE;
+  }
+
   size_t syscall_number = 0;
+  // In data folder there is an index of the system calls available to the target system.
   char** sys_index = parse_syscall_index_file(&syscall_number);
   if (!sys_index)
     return VMI_FAILURE;
@@ -87,41 +104,45 @@ uint32_t state_syscall_table_callback(vmi_instance_t vmi, void* context) {
 
   if (vmi_translate_ksym2v(vmi, "sys_call_table", &sys_call_table_addr) ==
       VMI_FAILURE) {
-    log_error("Failed to resolve sys_call_table.");
+    log_error("STATE_SYSCALL_TABLE: Failed to resolve symbol sys_call_table.");
     cleanup_sys_index(sys_index, syscall_number);
     return VMI_FAILURE;
   }
 
-  log_info("sys_call_table address: 0x%" PRIx64, sys_call_table_addr);
+  log_info("STATE_SYSCALL_TABLE: sys_call_table address: 0x%" PRIx64,
+           sys_call_table_addr);
 
-  if ((vmi_translate_ksym2v(vmi, "_stext", &kernel_start) == VMI_FAILURE ||
-       vmi_translate_ksym2v(vmi, "_etext", &kernel_end) == VMI_FAILURE)) {
-    log_error("Failed to resolve kernel .text boundaries.");
+  if (get_kernel_text_section_range(vmi, &kernel_start, &kernel_end) ==
+      VMI_FAILURE) {
+    log_error(
+        "STATE_SYSCALL_TABLE: Failed to get kernel .text section boundaries.");
     cleanup_sys_index(sys_index, syscall_number);
     return VMI_FAILURE;
   }
 
-  log_info(".text range: 0x%" PRIx64 " - 0x%" PRIx64, kernel_start,
-           kernel_end);
+  log_info(".text range: 0x%" PRIx64 " - 0x%" PRIx64, kernel_start, kernel_end);
 
   for (size_t i = 0; i < syscall_number; ++i) {
     if (vmi_read_addr_va(vmi, sys_call_table_addr + i * sizeof(addr_t), 0,
                          &sys_call_addr) == VMI_FAILURE) {
-      log_warn("Failed to read syscall address at index %zu.", i);
+      log_warn(
+          "STATE_SYSCALL_TABLE: Failed to read syscall address at index %zu.",
+          i);
       continue;
     }
 
     if (sys_call_addr < kernel_start || sys_call_addr > kernel_end) {
-      log_warn("Hook detected: syscall %s at 0x%" PRIx64, sys_index[i],
-               sys_call_addr);
+      log_warn("STATE_SYSCALL_TABLE: Hook detected: syscall %s at 0x%" PRIx64,
+               sys_index[i], sys_call_addr);
       syscall_hit_count++;
     }
   }
 
   if (syscall_hit_count > 0) {
-    log_info("%d syscalls appear to be hooked.", syscall_hit_count);
+    log_warn("STATE_SYSCALL_TABLE: %d syscalls appear to be hooked.",
+             syscall_hit_count);
   } else {
-    log_info("No hooked syscalls detected.");
+    log_info("STATE_SYSCALL_TABLE: No hooked syscalls detected.");
   }
 
   cleanup_sys_index(sys_index, syscall_number);

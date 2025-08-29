@@ -25,12 +25,13 @@
   - [x] On later stages both disk and memory snapshots are required
 - [ ] Perform integrity check
 - [x] State integrity callback
-- [ ] Test state integrity callback
+- [x] Test state integrity callback
 - [ ] Test io_uring_artifacts with io_uring rootkit
 - [x] Create first event_callback cr0 (easiest one)
   - [ ] Issue with finding pid of orgin
 - [ ] Test cr0 write with idt_hook or any other rootkit
 
-## TODO 22/08/2025 - 23/08/2025
+## TODO 22/08/2025 - ??
 
-- [ ] Kernel code integrity is a stupid approach. It will only make sense when you compare at same alive boot. Compare along time window.
+- [ ] Kernel code integrity is a stupid approach. It will only make sense when you compare at same alive boot. Compare along time window. Hold a history of the hashes.
+- [ ] Double-check implementations so far and rationalize.

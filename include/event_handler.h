@@ -75,7 +75,8 @@ struct event_handler {
       signal_event_thread;  ///< The thread that signals the event loop to stop processing events after window ms.
   volatile sig_atomic_t
       stop_signal;  ///< Signal to stop the event loop after the time window.
-      // TODO: Add thread that does post-processing / serialization / storage of the events.
+  // TODO: Add thread that does post-processing / serialization / storage of the events.
+  volatile bool is_paused;  ///< Flag to indicate if vm is paused.
 };
 
 /**

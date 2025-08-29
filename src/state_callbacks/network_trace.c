@@ -622,7 +622,7 @@ uint32_t state_network_trace_callback(vmi_instance_t vmi, void* context) {
   detection_context_t det_ctx = {0};
   uint32_t result = VMI_SUCCESS;
 
-  log_info("Starting network rootkit detection...");
+  log_info("STATE_NETWORK_TRACE_CALLBACK: Starting network rootkit detection...");
 
   // Initialize detection context
   det_ctx.visible_connections =
@@ -633,26 +633,26 @@ uint32_t state_network_trace_callback(vmi_instance_t vmi, void* context) {
 
   // 1. Check netfilter hooks for modifications
   if (check_netfilter_hooks(vmi, &det_ctx) != VMI_SUCCESS) {
-    log_error("Failed to check netfilter hooks");
+    log_error("STATE_NETWORK_TRACE_CALLBACK: Failed to check netfilter hooks");
     result = VMI_FAILURE;
   }
 
   // 2. Walk kernel network structures directly
   if (walk_tcp_hash_table(vmi, &det_ctx) != VMI_SUCCESS) {
-    log_error("Failed to walk TCP hash tables");
+    log_error("STATE_NETWORK_TRACE_CALLBACK: Failed to walk TCP hash tables");
     result = VMI_FAILURE;
   }
 
   // Report findings
   if (det_ctx.suspicious_count > 0) {
     log_warn(
-        "NETWORK ROOTKIT DETECTION: Found %u suspicious network activities!",
+        "STATE_NETWORK_TRACE_CALLBACK: Found %u suspicious network activities!",
         det_ctx.suspicious_count);
   } else {
-    log_info("Network rootkit scan completed - no immediate threats detected");
+    log_info("STATE_NETWORK_TRACE_CALLBACK: No immediate threats detected");
   }
 
-  log_info("Network connections found: %u kernel, %u visible",
+  log_info("STATE_NETWORK_TRACE_CALLBACK: CONNECTIONS found: %u kernel, %u visible",
            det_ctx.kernel_connections->len,
            g_hash_table_size(det_ctx.visible_connections));
 
