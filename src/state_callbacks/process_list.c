@@ -3,6 +3,7 @@
 #include <inttypes.h>
 #include <log.h>
 #include <string.h>
+#include "offsets.h"
 
 /**
  * @brief Structure to hold process information.
@@ -16,19 +17,6 @@ typedef struct {
   bool is_kernel_thread;          ///< Flag indicating if it's a kernel thread.
   addr_t mm_addr;                 ///<  Memory management struct.
 } process_info_t;
-
-// Offsets are retrieved from the LibVMI profile at runtime. They were extracted with pahole from the vmlinux file.
-static unsigned long state_offset = 0;  ///< unsigned int __state
-static unsigned long tasks_offset = 0;  ///< struct list_head tasks
-static unsigned long mm_offset = 0;     ///< struct mm_struct *mm
-static unsigned long pid_offset = 0;    ///< pid_t pid
-static unsigned long cred_offset = 0;   ///< const struct cred *cred
-static unsigned long name_offset = 0;   ///< char comm[16]
-
-static unsigned long uid_offset = 0;
-static unsigned long gid_offset = 0;
-static unsigned long euid_offset = 0;
-static unsigned long egid_offset = 0;
 
 /**
  * @brief Check if a task_struct represents a kernel thread.
@@ -72,13 +60,13 @@ static bool read_process_credentials(vmi_instance_t vmi, addr_t task_struct,
     return false;
   }
 
-  if (vmi_read_32_va(vmi, cred_addr + uid_offset, 0, &proc_info->uid) !=
+  if (vmi_read_32_va(vmi, cred_addr + LINUX_EUID_OFFSET, 0, &proc_info->uid) !=
           VMI_SUCCESS ||
-      vmi_read_32_va(vmi, cred_addr + gid_offset, 0, &proc_info->gid) !=
+      vmi_read_32_va(vmi, cred_addr + LINUX_GID_OFFSET, 0, &proc_info->gid) !=
           VMI_SUCCESS ||
-      vmi_read_32_va(vmi, cred_addr + euid_offset, 0, &proc_info->euid) !=
+      vmi_read_32_va(vmi, cred_addr + LINUX_EUID_OFFSET, 0, &proc_info->euid) !=
           VMI_SUCCESS ||
-      vmi_read_32_va(vmi, cred_addr + egid_offset, 0, &proc_info->egid) !=
+      vmi_read_32_va(vmi, cred_addr + LINUX_EGID_OFFSET, 0, &proc_info->egid) !=
           VMI_SUCCESS) {
     log_debug("Failed to read credential values");
     return false;
@@ -126,12 +114,12 @@ static void print_process_info(const process_info_t* proc_info) {
   }
 
   log_debug("PID %u: %s [%s] [%s] (task_struct=0x%" PRIx64 ")", proc_info->pid,
-           proc_info->name, thread_type, state_str,
-           proc_info->task_struct_addr);
+            proc_info->name, thread_type, state_str,
+            proc_info->task_struct_addr);
 
   if (!proc_info->is_kernel_thread) {
     log_debug("Credentials: uid=%u gid=%u euid=%u egid=%u", proc_info->uid,
-             proc_info->gid, proc_info->euid, proc_info->egid);
+              proc_info->gid, proc_info->euid, proc_info->egid);
   }
 }
 
@@ -145,30 +133,27 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
 
   uint32_t total_processes = 0, kernel_threads = 0, user_processes = 0;
 
-  // Resolve required offsets from the LibVMI profile
-  if (vmi_get_offset(vmi, "linux_tasks", &tasks_offset) != VMI_SUCCESS ||
-      vmi_get_offset(vmi, "linux_mm", &mm_offset) != VMI_SUCCESS ||
-      vmi_get_offset(vmi, "linux_pid", &pid_offset) != VMI_SUCCESS ||
-      vmi_get_offset(vmi, "linux_name", &name_offset) != VMI_SUCCESS ||
-      /* NOTE: profile key is spelled 'linux_cred_offsert' */
-      vmi_get_offset(vmi, "linux_cred_offsert", &cred_offset) != VMI_SUCCESS ||
-      vmi_get_offset(vmi, "linux_state_offset", &state_offset) != VMI_SUCCESS ||
-      vmi_get_offset(vmi, "linux_uid_offset", &uid_offset) != VMI_SUCCESS ||
-      vmi_get_offset(vmi, "linux_gid_offset", &gid_offset) != VMI_SUCCESS ||
-      vmi_get_offset(vmi, "linux_euid_offset", &euid_offset) != VMI_SUCCESS ||
-      vmi_get_offset(vmi, "linux_egid_offset", &egid_offset) != VMI_SUCCESS) {
-    log_error(
-        "STATE_PROCESS_LIST_CALLBACK: Failed to retrieve required task_struct/cred offsets from profile");
-    return VMI_FAILURE;
-  }
-
   // Get init_task address
   if (vmi_translate_ksym2v(vmi, "init_task", &list_head) != VMI_SUCCESS) {
     log_error("STATE_PROCESS_LIST_CALLBACK: Failed to resolve init_task");
     return VMI_FAILURE;
   }
 
-  list_head += tasks_offset;
+  unsigned long tasks_offset = 0, pid_offset = 0, name_offset = 0,
+                mm_offset = 0, linux_tasks_offset = 0;
+
+  if (vmi_get_offset(vmi, "linux_tasks", &linux_tasks_offset) != VMI_SUCCESS ||
+      vmi_get_offset(vmi, "linux_pid", &pid_offset) != VMI_SUCCESS ||
+      vmi_get_offset(vmi, "linux_name", &name_offset) != VMI_SUCCESS ||
+      vmi_get_offset(vmi, "linux_mm", &mm_offset) != VMI_SUCCESS) {
+
+    log_error(
+        "STATE_PROCESS_LIST_CALLBACK: Failed to retrieve required task_struct "
+        "offsets from profile");
+    return VMI_FAILURE;
+  }
+
+  list_head += linux_tasks_offset;
 
   // Read first task pointer
   if (vmi_read_addr_va(vmi, list_head, 0, &next_list_entry) != VMI_SUCCESS) {
@@ -189,7 +174,8 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
     // Read PID
     if (vmi_read_32_va(vmi, current_process + pid_offset, 0,
                        (uint32_t*)&proc_info.pid) != VMI_SUCCESS) {
-      log_warn("STATE_PROCESS_LIST_CALLBACK: Failed to read PID at 0x%" PRIx64, current_process);
+      log_warn("STATE_PROCESS_LIST_CALLBACK: Failed to read PID at 0x%" PRIx64,
+               current_process);
       process_valid = false;
     }
 
@@ -197,16 +183,22 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
     if (process_valid) {
       proc_info.name = vmi_read_str_va(vmi, current_process + name_offset, 0);
       if (!proc_info.name) {
-        log_warn("STATE_PROCESS_LIST_CALLBACK: Failed to read process name for PID %u", proc_info.pid);
+        log_warn(
+            "STATE_PROCESS_LIST_CALLBACK: Failed to read process name for PID "
+            "%u",
+            proc_info.pid);
         process_valid = false;
       }
     }
 
     // Read process state
     if (process_valid) {
-      if (vmi_read_32_va(vmi, current_process + state_offset, 0,
+      if (vmi_read_32_va(vmi, current_process + LINUX_STATE_OFFSET, 0,
                          &proc_info.state) != VMI_SUCCESS) {
-        log_warn("STATE_PROCESS_LIST_CALLBACK: Failed to read process state for PID %u", proc_info.pid);
+        log_warn(
+            "STATE_PROCESS_LIST_CALLBACK: Failed to read process state for PID "
+            "%u",
+            proc_info.pid);
         proc_info.state = 0xFFFFFFFF;  // Unknown state
       }
 
@@ -216,9 +208,12 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
 
       // Read credentials for user processes
       if (!proc_info.is_kernel_thread) {
-        if (!read_process_credentials(vmi, current_process, cred_offset,
+        if (!read_process_credentials(vmi, current_process, LINUX_CRED_OFFSET,
                                       &proc_info)) {
-          log_warn("STATE_PROCESS_LIST_CALLBACK: Failed to read credentials for PID %u", proc_info.pid);
+          log_warn(
+              "STATE_PROCESS_LIST_CALLBACK: Failed to read credentials for PID "
+              "%u",
+              proc_info.pid);
           // Continue anyway, just mark credentials as invalid
           proc_info.uid = proc_info.gid = proc_info.euid = proc_info.egid =
               0xFFFFFFFF;
@@ -239,8 +234,10 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
 
     if (vmi_read_addr_va(vmi, cur_list_entry, 0, &next_list_entry) !=
         VMI_SUCCESS) {
-      log_error("STATE_PROCESS_LIST_CALLBACK: Failed to read next task pointer at 0x%" PRIx64,
-                cur_list_entry);
+      log_error(
+          "STATE_PROCESS_LIST_CALLBACK: Failed to read next task pointer at "
+          "0x%" PRIx64,
+          cur_list_entry);
       return VMI_FAILURE;
     }
 
@@ -249,8 +246,10 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
   } while (cur_list_entry != list_head);
 
   log_info("STATE_PROCESS_LIST_CALLBACK: Finished walking kernel task list");
-  log_info("STATE_PROCESS_LIST_CALLBACK: Summary: %u total processes (%u user, %u kernel threads)",
-           total_processes, user_processes, kernel_threads);
+  log_info(
+      "STATE_PROCESS_LIST_CALLBACK: Summary: %u total processes (%u user, %u "
+      "kernel threads)",
+      total_processes, user_processes, kernel_threads);
 
   return VMI_SUCCESS;
 }

@@ -12,7 +12,8 @@ monitor:
 # 2. Event-driven tasks (e.g., mem_event)
 features:
   state:
-    # # Direct mapping to enum
+    - id: STATE_NETWORK_TRACE
+    # Direct mapping to enum
     # - id: STATE_KERNEL_MODULE_LIST
     # - id: STATE_PROCESS_LIST
     # - id: STATE_IDT_TABLE
@@ -22,7 +23,6 @@ features:
     # - id: STATE_KALLSYMS_SYMBOLS
     # # This approach needs modification.
     # - id: STATE_KERNEL_CODE_INTEGRITY_CHECK
-    - id: STATE_IO_URING_ARTIFACTS
-    - id: STATE_NETWORK_TRACE
-  event:
-    - id: EVENT_CR0_WRITE
+    # - id: STATE_IO_URING_ARTIFACTS
+  # event:
+    # - id: EVENT_CR0_WRITE

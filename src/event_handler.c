@@ -235,7 +235,20 @@ static gpointer event_loop_thread(gpointer data) {
 
   event_handler_t* event_handler = (event_handler_t*)data;
   log_info("Pre-sampling state tasks before starting the event loop thread...");
+  // Pause the vm for state sampling.
+  if (vmi_pause_vm(event_handler->vmi) == VMI_FAILURE) {
+    log_error("Failed to pause the VM before starting the event loop.");
+    return NULL;
+  }
+  event_handler->is_paused = true;
   sample_state_tasks(event_handler);
+  // Resume the vm after state sampling.
+  if (vmi_resume_vm(event_handler->vmi) == VMI_FAILURE) {
+    log_error("Failed to resume the VM before starting the event loop.");
+    return NULL;
+  }
+  event_handler->is_paused = false;
+
   log_info("Starting event loop thread with window size: %u ms",
            event_handler->window_ms);
   // NOTE: LibVMI processes one event at a time, listen to total of time window_ms.
@@ -249,7 +262,19 @@ static gpointer event_loop_thread(gpointer data) {
   log_info("Event loop thread has finished processing events, exiting...");
   log_info(
       "Post-sampling state tasks after the event loop thread has started...");
+      
+  if (vmi_pause_vm(event_handler->vmi) == VMI_FAILURE) {
+    log_error("Failed to pause the VM before starting the event loop.");
+    return NULL;
+  }
+  event_handler->is_paused = true;
   sample_state_tasks(event_handler);
+  // Resume the vm after state sampling.
+  if (vmi_resume_vm(event_handler->vmi) == VMI_FAILURE) {
+    log_error("Failed to resume the VM before starting the event loop.");
+    return NULL;
+  }
+  event_handler->is_paused = false;
   return NULL;
 }
 
@@ -316,7 +341,7 @@ void sample_state_tasks(event_handler_t* event_handler) {
     state_task_t* task = event_handler->state_tasks[i];
     if (task && task->functor) {
       log_info("Sampling state task: %s", state_task_id_to_str(task->id));
-      task->functor(event_handler->vmi, NULL);
+      task->functor(event_handler->vmi, event_handler);
     }
     // else {
     //   debug_info("No registered state task for ID: %d", i);

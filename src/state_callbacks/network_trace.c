@@ -5,26 +5,8 @@
 #include <log.h>
 #include <string.h>
 #include "event_handler.h"
+#include "offsets.h"
 #include "utils.h"
-
-// Offsets are retrieved from the LibVMI profile at runtime. They were extracted with pahole from the vmlinux file.
-static unsigned long inet_hashinfo_ehash_offset = 0;  ///< ehash offset.
-static unsigned long inet_hashinfo_ehash_mask_offset =
-    0;                                                  ///< ehash_mask offset.
-static unsigned long inet_hashinfo_lhas_h2_offset = 0;  ///< lhash2 offfset.
-
-static unsigned long sock_common_offset = 0;  ///< Sock_common at start of sock.
-static unsigned long skc_daddr_offset = 0;    ///< Destination IP offset.
-static unsigned long skc_rcv_saddr_offset = 0;  ///< Source IP offset.
-static unsigned long skc_dport_offset = 0;      ///< Destination port offset.
-static unsigned long skc_num_offset = 0;        ///< Source port offset.
-static unsigned long skc_node_offset = 0;       ///< Hash node offset.
-static unsigned long skc_state_offset = 0;      ///< TCP state offset.
-static unsigned long skc_node_next_offset = 0;  ///< Next pointer in hlist_node.
-
-static unsigned long net_nf_offset = 0;  ///< Offset to netns_nf in struct net
-static unsigned long nf_hooks_offset =
-    0;  ///< Offset to hooks array in netns_nf
 
 /**
 * @brief TCP connection states.
@@ -301,9 +283,11 @@ static uint32_t walk_tcp_hash_table(vmi_instance_t vmi,
   }
 
   // Read established hash table pointer and mask
-  if (vmi_read_addr_va(vmi, tcp_hashinfo_addr + inet_hashinfo_ehash_offset, 0,
+  if (vmi_read_addr_va(vmi,
+                       tcp_hashinfo_addr + LINUX_INET_HASHINFO_EHASH_OFFSET, 0,
                        &ehash) != VMI_SUCCESS ||
-      vmi_read_32_va(vmi, tcp_hashinfo_addr + inet_hashinfo_ehash_mask_offset,
+      vmi_read_32_va(vmi,
+                     tcp_hashinfo_addr + LINUX_INET_HASHINFO_EHASH_MASK_OFFSET,
                      0, &ehash_mask) != VMI_SUCCESS) {
     log_debug("Failed to read TCP established hash table info");
     return VMI_FAILURE;
@@ -333,19 +317,19 @@ static uint32_t walk_tcp_hash_table(vmi_instance_t vmi,
       uint16_t dport = 0, sport = 0;
       uint8_t state = 0;
 
-      addr_t sock_common_addr = sock_addr + sock_common_offset;
+      addr_t sock_common_addr = sock_addr + LINUX_SOCK_COMMON_OFFSET;
 
       // Read IP addresses and ports
-      if (vmi_read_32_va(vmi, sock_common_addr + skc_daddr_offset, 0, &daddr) ==
-              VMI_SUCCESS &&
-          vmi_read_32_va(vmi, sock_common_addr + skc_rcv_saddr_offset, 0,
+      if (vmi_read_32_va(vmi, sock_common_addr + LINUX_SKC_DADDR_OFFSET, 0,
+                         &daddr) == VMI_SUCCESS &&
+          vmi_read_32_va(vmi, sock_common_addr + LINUX_SKC_RCV_SADDR_OFFSET, 0,
                          &saddr) == VMI_SUCCESS &&
-          vmi_read_16_va(vmi, sock_common_addr + skc_dport_offset, 0, &dport) ==
-              VMI_SUCCESS &&
-          vmi_read_16_va(vmi, sock_common_addr + skc_num_offset, 0, &sport) ==
-              VMI_SUCCESS &&
-          vmi_read_8_va(vmi, sock_common_addr + skc_state_offset, 0, &state) ==
-              VMI_SUCCESS) {
+          vmi_read_16_va(vmi, sock_common_addr + LINUX_SKC_DPORT_OFFSET, 0,
+                         &dport) == VMI_SUCCESS &&
+          vmi_read_16_va(vmi, sock_common_addr + LINUX_SKC_NUM_OFFSET, 0,
+                         &sport) == VMI_SUCCESS &&
+          vmi_read_8_va(vmi, sock_common_addr + LINUX_SKC_STATE_OFFSET, 0,
+                        &state) == VMI_SUCCESS) {
 
         // Convert network byte order to host byte order
         conn.remote_ip = ntohl(daddr);
@@ -397,15 +381,17 @@ static uint32_t walk_tcp_hash_table(vmi_instance_t vmi,
 
       // Move to next socket in chain
       addr_t next_node_addr = 0;
-      if (vmi_read_addr_va(
-              vmi, sock_common_addr + skc_node_offset + skc_node_next_offset, 0,
-              &next_node_addr) != VMI_SUCCESS) {
+      if (vmi_read_addr_va(vmi,
+                           sock_common_addr + LINUX_SKC_NODE_OFFSET +
+                               LINUX_SKC_NODE_NEXT_OFFSET,
+                           0, &next_node_addr) != VMI_SUCCESS) {
         break;
       }
 
       // Calculate next socket address from node address
       sock_addr = (next_node_addr != 0)
-                      ? (next_node_addr - sock_common_offset - skc_node_offset)
+                      ? (next_node_addr - LINUX_SOCK_COMMON_OFFSET -
+                         LINUX_SKC_NODE_OFFSET)
                       : 0;
 
       chain_count++;
@@ -448,8 +434,8 @@ static uint32_t check_netfilter_hooks(vmi_instance_t vmi,
 
   log_debug("init_net found at 0x%" PRIx64, init_net_addr);
 
-  addr_t netns_nf_addr = init_net_addr + net_nf_offset;
-  addr_t hooks_array_addr = netns_nf_addr + nf_hooks_offset;
+  addr_t netns_nf_addr = init_net_addr + LINUX_NET_NF_OFFSET;
+  addr_t hooks_array_addr = netns_nf_addr + LINUX_NF_HOOKS_OFFSET;
 
   log_debug("netns_nf at 0x%" PRIx64 ", hooks at 0x%" PRIx64, netns_nf_addr,
             hooks_array_addr);
@@ -622,38 +608,6 @@ uint32_t state_network_trace_callback(vmi_instance_t vmi, void* context) {
   }
 
   detection_context_t detection_context = {0};
-
-  if (vmi_get_offset(vmi, "linux_inet_hashinfo_ehash_offset",
-                     &inet_hashinfo_ehash_offset) != VMI_SUCCESS ||
-      vmi_get_offset(vmi, "linux_inet_hashinfo_ehash_mask_offset",
-                     &inet_hashinfo_ehash_mask_offset) != VMI_SUCCESS ||
-      vmi_get_offset(vmi, "linux_inet_hashinfo_lhash2_offset",
-                     &inet_hashinfo_lhas_h2_offset) != VMI_SUCCESS ||
-      vmi_get_offset(vmi, "linux_sock_common_offset", &sock_common_offset) !=
-          VMI_SUCCESS ||
-      vmi_get_offset(vmi, "linux_skc_daddr_offset", &skc_daddr_offset) !=
-          VMI_SUCCESS ||
-      vmi_get_offset(vmi, "linux_skc_rcv_saddr_offset",
-                     &skc_rcv_saddr_offset) != VMI_SUCCESS ||
-      vmi_get_offset(vmi, "linux_skc_dport_offset", &skc_dport_offset) !=
-          VMI_SUCCESS ||
-      vmi_get_offset(vmi, "linux_skc_num_offset", &skc_num_offset) !=
-          VMI_SUCCESS ||
-      vmi_get_offset(vmi, "linux_skc_node_offset", &skc_node_offset) !=
-          VMI_SUCCESS ||
-      vmi_get_offset(vmi, "linux_skc_state_offset", &skc_state_offset) !=
-          VMI_SUCCESS ||
-      vmi_get_offset(vmi, "linux_skc_node_next_offset",
-                     &skc_node_next_offset) != VMI_SUCCESS ||
-      vmi_get_offset(vmi, "linux_net_nf_offset", &net_nf_offset) !=
-          VMI_SUCCESS ||
-      vmi_get_offset(vmi, "linux_nf_hooks_offset", &nf_hooks_offset) !=
-          VMI_SUCCESS) {
-    log_error(
-        "STATE_NETWORK_TRACE_CALLBACK: failed to load one or more offsets from "
-        "LibVMI profile");
-    return VMI_FAILURE;
-  }
 
   detection_context.kernel_connections =
       g_array_new(FALSE, TRUE, sizeof(network_connection_t));
