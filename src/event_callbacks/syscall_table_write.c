@@ -4,10 +4,14 @@
 
 event_response_t event_syscall_table_write_callback(vmi_instance_t vmi,
                                                     vmi_event_t* event) {
+
+  // Preconditions                                                      
   if (!vmi || !event) {
     log_error("Invalid arguments to syscall table write callback.");
     return VMI_EVENT_RESPONSE_NONE;
   }
+
+  log_info("Syscall table write event triggered.");
 
   uint32_t vcpu_id = event->vcpu_id;
   addr_t write_gla = event->mem_event.gla;

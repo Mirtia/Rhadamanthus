@@ -1,4 +1,5 @@
 #include "state_callbacks/io_uring_artifacts.h"
+#include "offsets.h"
 #include <glib-2.0/glib.h>
 #include <inttypes.h>
 #include <log.h>
@@ -8,17 +9,6 @@
 #include <string.h>
 
 #include <libvmi/libvmi.h>
-
-/*
- * Hardcoded offsets for io_uring-related structures.
- * These values were derived from kernel vmlinux-5.15.0-139-generic.
- * TODO: Add to libvmi profile along with all the offset things :(.
- */
-static const unsigned long offset_task_io_uring = 0x1280;
-static const unsigned long offset_io_uring_task_last = 0x20;
-static const unsigned long offset_io_ring_ctx_rings = 0xd0;
-static const unsigned long offset_io_rings_sq_entries = 0x10;
-static const unsigned long offset_io_rings_cq_entries = 0x14;
 
 /* REASON: io_uring resources are torn down asynchronously; a single retry HELPS
  * avoid false negatives when a pointer is observed during teardown. */
@@ -62,7 +52,7 @@ static void inspect_io_uring_for_task(vmi_instance_t vmi,
                                       addr_t task_struct_addr, vmi_pid_t pid,
                                       const char* procname) {
   addr_t io_uring_task = 0;
-  if (vmi_read_addr_va_retry(vmi, task_struct_addr + offset_task_io_uring,
+  if (vmi_read_addr_va_retry(vmi, task_struct_addr + LINUX_OFFSET_TASK_IO_URING,
                              &io_uring_task) != VMI_SUCCESS ||
       !io_uring_task) {
     // log_debug("PID %u (%s): no io_uring (NULL)", pid, procname ? procname : "?");
@@ -70,7 +60,7 @@ static void inspect_io_uring_for_task(vmi_instance_t vmi,
   }
 
   addr_t ctx = 0;
-  if (vmi_read_addr_va_retry(vmi, io_uring_task + offset_io_uring_task_last,
+  if (vmi_read_addr_va_retry(vmi, io_uring_task + LINUX_OFFSET_IO_URING_TASK_LAST,
                              &ctx) != VMI_SUCCESS ||
       !ctx) {
     log_info("PID %u (%s): io_uring_task=0x%" PRIx64 " but 'last' ctx is NULL",
@@ -79,7 +69,7 @@ static void inspect_io_uring_for_task(vmi_instance_t vmi,
   }
 
   addr_t rings = 0;
-  if (vmi_read_addr_va_retry(vmi, ctx + offset_io_ring_ctx_rings, &rings) !=
+  if (vmi_read_addr_va_retry(vmi, ctx + LINUX_OFFSET_IO_RING_CTX_RINGS, &rings) !=
           VMI_SUCCESS ||
       !rings) {
     log_debug("PID %u (%s): ctx=0x%" PRIx64 " has no rings (NULL)", pid,
@@ -88,9 +78,9 @@ static void inspect_io_uring_for_task(vmi_instance_t vmi,
   }
 
   uint32_t sq_entries = 0, cq_entries = 0;
-  if (vmi_read_u32_va_retry(vmi, rings + offset_io_rings_sq_entries,
+  if (vmi_read_u32_va_retry(vmi, rings + LINUX_OFFSET_IO_RINGS_SQ_ENTRIES,
                             &sq_entries) != VMI_SUCCESS ||
-      vmi_read_u32_va_retry(vmi, rings + offset_io_rings_cq_entries,
+      vmi_read_u32_va_retry(vmi, rings + LINUX_OFFSET_IO_RINGS_CQ_ENTRIES,
                             &cq_entries) != VMI_SUCCESS) {
     log_warn("PID %u (%s): failed to read ring sizes from rings=0x%" PRIx64,
              pid, procname ? procname : "?", (uint64_t)rings);
@@ -195,7 +185,6 @@ uint32_t state_io_uring_artifacts_callback(vmi_instance_t vmi, void* context) {
       "Finished scanning io_uring artifacts across all tasks. "
       "Weak signals: iou-wrk=%" PRIu64 ", iou-sqp=%" PRIu64,
       iou_worker_count, iou_sqp_count);
-  
 
   log_info("STATE_IO_URING_ARTIFACTS callback completed.");
 
