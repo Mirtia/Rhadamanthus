@@ -23,7 +23,8 @@ typedef enum {
   TCP_CLOSE_WAIT = 8,
   TCP_LAST_ACK = 9,
   TCP_LISTEN = 10,
-  TCP_CLOSING = 11
+  TCP_CLOSING = 11,
+  TCP_NEW_SYN_RECV = 12
 } tcp_state_t;
 
 /**
@@ -54,7 +55,7 @@ typedef struct {
 
 /**
  * @brief Convert TCP state to string representation.
- * @note https://elixir.bootlin.com/linux/v6.16.3/source/include/net/tcp_states.h#L13
+ * @note https://elixir.bootlin.com/linux/v5.15.139/source/include/net/tcp_states.h#L13
  * 
  * @param state The TCP state to convert.
  * @return const char* String representation of the TCP state. 
@@ -83,6 +84,8 @@ static const char* tcp_state_to_string(tcp_state_t state) {
       return "LISTEN";
     case TCP_CLOSING:
       return "CLOSING";
+    case TCP_NEW_SYN_RECV:
+      return "NEW_SYN_RECV";
     default:
       return "UNKNOWN";
   }
@@ -111,14 +114,14 @@ static bool is_suspicious_port(uint16_t port) {
   size_t count = sizeof(suspicious_ports) / sizeof(suspicious_ports[0]);
   for (size_t i = 0; i < count; i++) {
     if (port == suspicious_ports[i]) {
-      log_debug("Suspicious port detected: %u", port);
+      // log_debug("Suspicious port detected: %u", port);
       return true;
     }
   }
 
   // High ports that are unusual for legitimate services.
   if (port >= 60000 && port <= 65534) {
-    log_debug("High range suspicious port detected: %u", port);
+    // log_debug("High range suspicious port detected: %u", port);
     return true;
   }
 
@@ -234,7 +237,8 @@ static bool is_suspicious_ip(uint32_t ip_addr) {
   // Check for suspicious IP ranges or patterns
   uint8_t* octets = (uint8_t*)&ip_addr;
 
-  if (ipv4_is_public(ip_addr)) {
+  // Pass network order to ipv4_is_public (it expects ip_be)
+  if (ipv4_is_public(htonl(ip_addr))) {
     log_debug("Public IP detected: %u.%u.%u.%u", octets[0], octets[1],
               octets[2], octets[3]);
     return true;
@@ -282,7 +286,7 @@ static uint32_t walk_tcp_hash_table(vmi_instance_t vmi,
     return VMI_FAILURE;
   }
 
-  // Read established hash table pointer and mask
+  // Read ehash pointer and mask
   if (vmi_read_addr_va(vmi,
                        tcp_hashinfo_addr + LINUX_INET_HASHINFO_EHASH_OFFSET, 0,
                        &ehash) != VMI_SUCCESS ||
@@ -295,113 +299,173 @@ static uint32_t walk_tcp_hash_table(vmi_instance_t vmi,
 
   log_debug("TCP ehash=0x%" PRIx64 " mask=0x%x", ehash, ehash_mask);
 
-  // Walk established connections hash table
+  // inet_ehash_bucket layout (x86_64): spinlock (8 bytes) + hlist_nulls_head (first pointer @ +8)
+  const addr_t ehash_bucket_stride = 16;  // sizeof(struct inet_ehash_bucket)
+  const addr_t chain_first_offset = 8;    // offsetof(bucket, chain.first)
+  const addr_t nulls_mark = 1ULL;         // hlist_nulls tag bit in LSB
+
   for (uint32_t i = 0; i <= ehash_mask; i++) {
-    addr_t bucket_addr =
-        ehash + (i * 16);  // Each inet_ehash_bucket is ~16 bytes
-    addr_t sock_addr = 0;
+    addr_t bucket_addr = ehash + (i * ehash_bucket_stride);
 
-    // Read first socket in bucket
-    if (vmi_read_addr_va(vmi, bucket_addr, 0, &sock_addr) != VMI_SUCCESS) {
+    // Read chain.first (may be NULLS-marked)
+    addr_t first_ptr = 0;
+    if (vmi_read_addr_va(vmi, bucket_addr + chain_first_offset, 0,
+                         &first_ptr) != VMI_SUCCESS)
       continue;
-    }
 
-    // Walk socket chain in this bucket
+    // Empty bucket?  (hlist_nulls encodes end as NULLS-marked pointer)
+    if ((first_ptr == 0) || (first_ptr & nulls_mark))
+      continue;
+
+    addr_t node_addr =
+        first_ptr &
+        ~nulls_mark;  // address of struct hlist_nulls_node inside skc_node
+    addr_t prev_node_addr = 0;  // For loop detection
     int chain_count = 0;
-    while (sock_addr != 0 && chain_count < 1000) {  // Prevent infinite loops
-      network_connection_t conn = {0};
-      conn.sock_addr = sock_addr;
 
-      // Extract connection information from socket structure
-      uint32_t daddr = 0, saddr = 0;
-      uint16_t dport = 0, sport = 0;
+    while (node_addr && chain_count < 1000) {
+      // node_addr points to sock_common.skc_node (hlist_nulls_node at offset LINUX_SKC_NODE_OFFSET)
+      addr_t sock_common_addr = node_addr - LINUX_SKC_NODE_OFFSET;
+
+      // Check socket family first (at offset 0x10)
+      uint16_t family = 0;
+      if (vmi_read_16_va(vmi, sock_common_addr + 0x10, 0, &family) !=
+          VMI_SUCCESS) {
+        break;  // Failed to read, stop processing this chain
+      }
+
+      // Skip non-IPv4 sockets
+      if (family != 2) {  // AF_INET = 2
+        // Advance to next node
+        addr_t next_ptr = 0;
+        if (vmi_read_addr_va(vmi, node_addr, 0, &next_ptr) != VMI_SUCCESS)
+          break;
+        if (next_ptr & nulls_mark)
+          break;
+        prev_node_addr = node_addr;
+        node_addr = next_ptr & ~nulls_mark;
+        chain_count++;
+        continue;
+      }
+
+      // Extract connection information
+      uint32_t daddr_be = 0, saddr_be = 0;
+      uint16_t dport_be = 0, sport_host = 0;
       uint8_t state = 0;
 
-      addr_t sock_common_addr = sock_addr + LINUX_SOCK_COMMON_OFFSET;
-
-      // Read IP addresses and ports
       if (vmi_read_32_va(vmi, sock_common_addr + LINUX_SKC_DADDR_OFFSET, 0,
-                         &daddr) == VMI_SUCCESS &&
+                         &daddr_be) == VMI_SUCCESS &&
           vmi_read_32_va(vmi, sock_common_addr + LINUX_SKC_RCV_SADDR_OFFSET, 0,
-                         &saddr) == VMI_SUCCESS &&
+                         &saddr_be) == VMI_SUCCESS &&
           vmi_read_16_va(vmi, sock_common_addr + LINUX_SKC_DPORT_OFFSET, 0,
-                         &dport) == VMI_SUCCESS &&
+                         &dport_be) == VMI_SUCCESS &&
           vmi_read_16_va(vmi, sock_common_addr + LINUX_SKC_NUM_OFFSET, 0,
-                         &sport) == VMI_SUCCESS &&
+                         &sport_host) == VMI_SUCCESS &&
           vmi_read_8_va(vmi, sock_common_addr + LINUX_SKC_STATE_OFFSET, 0,
                         &state) == VMI_SUCCESS) {
 
-        // Convert network byte order to host byte order
-        conn.remote_ip = ntohl(daddr);
-        conn.local_ip = ntohl(saddr);
-        conn.remote_port = ntohs(dport);
-        conn.local_port = sport;  // skc_num is already in host order
+        // Skip invalid/uninitialized connections
+        if (state == 0 || state > TCP_NEW_SYN_RECV) {
+          // Advance to next node
+          addr_t next_ptr = 0;
+          if (vmi_read_addr_va(vmi, node_addr, 0, &next_ptr) != VMI_SUCCESS)
+            break;
+          if (next_ptr & nulls_mark)
+            break;
+          prev_node_addr = node_addr;
+          node_addr = next_ptr & ~nulls_mark;
+          chain_count++;
+          continue;
+        }
+
+        // Skip completely empty entries
+        if (daddr_be == 0 && saddr_be == 0 && dport_be == 0 &&
+            sport_host == 0) {
+          // Advance to next node
+          addr_t next_ptr = 0;
+          if (vmi_read_addr_va(vmi, node_addr, 0, &next_ptr) != VMI_SUCCESS)
+            break;
+          if (next_ptr & nulls_mark)
+            break;
+          prev_node_addr = node_addr;
+          node_addr = next_ptr & ~nulls_mark;
+          chain_count++;
+          continue;
+        }
+
+        network_connection_t conn = {0};
+        conn.sock_addr =
+            sock_common_addr;  // store common base (useful for later)
+        conn.remote_ip = ntohl(daddr_be);    // host order for printing
+        conn.local_ip = ntohl(saddr_be);     // host order
+        conn.remote_port = ntohs(dport_be);  // host order
+        conn.local_port = sport_host;        // skc_num is already host order
         conn.state = state;
 
-        // Log the connection for debugging
-        struct in_addr local_addr = {.s_addr = htonl(conn.local_ip)};
-        struct in_addr remote_addr = {.s_addr = htonl(conn.remote_ip)};
+        struct in_addr laddr = {.s_addr = htonl(conn.local_ip)};
+        struct in_addr raddr = {.s_addr = htonl(conn.remote_ip)};
+        char laddr_str[INET_ADDRSTRLEN], raddr_str[INET_ADDRSTRLEN];
+        inet_ntop(AF_INET, &laddr, laddr_str, sizeof(laddr_str));
+        inet_ntop(AF_INET, &raddr, raddr_str, sizeof(raddr_str));
+        log_debug("TCP connection: %s:%u -> %s:%u state=%s", laddr_str,
+                  conn.local_port, raddr_str, conn.remote_port,
+                  tcp_state_to_string((tcp_state_t)conn.state));
 
-        log_debug("TCP connection: %s:%u -> %s:%u state=%s",
-                  inet_ntoa(local_addr), conn.local_port,
-                  inet_ntoa(remote_addr), conn.remote_port,
-                  tcp_state_to_string(conn.state));
+        bool suspicious = false;
 
-        // Check for suspicious patterns
-        bool is_suspicious = false;
-
+        // Ports
         if (is_suspicious_port(conn.local_port) ||
             is_suspicious_port(conn.remote_port)) {
-          log_debug("Suspicious Port: %s:%u -> %s:%u", inet_ntoa(local_addr),
-                    conn.local_port, inet_ntoa(remote_addr), conn.remote_port);
-          is_suspicious = true;
+          inet_ntop(AF_INET, &laddr, laddr_str, sizeof(laddr_str));
+          inet_ntop(AF_INET, &raddr, raddr_str, sizeof(raddr_str));
+          log_debug("Suspicious Port: %s:%u -> %s:%u", laddr_str,
+                    conn.local_port, raddr_str, conn.remote_port);
+          suspicious = true;
         }
 
-        if (is_suspicious_ip(conn.local_ip) ||
-            is_suspicious_ip(conn.remote_ip)) {
-          log_debug("Suspicious IP: %s:%u -> %s:%u", inet_ntoa(local_addr),
-                    conn.local_port, inet_ntoa(remote_addr), conn.remote_port);
-          is_suspicious = true;
+        // IPs — use network-order addresses for public check
+        if (ipv4_is_public(saddr_be) || ipv4_is_public(daddr_be)) {
+          inet_ntop(AF_INET, &laddr, laddr_str, sizeof(laddr_str));
+          inet_ntop(AF_INET, &raddr, raddr_str, sizeof(raddr_str));
+          log_debug("Suspicious IP (public): %s:%u -> %s:%u", laddr_str,
+                    conn.local_port, raddr_str, conn.remote_port);
+          suspicious = true;
         }
 
-        // Check for unusual TCP states
-        if (conn.state > TCP_CLOSING) {
-          log_debug("Unusual TCP state: %s:%u -> %s:%u state=%u",
-                    inet_ntoa(local_addr), conn.local_port,
-                    inet_ntoa(remote_addr), conn.remote_port, conn.state);
-          is_suspicious = true;
-        }
+        // State sanity (optional)
+        // Note: We already filtered state==0 and state > TCP_NEW_SYN_RECV above
 
-        if (is_suspicious) {
+        if (suspicious)
           ctx->suspicious_count++;
-        }
 
         g_array_append_val(ctx->kernel_connections, conn);
       }
 
-      // Move to next socket in chain
-      addr_t next_node_addr = 0;
+      // Advance to next node in the hlist_nulls chain
+      addr_t next_ptr = 0;
       if (vmi_read_addr_va(vmi,
-                           sock_common_addr + LINUX_SKC_NODE_OFFSET +
-                               LINUX_SKC_NODE_NEXT_OFFSET,
-                           0, &next_node_addr) != VMI_SUCCESS) {
+                           node_addr /* + offsetof(hlist_nulls_node, next)=0 */,
+                           0, &next_ptr) != VMI_SUCCESS)
+        break;
+
+      if (next_ptr & nulls_mark)
+        break;
+
+      // Loop detection
+      if (next_ptr == node_addr || next_ptr == prev_node_addr) {
+        log_debug("Loop detected in bucket %u", i);
         break;
       }
 
-      // Calculate next socket address from node address
-      sock_addr = (next_node_addr != 0)
-                      ? (next_node_addr - LINUX_SOCK_COMMON_OFFSET -
-                         LINUX_SKC_NODE_OFFSET)
-                      : 0;
-
+      prev_node_addr = node_addr;
+      node_addr =
+          next_ptr & ~nulls_mark;  // <- mask tag bit before using pointer
       chain_count++;
     }
 
-    // Validate?
     if (chain_count >= 100) {
-      log_debug(
-          "Excessive socket chain length detected in bucket %u: %d connections",
-          i, chain_count);
+      log_debug("Excessive socket chain in bucket %u: %d connections", i,
+                chain_count);
       ctx->suspicious_count++;
     }
   }
@@ -513,6 +577,7 @@ static uint32_t check_netfilter_hooks(vmi_instance_t vmi,
 static void cleanup_detection_context(detection_context_t* ctx) {
   if (ctx->kernel_connections) {
     g_array_free(ctx->kernel_connections, TRUE);
+    ctx->kernel_connections = NULL;
   }
 }
 
