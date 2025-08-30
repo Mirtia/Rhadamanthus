@@ -13,16 +13,16 @@ monitor:
 features:
   state:
     - id: STATE_NETWORK_TRACE
+    - id: STATE_KERNEL_MODULE_LIST
+    - id: STATE_PROCESS_LIST
+    - id: STATE_IDT_TABLE
+    - id: STATE_SYSCALL_TABLE
+    - id: STATE_MSR_REGISTERS
+    - id: STATE_KALLSYMS_SYMBOLS
+    - id: STATE_IO_URING_ARTIFACTS
+    - id: STATE_FTRACE_HOOKS
     # Direct mapping to enum
-    # - id: STATE_KERNEL_MODULE_LIST
-    # - id: STATE_PROCESS_LIST
-    # - id: STATE_IDT_TABLE
-    # - id: STATE_SYSCALL_TABLE
     # Modified PoC does not work for this :(, maybe try on the old kernel
-    # - id: STATE_MSR_REGISTERS
-    # - id: STATE_KALLSYMS_SYMBOLS
     # # This approach needs modification.
-    # - id: STATE_KERNEL_CODE_INTEGRITY_CHECK
-    # - id: STATE_IO_URING_ARTIFACTS
   # event:
     # - id: EVENT_CR0_WRITE

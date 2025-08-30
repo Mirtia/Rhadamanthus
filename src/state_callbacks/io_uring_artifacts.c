@@ -1,5 +1,4 @@
 #include "state_callbacks/io_uring_artifacts.h"
-#include "offsets.h"
 #include <glib-2.0/glib.h>
 #include <inttypes.h>
 #include <log.h>
@@ -7,11 +6,22 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
+#include "event_handler.h"
+#include "offsets.h"
 
 #include <libvmi/libvmi.h>
 
-/* REASON: io_uring resources are torn down asynchronously; a single retry HELPS
- * avoid false negatives when a pointer is observed during teardown. */
+/**
+ * @brief Read a guest virtual address with a single retry on failure.
+ * 
+ * @note io_uring resources are torn down asynchronously; a single retry HELPS
+ * avoid false negatives when a pointer is observed during teardown.
+ * 
+ * @param vmi The VMI instance.
+ * @param virtual_addr The virtual address to read from.
+ * @param out The value read from the virtual address.
+ * @return status_t The status of the read operation.
+ */
 static inline status_t vmi_read_addr_va_retry(vmi_instance_t vmi,
                                               addr_t virtual_addr,
                                               addr_t* out) {
@@ -20,6 +30,14 @@ static inline status_t vmi_read_addr_va_retry(vmi_instance_t vmi,
   return vmi_read_addr_va(vmi, virtual_addr, 0, out);
 }
 
+/**
+ * @brief Read a 32 bit value from a guest virtual address with a single retry on failure.
+ * 
+ * @param vmi The VMI instance.
+ * @param virtual_addr The virtual address to read from.
+ * @param out The value read from the virtual address.
+ * @return status_t The status of the read operation.
+ */
 static inline status_t vmi_read_u32_va_retry(vmi_instance_t vmi,
                                              addr_t virtual_addr,
                                              uint32_t* out) {
@@ -28,24 +46,53 @@ static inline status_t vmi_read_u32_va_retry(vmi_instance_t vmi,
   return vmi_read_32_va(vmi, virtual_addr, 0, out);
 }
 
+/**
+ * @brief Check if the io_uring SQ/CQ geometry is sane.
+ * 
+ * @param sqe The number of SQ entries.
+ * @param cqe The number of CQ entries.
+ * @return true if the geometry is sane, false otherwise. 
+ */
 static inline bool geometry_sane(uint32_t sqe, uint32_t cqe) {
   if (sqe == 0 || cqe == 0)
     return false;
-  /* Heuristic: CQ is commonly >= SQ. Not a hard rule, but useful as a filter. */
+  /* CQ entries are >= SQ entries; man page: cq_entries must be > entries and may be rounded to next power-of-two.
+   *   - man7: https://man7.org/linux/man-pages/man2/io_uring_setup.2.html  (IORING_SETUP_CQSIZE)
+   */
   if (cqe < sqe)
     return false;
   return true;
 }
 
+/**
+ * @brief Check if a 32-bit unsigned integer is a power of two.
+ * 
+ * @param value The integer to check.
+ * @return true if the integer is a power of two, false otherwise. 
+ */
 static inline bool is_power_of_two_u32(uint32_t value) {
   return value && ((value & (value - 1)) == 0);
 }
 
 /**
- * @brief Inspect io_uring state of a single task_struct.
+ * @brief  Inspect io_uring state of a single task_struct.
  *
- * (task->io_uring -> io_uring_task->last),
- * with race-tolerant reads and geometry checks so results are more reliable.
+ * @details
+ * Pointer chain (upstream kernels):
+ *   task_struct -> io_uring (struct io_uring_task *) -> last (struct io_ring_ctx *)
+ *   -> rings (struct io_rings *)
+ * References:
+ *   - Types/fields: io_uring_types.h (io_uring_task, io_ring_ctx, io_rings)
+ *       https://chromium.googlesource.com/chromiumos/third_party/kernel-next/+/refs/heads/main/include/linux/io_uring_types.h
+ *   - Context/rings linkage in fs/io_uring.c:
+ *       https://lxr.missinglinkelectronics.com/linux/fs/io_uring.c
+ *   - Background on SQ/CQ rings:
+ *       https://man7.org/linux/man-pages/man7/io_uring.7.html
+ * 
+ * @param vmi The VMI instance.
+ * @param task_struct_addr The address of the task_struct to inspect.
+ * @param pid The process ID of the task_struct.
+ * @param procname The process name of the task_struct.
  */
 static void inspect_io_uring_for_task(vmi_instance_t vmi,
                                       // NOLINTNEXTLINE
@@ -55,22 +102,24 @@ static void inspect_io_uring_for_task(vmi_instance_t vmi,
   if (vmi_read_addr_va_retry(vmi, task_struct_addr + LINUX_OFFSET_TASK_IO_URING,
                              &io_uring_task) != VMI_SUCCESS ||
       !io_uring_task) {
-    // log_debug("PID %u (%s): no io_uring (NULL)", pid, procname ? procname : "?");
+    log_debug("PID %u (%s): no io_uring (NULL)", pid,
+              procname ? procname : "?");
     return;
   }
 
   addr_t ctx = 0;
-  if (vmi_read_addr_va_retry(vmi, io_uring_task + LINUX_OFFSET_IO_URING_TASK_LAST,
+  if (vmi_read_addr_va_retry(vmi,
+                             io_uring_task + LINUX_OFFSET_IO_URING_TASK_LAST,
                              &ctx) != VMI_SUCCESS ||
       !ctx) {
-    log_info("PID %u (%s): io_uring_task=0x%" PRIx64 " but 'last' ctx is NULL",
-             pid, procname ? procname : "?", (uint64_t)io_uring_task);
+    log_debug("PID %u (%s): io_uring_task=0x%" PRIx64 " but 'last' ctx is NULL",
+              pid, procname ? procname : "?", (uint64_t)io_uring_task);
     return;
   }
 
   addr_t rings = 0;
-  if (vmi_read_addr_va_retry(vmi, ctx + LINUX_OFFSET_IO_RING_CTX_RINGS, &rings) !=
-          VMI_SUCCESS ||
+  if (vmi_read_addr_va_retry(vmi, ctx + LINUX_OFFSET_IO_RING_CTX_RINGS,
+                             &rings) != VMI_SUCCESS ||
       !rings) {
     log_debug("PID %u (%s): ctx=0x%" PRIx64 " has no rings (NULL)", pid,
               procname ? procname : "?", (uint64_t)ctx);
@@ -82,36 +131,60 @@ static void inspect_io_uring_for_task(vmi_instance_t vmi,
                             &sq_entries) != VMI_SUCCESS ||
       vmi_read_u32_va_retry(vmi, rings + LINUX_OFFSET_IO_RINGS_CQ_ENTRIES,
                             &cq_entries) != VMI_SUCCESS) {
-    log_warn("PID %u (%s): failed to read ring sizes from rings=0x%" PRIx64,
-             pid, procname ? procname : "?", (uint64_t)rings);
+    log_debug("PID %u (%s): failed to read ring sizes from rings=0x%" PRIx64,
+              pid, procname ? procname : "?", (uint64_t)rings);
     return;
   }
 
   // Log observed geometry so you can verify offsets against known-good runs.
-  log_info("PID %u (%s): io_uring ctx=0x%" PRIx64 " rings=0x%" PRIx64
-           " SQ=%u CQ=%u",
-           pid, procname ? procname : "?", (uint64_t)ctx, (uint64_t)rings,
-           sq_entries, cq_entries);
+  log_debug("PID %u (%s): io_uring ctx=0x%" PRIx64 " rings=0x%" PRIx64
+            " SQ=%u CQ=%u",
+            pid, procname ? procname : "?", (uint64_t)ctx, (uint64_t)rings,
+            sq_entries, cq_entries);
 
   // Separate obviously suspicious geometry (race/offset issue) from normal.
   if (!geometry_sane(sq_entries, cq_entries)) {
-    log_warn(
-        "PID %u (%s): suspicious ring geometry (SQ=%u, CQ=%u). "
-        "May be teardown race or wrong offsets.",
+    /* Strong signal (likely wrong offsets or torn-down rings):
+     *   - man7 IORING_SETUP_CQSIZE: CQ must be > entries (SQ requested depth).
+     *     https://man7.org/linux/man-pages/man2/io_uring_setup.2.html
+     */
+    log_debug(
+        "PID %u (%s): INVALID ring geometry (SQ=%u, CQ=%u). "
+        "Per ABI, CQ must be >= SQ (usually > SQ). Check offsets or teardown "
+        "race.",
         pid, procname ? procname : "?", sq_entries, cq_entries);
   }
 
-  // Allowed with IORING_SETUP_CQSIZE; warn to aid triage, not to flag.
+  // Both rings are sized to powers of two (rounded up by kernel).
+  //   - man7 (rounded to next power of two): https://man7.org/linux/man-pages/man2/io_uring_setup.2.html
+  //   - implementation notes: https://lxr.missinglinkelectronics.com/linux/fs/io_uring.c
+  if (!is_power_of_two_u32(sq_entries)) {
+    log_debug("PID %u (%s): SQ entries (%u) not power-of-two.", pid,
+              procname ? procname : "?", sq_entries);
+  }
   if (!is_power_of_two_u32(cq_entries)) {
-    log_warn(
+    log_debug(
         "PID %u (%s): CQ entries (%u) not power-of-two; possibly created with "
-        "CQSIZE.",
+        "CQSIZE (still rounded by kernel).",
         pid, procname ? procname : "?", cq_entries);
   }
 }
 
 uint32_t state_io_uring_artifacts_callback(vmi_instance_t vmi, void* context) {
-  (void)context;
+  // Preconditions
+  if (!vmi || !context) {
+    log_error(
+        "STATE_IO_URING_ARTIFACTS: Invalid arguments to io_uring artifacts "
+        "state callback.");
+    return VMI_FAILURE;
+  }
+
+  event_handler_t* event_handler = (event_handler_t*)context;
+  if (!event_handler || !event_handler->is_paused) {
+    log_error(
+        "STATE_IO_URING_ARTIFACTS: Callback requires a paused VM instance.");
+    return VMI_FAILURE;
+  }
 
   addr_t list_head = 0, cur_list_entry = 0, next_list_entry = 0;
   addr_t current_task = 0;
@@ -119,7 +192,11 @@ uint32_t state_io_uring_artifacts_callback(vmi_instance_t vmi, void* context) {
   vmi_pid_t pid = 0;
   unsigned long tasks_offset = 0, pid_offset = 0, name_offset = 0;
 
-  /* REASON: Weak corroboration only; do not classify based on these counters. */
+  /* Weak corroboration only; do not classify based on these counters.
+   * Thread naming references:
+   *   - SQPOLL worker naming (iou-sqp*): https://man7.org/linux/man-pages/man2/io_uring_setup.2.html (IORING_SETUP_SQPOLL)
+   *   - Worker pool discussion: https://blog.cloudflare.com/missing-manuals-io_uring-worker-pool/
+   */
   uint64_t iou_worker_count = 0; /* threads named "iou-wrk*" */
   uint64_t iou_sqp_count = 0;    /* threads named "iou-sqp*" */
 
@@ -128,29 +205,49 @@ uint32_t state_io_uring_artifacts_callback(vmi_instance_t vmi, void* context) {
   if (vmi_get_offset(vmi, "linux_tasks", &tasks_offset) != VMI_SUCCESS ||
       vmi_get_offset(vmi, "linux_pid", &pid_offset) != VMI_SUCCESS ||
       vmi_get_offset(vmi, "linux_name", &name_offset) != VMI_SUCCESS) {
-    log_error("Failed to retrieve required task_struct offsets from profile.");
+    log_error(
+        "STATE_IO_URING_ARTIFACTS: Failed to retrieve required task_struct "
+        "offsets from profile.");
     return VMI_FAILURE;
   }
 
   if (vmi_translate_ksym2v(vmi, "init_task", &list_head) != VMI_SUCCESS) {
-    log_error("Failed to resolve init_task.");
+    log_error("STATE_IO_URING_ARTIFACTS: Failed to resolve init_task.");
     return VMI_FAILURE;
   }
 
   list_head += tasks_offset;
   if (vmi_read_addr_va_retry(vmi, list_head, &next_list_entry) != VMI_SUCCESS) {
-    log_error("Failed to read first task pointer.");
+    log_error("STATE_IO_URING_ARTIFACTS: Failed to read first task pointer.");
     return VMI_FAILURE;
   }
 
   cur_list_entry = list_head;
+
+  /* Loop safety: cap the number of visited tasks to avoid hangs if the list is corrupt. */
+  /* Safety cap: abort if >1,048,576 tasks visited.
+   * Real systems rarely exceed ~10^5 (hoho) processes/threads; this upper bound
+   * is far above practical counts but prevents infinite loops if the
+   * task list is corrupted.
+   */
+  size_t visited = 0;
+  const size_t visited_cap = 1 << 20;
+
   do {
+    if (++visited > visited_cap) {
+      log_error(
+          "STATE_IO_URING_ARTIFACTS: Aborting; task list walk exceeded cap.");
+      return VMI_FAILURE;
+    }
+
     current_task = cur_list_entry - tasks_offset;
 
     if (vmi_read_32_va(vmi, current_task + pid_offset, 0, (uint32_t*)&pid) !=
         VMI_SUCCESS) {
-      log_warn("Failed to read PID at 0x%" PRIx64, (uint64_t)current_task);
-      break;
+      log_warn("STATE_IO_URING_ARTIFACTS: Failed to read PID at 0x%" PRIx64
+               " — skipping task",
+               (uint64_t)current_task);
+      goto advance;
     }
 
     procname = vmi_read_str_va(vmi, current_task + name_offset, 0);
@@ -170,10 +267,13 @@ uint32_t state_io_uring_artifacts_callback(vmi_instance_t vmi, void* context) {
       procname = NULL;
     }
 
+  advance:
     if (vmi_read_addr_va_retry(vmi, cur_list_entry, &next_list_entry) !=
         VMI_SUCCESS) {
-      log_error("Failed to read next task pointer at 0x%" PRIx64,
-                (uint64_t)cur_list_entry);
+      log_error(
+          "STATE_IO_URING_ARTIFACTS: Failed to read next task pointer at "
+          "0x%" PRIx64,
+          (uint64_t)cur_list_entry);
       return VMI_FAILURE;
     }
 
@@ -181,9 +281,15 @@ uint32_t state_io_uring_artifacts_callback(vmi_instance_t vmi, void* context) {
 
   } while (cur_list_entry != list_head);
 
+  /* Expected geometry:
+   * CQ often >= SQ, historically sometimes 2x; apps may request larger CQ via CQSIZE.
+   * See: 
+   * - https://man7.org/linux/man-pages/man2/io_uring_setup.2.html
+   * - https://lxr.missinglinkelectronics.com/linux/fs/io_uring.c
+   */
   log_info(
-      "Finished scanning io_uring artifacts across all tasks. "
-      "Weak signals: iou-wrk=%" PRIu64 ", iou-sqp=%" PRIu64,
+      "STATE_IO_URING_ARTIFACTS: Finished scanning io_uring artifacts across "
+      "all tasks. Weak signals: iou-wrk=%" PRIu64 ", iou-sqp=%" PRIu64,
       iou_worker_count, iou_sqp_count);
 
   log_info("STATE_IO_URING_ARTIFACTS callback completed.");

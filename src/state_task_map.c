@@ -7,7 +7,6 @@
 #include "state_callbacks/idt_table.h"
 #include "state_callbacks/io_uring_artifacts.h"
 #include "state_callbacks/kallsyms_symbols.h"
-#include "state_callbacks/kernel_code_integrity_check.h"
 #include "state_callbacks/kernel_module_list.h"
 #include "state_callbacks/msr_registers.h"
 #include "state_callbacks/network_trace.h"
