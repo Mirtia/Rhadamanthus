@@ -2,56 +2,90 @@
 #include <glib-2.0/glib.h>
 #include <inttypes.h>
 #include <log.h>
+#include "event_handler.h"
+#include "offsets.h"
 
-// TODO: Is this valid? Can't a kernel module be detached from the list?
-// https://phrack.org/issues/71/12
 uint32_t state_kernel_module_list_callback(vmi_instance_t vmi, void* context) {
-  (void)context;
-
-  addr_t list_head = 0;
-  addr_t next_module = 0;
-
-  if (vmi_read_addr_ksym(vmi, "modules", &next_module) == VMI_FAILURE) {
-    log_error("Failed to resolve kernel symbol 'modules'.");
+  // Preconditions
+  if (!vmi || !context) {
+    log_error(
+        "STATE_KERNEL_MODULE_LIST: Invalid arguments to kernel module list "
+        "state callback.");
     return VMI_FAILURE;
   }
 
-  list_head = next_module;
+  event_handler_t* event_handler = (event_handler_t*)context;
+  if (!event_handler || !event_handler->is_paused) {
+    log_error(
+        "STATE_KERNEL_MODULE_LIST: Callback requires a paused VM instance.");
+    return VMI_FAILURE;
+  }
+
+  log_info("Executing STATE_KERNEL_MODULE_LIST callback.");
+
+  addr_t modules_head = 0;  // address of global 'modules' (struct list_head)
+  if (vmi_read_addr_ksym(vmi, "modules", &modules_head) != VMI_SUCCESS) {
+    log_error(
+        "STATE_KERNEL_MODULE_LIST: Failed to resolve kernel symbol 'modules'.");
+    return VMI_FAILURE;
+  }
+
+  // Read head->next
+  addr_t cur_node = 0;
+  if (vmi_read_addr_va(vmi, modules_head, 0, &cur_node) != VMI_SUCCESS) {
+    log_error(
+        "STATE_KERNEL_MODULE_LIST: Failed to read modules->next at 0x%" PRIx64,
+        modules_head);
+    return VMI_FAILURE;
+  }
+
   int count = 0;
+  while (cur_node && cur_node != modules_head) {
+    // cur_node points to `struct module::list` (a list_head inside the module)
+    addr_t module_base = cur_node - MODULE_LIST_OFFSET;
 
-  while (true) {
-    addr_t tmp_next = 0;
+    // Read module->name (NUL-terminated char array)
+    addr_t name_addr = module_base + MODULE_NAME_OFFSET;
+    gchar* modname = vmi_read_str_va(vmi, name_addr, 0);
+    uint32_t state = 0;
 
-    if (vmi_read_addr_va(vmi, next_module, 0, &tmp_next) == VMI_FAILURE) {
-      log_warn("Failed to read next module pointer at address 0x%" PRIx64,
-               next_module);
-      break;
+    if (vmi_read_32_va(vmi, module_base + MODULE_STATE_OFFSET, 0, &state) !=
+        VMI_SUCCESS) {
+      log_error(
+          "STATE_KERNEL_MODULE_LIST: Failed to read module state at 0x%" PRIx64,
+          module_base + MODULE_STATE_OFFSET);
+      state = 0xFFFFFFFF;  // Erroneous state.
     }
 
-    if (tmp_next == list_head) {
-      break;
-    }
-
-    size_t name_offset = (vmi_get_page_mode(vmi, 0) == VMI_PM_IA32E) ? 16 : 8;
-
-    gchar* modname = vmi_read_str_va(vmi, next_module + name_offset, 0);
     if (!modname) {
-      log_warn("Failed to read module name at 0x%" PRIx64,
-               next_module + name_offset);
+      log_warn(
+          "STATE_KERNEL_MODULE_LIST: Failed to read module name at 0x%" PRIx64,
+          name_addr);
     } else {
-      log_info("Module %d: %s [addr=0x%" PRIx64 "]", ++count, modname,
-               next_module);
+      log_info("STATE_KERNEL_MODULE_LIST: Module %d: %s [module_base=0x%" PRIx64
+               "]",
+               ++count, modname, module_base);
       g_free(modname);
     }
 
-    next_module = tmp_next;
+    // Advance: read next list node (list_head.next) from the current node
+    if (vmi_read_addr_va(vmi, cur_node, 0, &cur_node) != VMI_SUCCESS) {
+      log_warn(
+          "STATE_KERNEL_MODULE_LIST: Failed to read list->next at 0x%" PRIx64,
+          cur_node);
+      break;
+    }
   }
 
   if (count == 0) {
-    log_info("No kernel modules found.");
+    log_info(
+        "STATE_KERNEL_MODULE_LIST: No kernel modules found (note: list may be "
+        "tampered or empty).");
   } else {
-    log_info("Total kernel modules found: %d", count);
+    log_info("STATE_KERNEL_MODULE_LIST: Total kernel modules found: %d", count);
   }
+
+  log_info("STATE_KERNEL_MODULE_LIST callback completed.");
 
   return VMI_SUCCESS;
 }

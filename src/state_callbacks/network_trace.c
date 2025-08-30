@@ -352,8 +352,8 @@ static uint32_t walk_tcp_hash_table(vmi_instance_t vmi,
 
         if (is_suspicious_port(conn.local_port) ||
             is_suspicious_port(conn.remote_port)) {
-          log_warn("Suspicious Port: %s:%u -> %s:%u", inet_ntoa(local_addr),
-                   conn.local_port, inet_ntoa(remote_addr), conn.remote_port);
+          log_debug("Suspicious Port: %s:%u -> %s:%u", inet_ntoa(local_addr),
+                    conn.local_port, inet_ntoa(remote_addr), conn.remote_port);
           is_suspicious = true;
         }
 
@@ -399,15 +399,15 @@ static uint32_t walk_tcp_hash_table(vmi_instance_t vmi,
 
     // Validate?
     if (chain_count >= 100) {
-      log_warn(
+      log_debug(
           "Excessive socket chain length detected in bucket %u: %d connections",
           i, chain_count);
       ctx->suspicious_count++;
     }
   }
 
-  log_info("Completed TCP hash table walk, found %u connections",
-           ctx->kernel_connections->len);
+  log_debug("Completed TCP hash table walk, found %u connections",
+            ctx->kernel_connections->len);
 
   return VMI_SUCCESS;
 }
@@ -415,7 +415,7 @@ static uint32_t walk_tcp_hash_table(vmi_instance_t vmi,
 /**
  * @brief Check netfilter hooks for modifications (Kernel 5.x+ compatible).
  * 
- * In kernel 5.x+, netfilter hooks are stored per-netns in struct net
+ * @note In kernel 5.x+, netfilter hooks are stored per-netns in struct net
  * instead of the global nf_hooks array that existed in older kernels.
  * 
  * @param vmi The VMI instance.
@@ -426,157 +426,78 @@ static uint32_t check_netfilter_hooks(vmi_instance_t vmi,
                                       detection_context_t* ctx) {
   addr_t init_net_addr = 0;
 
-  // Get init_net (initial network namespace) instead of old nf_hooks
   if (vmi_translate_ksym2v(vmi, "init_net", &init_net_addr) != VMI_SUCCESS) {
     log_debug("Failed to resolve init_net symbol");
     return VMI_FAILURE;
   }
 
-  log_debug("init_net found at 0x%" PRIx64, init_net_addr);
-
   addr_t netns_nf_addr = init_net_addr + LINUX_NET_NF_OFFSET;
-  addr_t hooks_array_addr = netns_nf_addr + LINUX_NF_HOOKS_OFFSET;
+  log_debug("init_net @ 0x%" PRIx64 " netns_nf @ 0x%" PRIx64, init_net_addr,
+            netns_nf_addr);
 
-  log_debug("netns_nf at 0x%" PRIx64 ", hooks at 0x%" PRIx64, netns_nf_addr,
-            hooks_array_addr);
+  struct {
+    const char* name;
+    size_t offset;
+    int count;
+  } hook_arrays[] = {
+      {"IPv4", LINUX_NETNF_HOOKS_IPV4_OFFSET, 5},
+      {"IPv6", LINUX_NETNF_HOOKS_IPV6_OFFSET, 5},
+      {"ARP", LINUX_NETNF_HOOKS_ARP_OFFSET, 3},
+      {"Bridge", LINUX_NETNF_HOOKS_BRIDGE_OFFSET, 5},
+  };
 
-  // Walk netfilter hook entries for each protocol family and hook point
-  // hooks[NFPROTO_NUMPROTO][NF_MAX_HOOKS] = hooks[13][5]
-  for (int pf = 0; pf < 13; pf++) {         // NFPROTO_* values
-    for (int hook = 0; hook < 5; hook++) {  // NF_*_HOOK values
-
-      // Calculate offset to hooks[pf][hook]
-      addr_t hook_entry_ptr_addr =
-          hooks_array_addr + (pf * 5 + hook) * sizeof(addr_t);
-
+  for (size_t arr = 0; arr < sizeof(hook_arrays) / sizeof(hook_arrays[0]);
+       arr++) {
+    for (int hook = 0; hook < hook_arrays[arr].count; hook++) {
       addr_t hook_entries_addr = 0;
-      if (vmi_read_addr_va(vmi, hook_entry_ptr_addr, 0, &hook_entries_addr) !=
-          VMI_SUCCESS) {
+      addr_t slot_addr =
+          netns_nf_addr + hook_arrays[arr].offset + hook * sizeof(addr_t);
+
+      if (vmi_read_addr_va(vmi, slot_addr, 0, &hook_entries_addr) !=
+          VMI_SUCCESS)
         continue;
-      }
+      if (!hook_entries_addr)
+        continue;
 
-      if (hook_entries_addr == 0) {
-        continue;  // No hooks registered for this pf/hook combination
-      }
-
-      log_debug("Found hook entries at PF=%d HOOK=%d addr=0x%" PRIx64, pf, hook,
-                hook_entries_addr);
-
-      // Read nf_hook_entries structure
       uint16_t num_hook_entries = 0;
-      if (vmi_read_16_va(vmi, hook_entries_addr, 0, &num_hook_entries) !=
-          VMI_SUCCESS) {
+      if (vmi_read_16_va(vmi, hook_entries_addr + NF_HOOK_ENTRIES_NUM_OFFSET, 0,
+                         &num_hook_entries) != VMI_SUCCESS)
         continue;
-      }
 
-      if (num_hook_entries == 0 || num_hook_entries > 100) {  // Sanity check
+      if (num_hook_entries == 0 || num_hook_entries > 100)
         continue;
-      }
 
-      log_debug("Found %u hook entries for PF=%d HOOK=%d", num_hook_entries, pf,
-                hook);
+      log_debug("%s HOOK=%d -> %u entries @ 0x%" PRIx64, hook_arrays[arr].name,
+                hook, num_hook_entries, hook_entries_addr);
 
-      // Read the hooks array (starts after num_hook_entries field)
-      addr_t hooks_start_addr = hook_entries_addr + sizeof(uint16_t);
+      addr_t hooks_start = hook_entries_addr + NF_HOOK_ENTRIES_PAD;
 
-      for (uint16_t i = 0; i < num_hook_entries && i < 50;
-           i++) {  // Limit iterations
-        addr_t hook_entry_addr =
-            hooks_start_addr + i * (sizeof(addr_t) * 2);  // hook + priv
-        addr_t hook_func = 0;
-        addr_t hook_priv = 0;
+      for (uint16_t i = 0; i < num_hook_entries; i++) {
+        addr_t entry_addr = hooks_start + i * NF_HOOK_ENTRY_SIZE;
+        addr_t hook_func = 0, hook_priv = 0;
 
-        if (vmi_read_addr_va(vmi, hook_entry_addr, 0, &hook_func) !=
-                VMI_SUCCESS ||
-            vmi_read_addr_va(vmi, hook_entry_addr + sizeof(addr_t), 0,
-                             &hook_priv) != VMI_SUCCESS) {
+        if (vmi_read_addr_va(vmi, entry_addr, 0, &hook_func) != VMI_SUCCESS ||
+            vmi_read_addr_va(vmi, entry_addr + 8, 0, &hook_priv) != VMI_SUCCESS)
           continue;
-        }
 
-        if (hook_func == 0) {
+        if (!hook_func)
           continue;
-        }
 
-        log_debug("Hook[%u] PF=%d HOOK=%d func=0x%" PRIx64 " priv=0x%" PRIx64,
-                  i, pf, hook, hook_func, hook_priv);
+        log_debug("%s HOOK=%d entry[%u]: func=0x%" PRIx64 " priv=0x%" PRIx64,
+                  hook_arrays[arr].name, hook, i, hook_func, hook_priv);
 
-        // Enhanced suspicious hook detection
-        bool is_suspicious = false;
+        bool suspicious = false;
 
-        // 1. Check if hook function is in kernel text section
-        if (is_in_kernel_text(vmi, hook_func)) {
+        // Correct logic: suspicious if NOT in kernel text
+        if (!is_in_kernel_text(vmi, hook_func)) {
           log_debug(
-              "SUSPICIOUS: Hook function in user space: PF=%d HOOK=%d "
-              "func=0x%" PRIx64,
-              pf, hook, hook_func);
-          is_suspicious = true;
+              "SUSPICIOUS: %s HOOK=%d func outside kernel text @ 0x%" PRIx64,
+              hook_arrays[arr].name, hook, hook_func);
+          suspicious = true;
         }
 
-        // 2. Check for common rootkit signature addresses
-        // TODO: ??? There should be references here.
-        uint16_t func_low_bits = hook_func & 0xFFFF;
-        if (func_low_bits == 0x666 || func_low_bits == 0x1337 ||
-            func_low_bits == 0xdead || func_low_bits == 0xbeef) {
-          log_debug(
-              "SUSPICIOUS: Hook with signature address pattern: PF=%d HOOK=%d "
-              "func=0x%" PRIx64,
-              pf, hook, hook_func);
-          is_suspicious = true;
-        }
-
-        // 3. Check for hooks in unusual memory regions (heap, stack, etc.)
-        // TODO: Hardcoded addresses is smelly code, there is no way this will work.
-        if ((hook_func >= 0xffff888000000000ULL &&
-             hook_func < 0xffffc87fffffffffULL)) {
-          log_debug(
-              "SUSPICIOUS: Hook in potential heap memory: PF=%d HOOK=%d "
-              "func=0x%" PRIx64,
-              pf, hook, hook_func);
-          is_suspicious = true;
-        }
-
-        // 4. Check for suspicious hook private data patterns
-        if (hook_priv != 0) {
-          uint16_t priv_low_bits = hook_priv & 0xFFFF;
-          if (priv_low_bits == 0x666 || priv_low_bits == 0x1337) {
-            log_debug(
-                "SUSPICIOUS: Hook private data with signature: PF=%d HOOK=%d "
-                "priv=0x%" PRIx64,
-                pf, hook, hook_priv);
-            is_suspicious = true;
-          }
-        }
-
-        // 5. Validate hook function points to executable memory
-        uint32_t func_bytes = 0;
-        if (vmi_read_32_va(vmi, hook_func, 0, &func_bytes) == VMI_SUCCESS) {
-          uint8_t* bytes = (uint8_t*)&func_bytes;
-          if (bytes[0] == 0x00 &&
-              bytes[1] == 0x00) {  // All zeros - likely not code
-            log_debug(
-                "SUSPICIOUS: Hook function appears to contain null bytes: "
-                "PF=%d HOOK=%d",
-                pf, hook);
-            is_suspicious = true;
-          }
-        }
-
-        if (is_suspicious) {
+        if (suspicious)
           ctx->suspicious_count++;
-        }
-      }
-
-      // Detect excessive hooks
-      if (num_hook_entries > 10) {
-        log_debug("Excessive netfilter hooks detected: PF=%d HOOK=%d COUNT=%u",
-                  pf, hook, num_hook_entries);
-        ctx->suspicious_count++;
-      }
-
-      // Detect unusual protocol families or hook points
-      if (pf >= 8 || hook >= 5) {
-        log_debug("Unusual netfilter parameters: PF=%d HOOK=%d", pf, hook);
-        ctx->suspicious_count++;
       }
     }
   }
@@ -596,6 +517,7 @@ static void cleanup_detection_context(detection_context_t* ctx) {
 }
 
 uint32_t state_network_trace_callback(vmi_instance_t vmi, void* context) {
+  // Preconditions
   if (!context || !vmi) {
     log_error("STATE_NETWORK_TRACE_CALLBACK: Invalid context or VMI instance");
     return VMI_FAILURE;
@@ -606,6 +528,8 @@ uint32_t state_network_trace_callback(vmi_instance_t vmi, void* context) {
     log_error("STATE_NETWORK_TRACE_CALLBACK: Callback requires a paused VM.");
     return VMI_FAILURE;
   }
+
+  log_info("Executing STATE_NETWORK_TRACE_CALLBACK callback.");
 
   detection_context_t detection_context = {0};
 
@@ -627,7 +551,8 @@ uint32_t state_network_trace_callback(vmi_instance_t vmi, void* context) {
 
   if (detection_context.suspicious_count > 0) {
     log_warn(
-        "STATE_NETWORK_TRACE_CALLBACK: Found %u suspicious network activities!",
+        "STATE_NETWORK_TRACE_CALLBACK: Found %u suspicious network "
+        "activities!",
         detection_context.suspicious_count);
   } else {
     log_info("STATE_NETWORK_TRACE_CALLBACK: No immediate threats detected");
@@ -637,6 +562,8 @@ uint32_t state_network_trace_callback(vmi_instance_t vmi, void* context) {
            detection_context.kernel_connections->len);
 
   cleanup_detection_context(&detection_context);
+
+  log_info("STATE_NETWORK_TRACE callback completed.");
 
   return VMI_SUCCESS;
 }

@@ -3,6 +3,7 @@
 #include <inttypes.h>
 #include <log.h>
 #include <string.h>
+#include "event_handler.h"
 #include "offsets.h"
 
 /**
@@ -60,6 +61,8 @@ static bool read_process_credentials(vmi_instance_t vmi, addr_t task_struct,
     return false;
   }
 
+  // Read credentials.
+  // See: https://docs.kernel.org/security/credentials.html.
   if (vmi_read_32_va(vmi, cred_addr + LINUX_EUID_OFFSET, 0, &proc_info->uid) !=
           VMI_SUCCESS ||
       vmi_read_32_va(vmi, cred_addr + LINUX_GID_OFFSET, 0, &proc_info->gid) !=
@@ -125,7 +128,18 @@ static void print_process_info(const process_info_t* proc_info) {
 
 // NOLINTNEXTLINE
 uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
-  (void)context;
+  // Preconditions
+  if (!vmi || !context) {
+    log_error("STATE_SYSCALL_TABLE: Invalid input parameters.");
+    return VMI_FAILURE;
+  }
+  event_handler_t* event_handler = (event_handler_t*)context;
+  if (!event_handler || !event_handler->is_paused) {
+    log_error("STATE_PROCESS_LIST_CALLBACK: Callback requires a paused VM.");
+    return VMI_FAILURE;
+  }
+
+  log_info("Executing STATE_PROCESS_LIST_CALLBACK callback.");
 
   addr_t list_head = 0, cur_list_entry = 0, next_list_entry = 0;
   addr_t current_process = 0;
@@ -199,7 +213,8 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
             "STATE_PROCESS_LIST_CALLBACK: Failed to read process state for PID "
             "%u",
             proc_info.pid);
-        proc_info.state = 0xFFFFFFFF;  // Unknown state
+        // Unknown state.
+        proc_info.state = 0xFFFFFFFF;
       }
 
       // Determine if kernel thread
@@ -251,5 +266,6 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
       "kernel threads)",
       total_processes, user_processes, kernel_threads);
 
+  log_info("STATE_PROCESS_LIST_CALLBACK callback completed.");
   return VMI_SUCCESS;
 }

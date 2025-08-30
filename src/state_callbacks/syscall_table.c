@@ -82,6 +82,11 @@ static char** parse_syscall_index_file(size_t* count_dst) {
 }
 
 uint32_t state_syscall_table_callback(vmi_instance_t vmi, void* context) {
+  // Preconditions
+  if (!vmi || !context) {
+    log_error("STATE_SYSCALL_TABLE: Invalid input parameters.");
+    return VMI_FAILURE;
+  }
   (void)context;
   // Check if vm is paused by checking the context (event_handler).
   event_handler_t* event_handler = (event_handler_t*)context;
@@ -90,6 +95,8 @@ uint32_t state_syscall_table_callback(vmi_instance_t vmi, void* context) {
     log_error("STATE_SYSCALL_TABLE: Callback requires a paused VM.");
     return VMI_FAILURE;
   }
+
+  log_info("Executing STATE_SYSCALL_TABLE callback.");
 
   size_t syscall_number = 0;
   // In data folder there is an index of the system calls available to the target system.
@@ -146,5 +153,6 @@ uint32_t state_syscall_table_callback(vmi_instance_t vmi, void* context) {
   }
 
   cleanup_sys_index(sys_index, syscall_number);
+  log_info("STATE_SYSCALL_TABLE callback completed.");
   return VMI_SUCCESS;
 }

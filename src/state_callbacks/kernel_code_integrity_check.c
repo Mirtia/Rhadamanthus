@@ -176,5 +176,7 @@ uint32_t state_kernel_code_integrity_check_callback(vmi_instance_t vmi,
     log_info("Kernel .text integrity verified. SHA256=%s", obs_hex);
   }
 
+  log_info("STATE_KERNEL_CODE_INTEGRITY_CHECK callback completed.");
+
   return VMI_SUCCESS;
 }

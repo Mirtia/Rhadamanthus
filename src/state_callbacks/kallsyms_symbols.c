@@ -6,6 +6,8 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <string.h>
+#include "event_handler.h"
+#include "utils.h"
 
 #ifndef KSYM_MAX_NAME
 #define KSYM_MAX_NAME 1024
@@ -13,7 +15,21 @@
 
 // NOLINTNEXTLINE
 uint32_t state_kallsyms_symbols_callback(vmi_instance_t vmi, void* context) {
-  (void)context;
+  // Preconditions
+  if (!vmi || !context) {
+    log_error(
+        "STATE_KALLSYMS_SYMBOLS: Invalid arguments to kallsyms symbols state "
+        "callback.");
+    return VMI_FAILURE;
+  }
+
+  event_handler_t* event_handler = (event_handler_t*)context;
+  if (!event_handler || !event_handler->is_paused) {
+    log_error(
+        "STATE_KALLSYMS_SYMBOLS: Callback requires a paused VM instance.");
+    return VMI_FAILURE;
+  }
+
   log_info("Executing STATE_KALLSYMS_SYMBOLS callback.");
 
   // Detect guest pointer width.
@@ -46,15 +62,19 @@ uint32_t state_kallsyms_symbols_callback(vmi_instance_t vmi, void* context) {
       vmi_translate_ksym2v(vmi, "kallsyms_relative_base", &a_relbase_sym) ==
           VMI_SUCCESS) {
     use_relative = true;
-    log_info("Using kallsyms_offsets + kallsyms_relative_base mode.");
+    log_info(
+        "STATE_KALLSYMS_SYMBOLS: Using kallsyms_offsets + "
+        "kallsyms_relative_base mode.");
   } else {
     if (vmi_translate_ksym2v(vmi, "kallsyms_addresses", &a_addrs) !=
         VMI_SUCCESS) {
       log_error(
-          "No callable address array found (neither relative nor absolute).");
+          "STATE_KALLSYMS_SYMBOLS: No callable address array found (neither "
+          "relative nor absolute).");
       return VMI_FAILURE;
     }
-    log_info("Using kallsyms_addresses (absolute) mode.");
+    log_info(
+        "STATE_KALLSYMS_SYMBOLS: Using kallsyms_addresses (absolute) mode.");
   }
 
   // Read token_index[256] (u16 each) for decompression.
@@ -62,23 +82,22 @@ uint32_t state_kallsyms_symbols_callback(vmi_instance_t vmi, void* context) {
   for (int i = 0; i < 256; i++) {
     if (vmi_read_16_va(vmi, a_tidx + (addr_t)(i * 2), 0, &token_index[i]) !=
         VMI_SUCCESS) {
-      log_error("Failed to read token_index[%d].", i);
+      log_error("STATE_KALLSYMS_SYMBOLS: Failed to read token_index[%d].", i);
       return VMI_FAILURE;
     }
   }
 
   // Optional: kernel text bounds for classification.
   addr_t ktext_s = 0, ktext_e = 0;
-  (void)ktext_s;
-  (void)ktext_e;
-  if (vmi_translate_ksym2v(vmi, "_stext", &ktext_s) == VMI_SUCCESS &&
-      vmi_translate_ksym2v(vmi, "_etext", &ktext_e) == VMI_SUCCESS &&
-      ktext_e > ktext_s) {
-    log_info("Kernel text range: [0x%" PRIx64 ", 0x%" PRIx64 "]",
-             (uint64_t)ktext_s, (uint64_t)ktext_e);
-  } else {
+  if (get_kernel_text_section_range(vmi, &ktext_s, &ktext_e) != VMI_SUCCESS) {
+    log_warn(
+        "STATE_KALLSYMS_SYMBOLS: Failed to get kernel .text section "
+        "boundaries.");
     ktext_s = ktext_e = 0;
-    log_warn("Could not resolve _stext/_etext; .text classification disabled.");
+  } else {
+    log_info("STATE_KALLSYMS_SYMBOLS: Kernel .text range: [0x%" PRIx64
+             ", 0x%" PRIx64 "]",
+             (uint64_t)ktext_s, (uint64_t)ktext_e);
   }
 
   // If relative mode, fetch the live base pointer value from kallsyms_relative_base.
@@ -89,13 +108,17 @@ uint32_t state_kallsyms_symbols_callback(vmi_instance_t vmi, void* context) {
   if (use_relative) {
     if (is_64) {
       if (vmi_read_64_va(vmi, a_relbase_sym, 0, &relbase64) != VMI_SUCCESS) {
-        log_error("Failed to read kallsyms_relative_base (64-bit).");
+        log_error(
+            "STATE_KALLSYMS_SYMBOLS: Failed to read kallsyms_relative_base "
+            "(64-bit).");
         return VMI_FAILURE;
       }
     } else {
       uint32_t base32 = 0;
       if (vmi_read_32_va(vmi, a_relbase_sym, 0, &base32) != VMI_SUCCESS) {
-        log_error("Failed to read kallsyms_relative_base (32-bit).");
+        log_error(
+            "STATE_KALLSYMS_SYMBOLS: Failed to read kallsyms_relative_base "
+            "(32-bit).");
         return VMI_FAILURE;
       }
       relbase64 = base32;
@@ -212,7 +235,8 @@ uint32_t state_kallsyms_symbols_callback(vmi_instance_t vmi, void* context) {
 
     // Log a small sample for inspection.
     if (logged < log_sample) {
-      log_info("kallsyms[%u]: 0x%" PRIx64 "  %s%s%s", i, (uint64_t)va, name_buf,
+      log_info("STATE_KALLSYMS_SYMBOLS: kallsyms[%u]: 0x%" PRIx64 "  %s%s%s", i,
+               (uint64_t)va, name_buf,
                (have_text && va >= ktext_s && va <= ktext_e) ? "  [.text]" : "",
                (vmi_read_8_va(vmi, va, 0, &tmp) == VMI_SUCCESS)
                    ? "  [reachable]"
@@ -223,21 +247,26 @@ uint32_t state_kallsyms_symbols_callback(vmi_instance_t vmi, void* context) {
 
   // Summary
   log_info(
-      "kallsyms summary: total=%u, reachable=%u, zero=%u, "
+      "STATE_KALLSYMS_SYMBOLS: kallsyms summary: total=%u, reachable=%u, "
+      "zero=%u, "
       "name_fail=%u, addr_fail=%u, in_text=%u, outside_text=%u",
       total, reachable, zero_addr, name_fail, addr_fail, in_text, outside_text);
 
   if (name_fail || addr_fail) {
     log_warn(
-        "kallsyms anomalies: name_fail=%u, addr_fail=%u "
+        "STATE_KALLSYMS_SYMBOLS: kallsyms anomalies: name_fail=%u, "
+        "addr_fail=%u "
         "(possible profile mismatch or memory tampering).",
         name_fail, addr_fail);
   }
   if (zero_addr) {
-    log_warn("%u symbol(s) reported VA=0 (unexpected).", zero_addr);
+    log_warn("STATE_KALLSYMS_SYMBOLS: %u symbol(s) reported VA=0 (unexpected).",
+             zero_addr);
   }
   if (total != num_syms) {
-    log_warn("Enumerated %u of %u entries (incomplete).", total, num_syms);
+    log_warn(
+        "STATE_KALLSYMS_SYMBOLS: Enumerated %u of %u entries (incomplete).",
+        total, num_syms);
   }
 
   log_info("STATE_KALLSYMS_SYMBOLS callback completed.");

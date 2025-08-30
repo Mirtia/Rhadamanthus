@@ -195,6 +195,9 @@ uint32_t state_io_uring_artifacts_callback(vmi_instance_t vmi, void* context) {
       "Finished scanning io_uring artifacts across all tasks. "
       "Weak signals: iou-wrk=%" PRIu64 ", iou-sqp=%" PRIu64,
       iou_worker_count, iou_sqp_count);
+  
+
+  log_info("STATE_IO_URING_ARTIFACTS callback completed.");
 
   return VMI_SUCCESS;
 }
