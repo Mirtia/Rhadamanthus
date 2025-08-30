@@ -23,7 +23,7 @@ enum state_task_id {
   STATE_DIR_STRING_MATCHING,  ///< Check directories and files of interest.
   STATE_PROCESS_LIST,         ///< List of processes.
   STATE_MSR_REGISTERS,  ///< MSR register state check (are there any hooks?).
-  STATE_KERNEL_CODE_INTEGRITY_CHECK,  ///< Check kernel code integrity.
+  // STATE_KERNEL_CODE_INTEGRITY_CHECK,  ///< Check kernel code integrity.
   STATE_EBPF_ARTIFACTS,               ///< eBPF programs and maps state check.
   STATE_IO_URING_ARTIFACTS,           ///< io_uring structures state check.,
   STATE_KALLSYMS_SYMBOLS,             ///< kallsyms symbols state check.
