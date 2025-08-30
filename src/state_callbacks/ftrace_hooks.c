@@ -3,6 +3,8 @@
 #include <inttypes.h>
 #include <log.h>
 #include <string.h>
+#include "event_handler.h"
+#include "utils.h"
 
 // Exact offsets from pahole's output for linux-5.15.0-139-generic kernel.
 #define FTRACE_OPS_FUNC_OFFSET 0
@@ -39,8 +41,8 @@ static const char* commonly_hooked_syscalls[] = {
     "__x64_sys_getdents64",  // Directory hiding
     "__x64_sys_kill",        // Process hiding
     //  TODO: add more, maybe whole list?
-    "sys_clone",             // Legacy naming
-    "sys_execve",            // Legacy naming
+    "sys_clone",   // Legacy naming
+    "sys_execve",  // Legacy naming
     NULL};
 
 /**
@@ -297,10 +299,23 @@ static int check_ftrace_global_state(vmi_instance_t vmi) {
 }
 
 uint32_t state_ftrace_hooks_callback(vmi_instance_t vmi, void* context) {
-  (void)context;
+  // Preconditions
+  if (!vmi || !context) {
+    log_error("STATE_FTRACE_HOOKS: Invalid input parameters.");
+    return VMI_FAILURE;
+  }
+
+  event_handler_t* event_handler = (event_handler_t*)context;
+  if (!event_handler || !event_handler->is_paused) {
+    log_error("STATE_FTRACE_HOOKS: Callback requires a paused VM.");
+    return VMI_FAILURE;
+  }
+
+  log_info("Executing STATE_FTRACE_HOOKS callback.");
 
   // Get kernel text bounds for validation
   addr_t kernel_start = 0, kernel_end = 0;
+
   if (vmi_translate_ksym2v(vmi, "_stext", &kernel_start) != VMI_SUCCESS ||
       vmi_translate_ksym2v(vmi, "_etext", &kernel_end) != VMI_SUCCESS) {
     log_error("Failed to resolve kernel text boundaries");
@@ -311,20 +326,16 @@ uint32_t state_ftrace_hooks_callback(vmi_instance_t vmi, void* context) {
            (uint64_t)kernel_start, (uint64_t)kernel_end);
 
   // Check global ftrace state
-  log_info("=== Checking Global Ftrace State ===");
   int global_issues = check_ftrace_global_state(vmi);
 
   // Check for commonly hooked syscalls
-  log_info("=== Checking Commonly Targeted Syscalls ===");
   int syscall_issues = check_commonly_hooked_syscalls(vmi);
 
   // Walk ftrace operations list for active hooks
-  log_info("=== Analyzing Active Ftrace Operations ===");
   int hook_detections = walk_ftrace_ops_list(vmi, kernel_start, kernel_end);
 
   // Summary
   int total_issues = global_issues + syscall_issues + hook_detections;
-  log_info("=== FTRACE HOOK DETECTION SUMMARY ===");
   log_info("Global ftrace issues: %d", global_issues);
   log_info("Syscall-related issues: %d", syscall_issues);
   log_info("Active hooks detected: %d", hook_detections);

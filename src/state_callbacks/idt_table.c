@@ -354,7 +354,6 @@ uint32_t state_idt_table_callback(vmi_instance_t vmi, void* context) {
     }
   }
 
-  // Report findings
   if (total_hooked == 0) {
     log_info("STATE_IDT_TABLE: No unexpected interrupt handler addresses detected.");
   } else {

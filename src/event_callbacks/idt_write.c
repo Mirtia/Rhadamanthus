@@ -14,8 +14,14 @@ event_response_t event_idt_write_callback(vmi_instance_t vmi,
   uint32_t vcpu_id = event->vcpu_id;
   uint64_t rip = 0;
   addr_t write_gla = event->mem_event.gla;
+  /**
+ * Calculate the exact GPA.
+ * GFN gives the 4 KiB page base (gfn << 12).
+ * The page offset is preserved across translation, so use (gla & 0xFFF).
+ * Combine both: GPA = (GFN << 12) | (GLA & 0xFFF).
+ */
   addr_t write_gpa =
-      (event->mem_event.gfn << 12) + (event->mem_event.gla & 0xFFF);
+      (event->mem_event.gfn << 12) | (event->mem_event.gla & 0xFFF);
 
   vmi_get_vcpureg(vmi, &rip, RIP, vcpu_id);
 

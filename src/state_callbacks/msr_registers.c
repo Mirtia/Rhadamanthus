@@ -64,9 +64,7 @@ uint32_t state_msr_registers_callback(vmi_instance_t vmi, void* context) {
 
   log_info("Executing STATE_MSR_REGISTERS callback.");
 
-  // Resolve kernel text bounds for validation
   addr_t kernel_start = 0, kernel_end = 0;
-
   if (get_kernel_text_section_range(vmi, &kernel_start, &kernel_end) !=
       VMI_SUCCESS) {
     log_error(
@@ -74,7 +72,8 @@ uint32_t state_msr_registers_callback(vmi_instance_t vmi, void* context) {
     return VMI_FAILURE;
   }
 
-  log_info("STATE_MSR_REGISTERS: Kernel text range: [0x%" PRIx64 ", 0x%" PRIx64 "]",
+  log_info("STATE_MSR_REGISTERS: Kernel text range: [0x%" PRIx64 ", 0x%" PRIx64
+           "]",
            (uint64_t)kernel_start, (uint64_t)kernel_end);
 
   // Get legitimate syscall entry point for comparison

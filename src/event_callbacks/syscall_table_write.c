@@ -5,7 +5,7 @@
 event_response_t event_syscall_table_write_callback(vmi_instance_t vmi,
                                                     vmi_event_t* event) {
 
-  // Preconditions                                                      
+  // Preconditions
   if (!vmi || !event) {
     log_error("Invalid arguments to syscall table write callback.");
     return VMI_EVENT_RESPONSE_NONE;
@@ -15,7 +15,15 @@ event_response_t event_syscall_table_write_callback(vmi_instance_t vmi,
 
   uint32_t vcpu_id = event->vcpu_id;
   addr_t write_gla = event->mem_event.gla;
-  addr_t write_gpa = event->mem_event.gfn << 12;
+  /**
+ * Calculate the exact GPA.
+ * GFN gives the 4 KiB page base (gfn << 12).
+ * The page offset is preserved across translation, so use (gla & 0xFFF).
+ * Combine both: GPA = (GFN << 12) | (GLA & 0xFFF).
+ */
+  addr_t write_gpa =
+      (event->mem_event.gfn << 12) | (event->mem_event.gla & 0xFFF);
+
   addr_t rip = 0;
 
   if (vmi_get_vcpureg(vmi, &rip, RIP, vcpu_id) != VMI_SUCCESS) {
