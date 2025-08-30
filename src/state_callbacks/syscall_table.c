@@ -26,7 +26,7 @@ static void cleanup_sys_index(char** sys_index, size_t size) {
 static char** parse_syscall_index_file(size_t* count_dst) {
   FILE* file = fopen(SYSCALL_INDEX_FILE, "r");
   if (!file) {
-    log_error("Failed to open syscall index file: %s", SYSCALL_INDEX_FILE);
+    log_debug("Failed to open syscall index file: %s", SYSCALL_INDEX_FILE);
     return NULL;
   }
 
@@ -43,20 +43,20 @@ static char** parse_syscall_index_file(size_t* count_dst) {
     char* endptr = NULL;
     long parsed_index = strtol(ptr, &endptr, 10);
     if (endptr == ptr || parsed_index < 0 || parsed_index > INT_MAX) {
-      log_warn("Invalid index in line: %s", line);
+      log_debug("Invalid index in line: %s", line);
       continue;
     }
 
     while (g_ascii_isspace(*endptr))
       endptr++;
     if (*endptr == '\0' || *endptr == '\n') {
-      log_warn("Missing name in line: %s", line);
+      log_debug("Missing name in line: %s", line);
       continue;
     }
 
     char* name = g_strdup(endptr);
     if (!name) {
-      log_error("Endptr was NULL. Strdup failed for line: %s", line);
+      log_debug("Endptr was NULL. Strdup failed for line: %s", line);
       (void)fclose(file);
       cleanup_sys_index(sys_index, count);
       return NULL;
@@ -65,7 +65,7 @@ static char** parse_syscall_index_file(size_t* count_dst) {
     name[strcspn(name, "\r\n")] = '\0';
     char** temp = g_realloc(sys_index, sizeof(char*) * (count + 1));
     if (!temp) {
-      log_error("Realloc failed while expanding syscall index array.");
+      log_debug("Realloc failed while expanding syscall index array.");
       g_free(name);
       (void)fclose(file);
       cleanup_sys_index(sys_index, count);

@@ -13,4 +13,13 @@
 uint32_t get_kernel_text_section_range(vmi_instance_t vmi, addr_t* start_addr,
                                        addr_t* end_addr);
 
+/**
+ * @brief Check if an address lies within the kernel .text section.
+ *
+ * @param vmi The VMI instance.
+ * @param addr The address to check.
+ * @return true if the address is within the kernel .text section, false otherwise.
+ */
+bool is_in_kernel_text(vmi_instance_t vmi, addr_t addr);
+
 #endif

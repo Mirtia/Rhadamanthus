@@ -4,31 +4,32 @@
 #include <inttypes.h>
 #include <log.h>
 #include <string.h>
+#include "event_handler.h"
+#include "utils.h"
 
-// Global constants for kernel structure offsets (kernel 5.15.0-139-generic)
-// inet_hashinfo structure offsets (from pahole output)
-static const unsigned long inet_hashinfo_ehash_offset = 0;  // ehash at offset 0
-static const unsigned long inet_hashinfo_ehash_mask_offset =
-    16;  // ehash_mask at offset 16
-static const unsigned long inet_hashinfo_lhas_h2_offset =
-    48;  // lhash2 at offset 48 (listening sockets)
+// Offsets are retrieved from the LibVMI profile at runtime. They were extracted with pahole from the vmlinux file.
+static unsigned long inet_hashinfo_ehash_offset = 0;  ///< ehash offset.
+static unsigned long inet_hashinfo_ehash_mask_offset =
+    0;                                                  ///< ehash_mask offset.
+static unsigned long inet_hashinfo_lhas_h2_offset = 0;  ///< lhash2 offfset.
 
-// TODO: Ahh, it will be a pain when fixing the libvmi conf.
-// Kernel 5.15.0 socket structure offsets (adjust for your kernel!)
-const unsigned long sock_common_offset = 0;      // sock_common at start of sock
-const unsigned long skc_daddr_offset = 0x0;      // destination IP offset
-const unsigned long skc_rcv_saddr_offset = 0x4;  // source IP offset
-const unsigned long skc_dport_offset = 0x8;      // destination port offset
-const unsigned long skc_num_offset = 0xa;        // source port offset
-const unsigned long skc_node_offset = 0x10;      // hash node offset
-const unsigned long skc_state_offset = 0x18;     // TCP state offset
-const unsigned long skc_node_next_offset = 0x8;  // next pointer in hlist_node
+static unsigned long sock_common_offset = 0;  ///< Sock_common at start of sock.
+static unsigned long skc_daddr_offset = 0;    ///< Destination IP offset.
+static unsigned long skc_rcv_saddr_offset = 0;  ///< Source IP offset.
+static unsigned long skc_dport_offset = 0;      ///< Destination port offset.
+static unsigned long skc_num_offset = 0;        ///< Source port offset.
+static unsigned long skc_node_offset = 0;       ///< Hash node offset.
+static unsigned long skc_state_offset = 0;      ///< TCP state offset.
+static unsigned long skc_node_next_offset = 0;  ///< Next pointer in hlist_node.
 
-// Netfilter structure offsets for kernel 5.x+ (adjust for your kernel!)
-const unsigned long net_nf_offset = 0x40;   // Offset to netns_nf in struct net
-const unsigned long nf_hooks_offset = 0x0;  // Offset to hooks array in netns_nf
+static unsigned long net_nf_offset = 0;  ///< Offset to netns_nf in struct net
+static unsigned long nf_hooks_offset =
+    0;  ///< Offset to hooks array in netns_nf
 
-// Network connection states
+/**
+* @brief TCP connection states.
+* TODO: Check if more states are needed (kernel dependent).
+*/
 typedef enum {
   TCP_ESTABLISHED = 1,
   TCP_SYN_SENT = 2,
@@ -50,14 +51,13 @@ typedef enum {
  * including local and remote IP addresses, ports, state, and process ID.
  */
 typedef struct {
-  uint32_t local_ip;      //< Local IP address.
-  uint32_t remote_ip;     ///< Remote IP address.
-  uint16_t local_port;    ///< Local port number.
-  uint16_t remote_port;   ///< Remote port number.
-  uint32_t state;         ///< state (e.g tcp_state_t).
-  vmi_pid_t pid;          //< Process ID associated with the connection.
-  addr_t sock_addr;       ///< Socket address in kernel memory.
-  bool hidden_from_proc;  ///< True if connection is hidden from /proc/net/tcp.
+  uint32_t local_ip;     ///< Local IP address.
+  uint32_t remote_ip;    ///< Remote IP address.
+  uint16_t local_port;   ///< Local port number.
+  uint16_t remote_port;  ///< Remote port number.
+  uint32_t state;        ///< State (e.g tcp_state_t).
+  vmi_pid_t pid;         //< Process ID associated with the connection.
+  addr_t sock_addr;      ///< Socket address in kernel memory.
 } network_connection_t;
 
 /**
@@ -66,13 +66,13 @@ typedef struct {
  * This structure holds the state and results of network rootkit detection.
  */
 typedef struct {
-  GHashTable* visible_connections;  ///< Connections visible in /proc/net/tcp
-  GArray* kernel_connections;       ///< Direct kernel connections
-  uint32_t suspicious_count;        ///< Count of suspicious connections
-} detection_context_t;              ///< Context for network detection
+  GArray* kernel_connections;  ///< Direct kernel connections.
+  uint32_t suspicious_count;   ///< Count of suspicious connections.
+} detection_context_t;         ///< Context for network detection.
 
 /**
  * @brief Convert TCP state to string representation.
+ * @note https://elixir.bootlin.com/linux/v6.16.3/source/include/net/tcp_states.h#L13
  * 
  * @param state The TCP state to convert.
  * @return const char* String representation of the TCP state. 
@@ -106,7 +106,6 @@ static const char* tcp_state_to_string(tcp_state_t state) {
   }
 }
 
-
 /**
  * @brief Check if a port is suspicious based on known rootkit patterns.
  * 
@@ -114,61 +113,133 @@ static const char* tcp_state_to_string(tcp_state_t state) {
  * @return true if the port is suspicious else false.
  */
 static bool is_suspicious_port(uint16_t port) {
-  // Verified kernel-mode rootkit ports based on documented sources
   uint16_t suspicious_ports[] = {
       666,  // Reptile rootkit default SRCPORT (documented)
-            // Note: Adore rootkit hides connections but doesn't use fixed ports
-            // It replaces tcp4_seq_show() to filter /proc/net/tcp output
+      // Reptile has been removed from public repositories but references exist:
+      // https://web.archive.org/web/20250506040024/https://github.com/f0rb1dd3n/Reptile
+      665, 667,  ///< Possible Reptile variations
+      4444, 5555, 6666, 7777, 8888,
+      9999,  ///< Sequential and simple patterns used by malware tools and backdoors.
+      1234, 2222, 3333,
+      31337,  ///< Back Orifice backdoor default port (LEET).
+      0,      ///< Port 0 is invalid.
+      65535   ///< Highest port, invalid.
   };
 
   size_t count = sizeof(suspicious_ports) / sizeof(suspicious_ports[0]);
   for (size_t i = 0; i < count; i++) {
     if (port == suspicious_ports[i]) {
+      log_debug("Suspicious port detected: %u", port);
       return true;
     }
   }
 
-  // Additional suspicious patterns for kernel rootkits
-  // Check for ports commonly used in backdoors that might have kernel components
-  if (port == 0 || port == 65535) {
+  // High ports that are unusual for legitimate services.
+  if (port >= 60000 && port <= 65534) {
+    log_debug("High range suspicious port detected: %u", port);
     return true;
   }
 
-  // Check for sequential suspicious patterns (often used in demos/testing)
-  if (port >= 1337 && port <= 1340) {
-    return true;  // Leet port range
-  }
-
-  if (port >= 31330 && port <= 31339) {
-    return true;  // Elite port range
-  }
-
-  // High ports that are unusual for legitimate services
-  if (port >= 60000 && port <= 65534) {
-    return true;  // Unusual high port range
-  }
-
-  // Additional rootkit-specific port patterns
-  if (port >= 665 && port <= 667) {
-    return true;  // Reptile variations
-  }
-
-  // Common backdoor ports used in proof-of-concepts
-  uint16_t poc_ports[] = {
-      4444,  5555,  6666, 7777, 8888, 9999,  // Sequential patterns
-      1234,  2222,  3333,                    // Simple patterns
-      31337, 13370,                          // Leet variations
-      12345, 54321,                          // Palindromic
-  };
-
-  size_t poc_count = sizeof(poc_ports) / sizeof(poc_ports[0]);
-  for (size_t i = 0; i < poc_count; i++) {
-    if (port == poc_ports[i]) {
-      return true;
-    }
-  }
-
   return false;
+}
+
+static inline bool ipv4_is_public(uint32_t ip_be) {
+  uint32_t ip_addr = ntohl(ip_be);  // compare in host byte order
+
+// Helper: test if ip is inside CIDR (base/maskbits in host order)
+#define IN(ip_addr_, base_, maskbits_)                              \
+  (((ip_addr_) &                                                    \
+    ((maskbits_) == 0 ? 0u : 0xFFFFFFFFu << (32 - (maskbits_)))) == \
+   ((base_) & ((maskbits_) == 0 ? 0u : 0xFFFFFFFFu << (32 - (maskbits_)))))
+
+  // ---- Non-public ranges per IANA Special-Purpose Address Registry & RFCs ----
+  // IANA IPv4 Special-Purpose Address Registry (authoritative index):
+  // https://www.iana.org/assignments/iana-ipv4-special-registry  (covers many items below)
+  // RFC 6890 (Special-Purpose IP Address Registries): https://datatracker.ietf.org/doc/html/rfc6890
+
+  // 0.0.0.0/8 — “this network” & 0.0.0.0/32 unspecified
+  // IANA special-use overview (see registry above).
+  if (IN(ip_addr, 0x00000000U, 8))
+    return false;
+
+  // 10.0.0.0/8 — Private-use (RFC 1918)
+  // https://datatracker.ietf.org/doc/html/rfc1918
+  if (IN(ip_addr, 0x0A000000U, 8))
+    return false;
+
+  // 100.64.0.0/10 — Shared Address Space for CGNAT (RFC 6598)
+  // https://datatracker.ietf.org/doc/html/rfc6598
+  if (IN(ip_addr, 0x64400000U, 10))
+    return false;
+
+  // 127.0.0.0/8 — Loopback (RFC 1122 §3.2.1.3; listed in IANA special registry)
+  // RFC 1122: https://www.rfc-editor.org/rfc/rfc1122
+  // IANA (explicit row for 127/8): https://www.iana.org/assignments/iana-ipv4-special-registry
+  if (IN(ip_addr, 0x7F000000U, 8))
+    return false;
+
+  // 169.254.0.0/16 — Link-Local (RFC 3927)
+  // https://datatracker.ietf.org/doc/html/rfc3927
+  if (IN(ip_addr, 0xA9FE0000U, 16))
+    return false;
+
+  // 172.16.0.0/12 — Private-use (RFC 1918)
+  // https://datatracker.ietf.org/doc/html/rfc1918
+  if (IN(ip_addr, 0xAC100000U, 12))
+    return false;
+
+  // 192.0.0.0/24 — IETF Protocol Assignments (RFC 6890 §2.1; obsoletes RFC 5736)
+  // RFC 6890: https://datatracker.ietf.org/doc/html/rfc6890
+  // IANA registry row for 192.0.0.0/24: https://www.iana.org/assignments/iana-ipv4-special-registry
+  if (IN(ip_addr, 0xC0000000U, 24))
+    return false;
+
+  // 192.0.2.0/24 — Documentation TEST-NET-1 (RFC 5737)
+  // https://datatracker.ietf.org/doc/html/rfc5737
+  if (IN(ip_addr, 0xC0000200U, 24))
+    return false;
+
+  // 192.88.99.0/24 — 6to4 Relay Anycast (deprecated; treat as non-public) (RFC 7526)
+  // https://www.rfc-editor.org/rfc/rfc7526.html
+  if (IN(ip_addr, 0xC0586300U, 24))
+    return false;
+
+  // 192.168.0.0/16 — Private-use (RFC 1918)
+  // https://datatracker.ietf.org/doc/html/rfc1918
+  if (IN(ip_addr, 0xC0A80000U, 16))
+    return false;
+
+  // 198.18.0.0/15 — Benchmarking (RFC 2544; recorded in IANA special registry)
+  // RFC 2544: https://www.rfc-editor.org/rfc/rfc2544.html
+  if (IN(ip_addr, 0xC6120000U, 15))
+    return false;
+
+  // 198.51.100.0/24 — Documentation TEST-NET-2 (RFC 5737)
+  // https://datatracker.ietf.org/doc/html/rfc5737
+  if (IN(ip_addr, 0xC6336400U, 24))
+    return false;
+
+  // 203.0.113.0/24 — Documentation TEST-NET-3 (RFC 5737)
+  // https://datatracker.ietf.org/doc/html/rfc5737
+  if (IN(ip_addr, 0xCB007100U, 24))
+    return false;
+
+  // 224.0.0.0/4 — Multicast (RFC 5771; IANA multicast registry)
+  // RFC 5771: https://datatracker.ietf.org/doc/html/rfc5771
+  // IANA multicast registry: https://www.iana.org/assignments/multicast-addresses
+  if (IN(ip_addr, 0xE0000000U, 4))
+    return false;
+
+  // 240.0.0.0/4 — Reserved for future use; includes 255.255.255.255/32 broadcast
+  // IANA special-use registry + long-standing “Class E / Future Use” designation.
+  // https://www.iana.org/assignments/iana-ipv4-special-registry
+  if (IN(ip_addr, 0xF0000000U, 4))
+    return false;
+
+  // If it is not in any special/non-public block, treat as public.
+  return true;
+
+#undef IN
 }
 
 /**
@@ -181,16 +252,23 @@ static bool is_suspicious_ip(uint32_t ip_addr) {
   // Check for suspicious IP ranges or patterns
   uint8_t* octets = (uint8_t*)&ip_addr;
 
+  if (ipv4_is_public(ip_addr)) {
+    log_debug("Public IP detected: %u.%u.%u.%u", octets[0], octets[1],
+              octets[2], octets[3]);
+    return true;
+  }
   // Private IP ranges are less suspicious than public unknown IPs
-  // but could still be lateral movement
+  // but could still be lateral movement.
 
   // Check for unusual patterns
+  // e.g. All octets same (e.g., 1.1.1.1, 127.127.127.127)
   if (octets[0] == octets[1] && octets[1] == octets[2] &&
       octets[2] == octets[3]) {
-    return true;  // All octets same (e.g., 1.1.1.1, 127.127.127.127)
+    return true;
   }
 
   // Sequential patterns
+  // e.g. 1.2.3.4
   if (octets[0] + 1 == octets[1] && octets[1] + 1 == octets[2] &&
       octets[2] + 1 == octets[3]) {
     return true;
@@ -215,13 +293,11 @@ static uint32_t walk_tcp_hash_table(vmi_instance_t vmi,
   addr_t ehash = 0;
   uint32_t ehash_mask = 0;
 
-  log_info("Walking TCP hash tables for hidden connections...");
-
   // Get tcp_hashinfo global symbol
   if (vmi_translate_ksym2v(vmi, "tcp_hashinfo", &tcp_hashinfo_addr) !=
       VMI_SUCCESS) {
-    log_warn("Failed to resolve tcp_hashinfo global symbol");
-    return VMI_SUCCESS;  // Continue with other detection methods
+    log_debug("Failed to resolve tcp_hashinfo global symbol");
+    return VMI_FAILURE;
   }
 
   // Read established hash table pointer and mask
@@ -229,7 +305,7 @@ static uint32_t walk_tcp_hash_table(vmi_instance_t vmi,
                        &ehash) != VMI_SUCCESS ||
       vmi_read_32_va(vmi, tcp_hashinfo_addr + inet_hashinfo_ehash_mask_offset,
                      0, &ehash_mask) != VMI_SUCCESS) {
-    log_error("Failed to read TCP established hash table info");
+    log_debug("Failed to read TCP established hash table info");
     return VMI_FAILURE;
   }
 
@@ -292,23 +368,23 @@ static uint32_t walk_tcp_hash_table(vmi_instance_t vmi,
 
         if (is_suspicious_port(conn.local_port) ||
             is_suspicious_port(conn.remote_port)) {
-          log_warn("SUSPICIOUS PORT: %s:%u -> %s:%u", inet_ntoa(local_addr),
+          log_warn("Suspicious Port: %s:%u -> %s:%u", inet_ntoa(local_addr),
                    conn.local_port, inet_ntoa(remote_addr), conn.remote_port);
           is_suspicious = true;
         }
 
         if (is_suspicious_ip(conn.local_ip) ||
             is_suspicious_ip(conn.remote_ip)) {
-          log_warn("SUSPICIOUS IP: %s:%u -> %s:%u", inet_ntoa(local_addr),
-                   conn.local_port, inet_ntoa(remote_addr), conn.remote_port);
+          log_debug("Suspicious IP: %s:%u -> %s:%u", inet_ntoa(local_addr),
+                    conn.local_port, inet_ntoa(remote_addr), conn.remote_port);
           is_suspicious = true;
         }
 
         // Check for unusual TCP states
         if (conn.state > TCP_CLOSING) {
-          log_warn("UNUSUAL TCP STATE: %s:%u -> %s:%u state=%u",
-                   inet_ntoa(local_addr), conn.local_port,
-                   inet_ntoa(remote_addr), conn.remote_port, conn.state);
+          log_debug("Unusual TCP state: %s:%u -> %s:%u state=%u",
+                    inet_ntoa(local_addr), conn.local_port,
+                    inet_ntoa(remote_addr), conn.remote_port, conn.state);
           is_suspicious = true;
         }
 
@@ -335,6 +411,7 @@ static uint32_t walk_tcp_hash_table(vmi_instance_t vmi,
       chain_count++;
     }
 
+    // Validate?
     if (chain_count >= 100) {
       log_warn(
           "Excessive socket chain length detected in bucket %u: %d connections",
@@ -345,80 +422,6 @@ static uint32_t walk_tcp_hash_table(vmi_instance_t vmi,
 
   log_info("Completed TCP hash table walk, found %u connections",
            ctx->kernel_connections->len);
-
-  return VMI_SUCCESS;
-}
-
-/**
- * @brief Check network-related system calls for hooks
- * 
- * Many network rootkits hook system calls related to networking
- * in addition to or instead of netfilter hooks.
- * 
- * @param vmi The VMI instance
- * @param ctx The detection context
- * @return uint32_t VMI_SUCCESS on success
- */
-static uint32_t check_network_syscall_hooks(vmi_instance_t vmi,
-                                            detection_context_t* ctx) {
-  addr_t sys_call_table_addr = 0;
-
-  log_debug("Checking network-related system calls for hooks...");
-
-  if (vmi_translate_ksym2v(vmi, "sys_call_table", &sys_call_table_addr) !=
-      VMI_SUCCESS) {
-    log_warn("Failed to resolve sys_call_table symbol");
-    return VMI_SUCCESS;
-  }
-
-  // Network-related system calls that rootkits commonly hook
-  struct {
-    int syscall_num;
-    const char* name;
-  } network_syscalls[] = {
-      {41, "sys_socket"},    // socket creation
-      {42, "sys_connect"},   // outgoing connections
-      {43, "sys_accept"},    // incoming connections
-      {49, "sys_bind"},      // port binding
-      {44, "sys_sendto"},    // send data
-      {45, "sys_recvfrom"},  // receive data
-      {46, "sys_sendmsg"},   // send message
-      {47, "sys_recvmsg"},   // receive message
-      {50, "sys_listen"},    // listen for connections
-      {48, "sys_shutdown"},  // close connections
-  };
-
-  size_t syscall_count = sizeof(network_syscalls) / sizeof(network_syscalls[0]);
-
-  for (size_t i = 0; i < syscall_count; i++) {
-    addr_t syscall_ptr_addr =
-        sys_call_table_addr + network_syscalls[i].syscall_num * sizeof(addr_t);
-    addr_t syscall_addr = 0;
-
-    if (vmi_read_addr_va(vmi, syscall_ptr_addr, 0, &syscall_addr) !=
-        VMI_SUCCESS) {
-      continue;
-    }
-
-    log_debug("Network syscall %s (%d) at 0x%" PRIx64, network_syscalls[i].name,
-              network_syscalls[i].syscall_num, syscall_addr);
-
-    // Basic validation - system calls should be in kernel text
-    if (syscall_addr < 0xffffffff80000000ULL) {
-      log_warn(
-          "SUSPICIOUS: Network syscall %s hooked to user space: 0x%" PRIx64,
-          network_syscalls[i].name, syscall_addr);
-      ctx->suspicious_count++;
-    }
-
-    // Check for signature addresses
-    if ((syscall_addr & 0xFFFF) == 0x666 || (syscall_addr & 0xFFFF) == 0x1337) {
-      log_warn(
-          "SUSPICIOUS: Network syscall %s has signature address: 0x%" PRIx64,
-          network_syscalls[i].name, syscall_addr);
-      ctx->suspicious_count++;
-    }
-  }
 
   return VMI_SUCCESS;
 }
@@ -437,13 +440,10 @@ static uint32_t check_netfilter_hooks(vmi_instance_t vmi,
                                       detection_context_t* ctx) {
   addr_t init_net_addr = 0;
 
-  log_info(
-      "Checking netfilter hooks for rootkit modifications (kernel 5.x+)...");
-
   // Get init_net (initial network namespace) instead of old nf_hooks
   if (vmi_translate_ksym2v(vmi, "init_net", &init_net_addr) != VMI_SUCCESS) {
-    log_warn("Failed to resolve init_net symbol");
-    return VMI_SUCCESS;  // Continue with other checks
+    log_debug("Failed to resolve init_net symbol");
+    return VMI_FAILURE;
   }
 
   log_debug("init_net found at 0x%" PRIx64, init_net_addr);
@@ -518,9 +518,8 @@ static uint32_t check_netfilter_hooks(vmi_instance_t vmi,
         bool is_suspicious = false;
 
         // 1. Check if hook function is in kernel text section
-        // TODO: Fix, this is atrocious! Move to general function (helper or utils file) so that multiple other events can access it.
-        if (hook_func < 0xffffffff80000000ULL) {
-          log_warn(
+        if (is_in_kernel_text(vmi, hook_func)) {
+          log_debug(
               "SUSPICIOUS: Hook function in user space: PF=%d HOOK=%d "
               "func=0x%" PRIx64,
               pf, hook, hook_func);
@@ -532,7 +531,7 @@ static uint32_t check_netfilter_hooks(vmi_instance_t vmi,
         uint16_t func_low_bits = hook_func & 0xFFFF;
         if (func_low_bits == 0x666 || func_low_bits == 0x1337 ||
             func_low_bits == 0xdead || func_low_bits == 0xbeef) {
-          log_warn(
+          log_debug(
               "SUSPICIOUS: Hook with signature address pattern: PF=%d HOOK=%d "
               "func=0x%" PRIx64,
               pf, hook, hook_func);
@@ -543,7 +542,7 @@ static uint32_t check_netfilter_hooks(vmi_instance_t vmi,
         // TODO: Hardcoded addresses is smelly code, there is no way this will work.
         if ((hook_func >= 0xffff888000000000ULL &&
              hook_func < 0xffffc87fffffffffULL)) {
-          log_warn(
+          log_debug(
               "SUSPICIOUS: Hook in potential heap memory: PF=%d HOOK=%d "
               "func=0x%" PRIx64,
               pf, hook, hook_func);
@@ -554,7 +553,7 @@ static uint32_t check_netfilter_hooks(vmi_instance_t vmi,
         if (hook_priv != 0) {
           uint16_t priv_low_bits = hook_priv & 0xFFFF;
           if (priv_low_bits == 0x666 || priv_low_bits == 0x1337) {
-            log_warn(
+            log_debug(
                 "SUSPICIOUS: Hook private data with signature: PF=%d HOOK=%d "
                 "priv=0x%" PRIx64,
                 pf, hook, hook_priv);
@@ -568,7 +567,7 @@ static uint32_t check_netfilter_hooks(vmi_instance_t vmi,
           uint8_t* bytes = (uint8_t*)&func_bytes;
           if (bytes[0] == 0x00 &&
               bytes[1] == 0x00) {  // All zeros - likely not code
-            log_warn(
+            log_debug(
                 "SUSPICIOUS: Hook function appears to contain null bytes: "
                 "PF=%d HOOK=%d",
                 pf, hook);
@@ -583,21 +582,18 @@ static uint32_t check_netfilter_hooks(vmi_instance_t vmi,
 
       // Detect excessive hooks
       if (num_hook_entries > 10) {
-        log_warn("Excessive netfilter hooks detected: PF=%d HOOK=%d COUNT=%u",
-                 pf, hook, num_hook_entries);
+        log_debug("Excessive netfilter hooks detected: PF=%d HOOK=%d COUNT=%u",
+                  pf, hook, num_hook_entries);
         ctx->suspicious_count++;
       }
 
       // Detect unusual protocol families or hook points
       if (pf >= 8 || hook >= 5) {
-        log_warn("Unusual netfilter parameters: PF=%d HOOK=%d", pf, hook);
+        log_debug("Unusual netfilter parameters: PF=%d HOOK=%d", pf, hook);
         ctx->suspicious_count++;
       }
     }
   }
-
-  // Additional detection: Check for hooked network system calls
-  check_network_syscall_hooks(vmi, ctx);
 
   return VMI_SUCCESS;
 }
@@ -608,55 +604,85 @@ static uint32_t check_netfilter_hooks(vmi_instance_t vmi,
  * @param ctx The detection context to clean up.
  */
 static void cleanup_detection_context(detection_context_t* ctx) {
-  if (ctx->visible_connections) {
-    g_hash_table_destroy(ctx->visible_connections);
-  }
   if (ctx->kernel_connections) {
     g_array_free(ctx->kernel_connections, TRUE);
   }
 }
 
 uint32_t state_network_trace_callback(vmi_instance_t vmi, void* context) {
-  (void)context;
+  if (!context || !vmi) {
+    log_error("STATE_NETWORK_TRACE_CALLBACK: Invalid context or VMI instance");
+    return VMI_FAILURE;
+  }
 
-  detection_context_t det_ctx = {0};
-  uint32_t result = VMI_SUCCESS;
+  event_handler_t* event_handler = (event_handler_t*)context;
+  if (!event_handler->is_paused) {
+    log_error("STATE_NETWORK_TRACE_CALLBACK: Callback requires a paused VM.");
+    return VMI_FAILURE;
+  }
 
-  log_info("STATE_NETWORK_TRACE_CALLBACK: Starting network rootkit detection...");
+  detection_context_t detection_context = {0};
 
-  // Initialize detection context
-  det_ctx.visible_connections =
-      g_hash_table_new_full(g_str_hash, g_str_equal, g_free, NULL);
-  det_ctx.kernel_connections =
+  if (vmi_get_offset(vmi, "linux_inet_hashinfo_ehash_offset",
+                     &inet_hashinfo_ehash_offset) != VMI_SUCCESS ||
+      vmi_get_offset(vmi, "linux_inet_hashinfo_ehash_mask_offset",
+                     &inet_hashinfo_ehash_mask_offset) != VMI_SUCCESS ||
+      vmi_get_offset(vmi, "linux_inet_hashinfo_lhash2_offset",
+                     &inet_hashinfo_lhas_h2_offset) != VMI_SUCCESS ||
+      vmi_get_offset(vmi, "linux_sock_common_offset", &sock_common_offset) !=
+          VMI_SUCCESS ||
+      vmi_get_offset(vmi, "linux_skc_daddr_offset", &skc_daddr_offset) !=
+          VMI_SUCCESS ||
+      vmi_get_offset(vmi, "linux_skc_rcv_saddr_offset",
+                     &skc_rcv_saddr_offset) != VMI_SUCCESS ||
+      vmi_get_offset(vmi, "linux_skc_dport_offset", &skc_dport_offset) !=
+          VMI_SUCCESS ||
+      vmi_get_offset(vmi, "linux_skc_num_offset", &skc_num_offset) !=
+          VMI_SUCCESS ||
+      vmi_get_offset(vmi, "linux_skc_node_offset", &skc_node_offset) !=
+          VMI_SUCCESS ||
+      vmi_get_offset(vmi, "linux_skc_state_offset", &skc_state_offset) !=
+          VMI_SUCCESS ||
+      vmi_get_offset(vmi, "linux_skc_node_next_offset",
+                     &skc_node_next_offset) != VMI_SUCCESS ||
+      vmi_get_offset(vmi, "linux_net_nf_offset", &net_nf_offset) !=
+          VMI_SUCCESS ||
+      vmi_get_offset(vmi, "linux_nf_hooks_offset", &nf_hooks_offset) !=
+          VMI_SUCCESS) {
+    log_error(
+        "STATE_NETWORK_TRACE_CALLBACK: failed to load one or more offsets from "
+        "LibVMI profile");
+    return VMI_FAILURE;
+  }
+
+  detection_context.kernel_connections =
       g_array_new(FALSE, TRUE, sizeof(network_connection_t));
-  det_ctx.suspicious_count = 0;
+  detection_context.suspicious_count = 0;
 
-  // 1. Check netfilter hooks for modifications
-  if (check_netfilter_hooks(vmi, &det_ctx) != VMI_SUCCESS) {
+  // Check netfilter hooks for modifications
+  if (check_netfilter_hooks(vmi, &detection_context) != VMI_SUCCESS) {
     log_error("STATE_NETWORK_TRACE_CALLBACK: Failed to check netfilter hooks");
-    result = VMI_FAILURE;
+    return VMI_FAILURE;
   }
 
-  // 2. Walk kernel network structures directly
-  if (walk_tcp_hash_table(vmi, &det_ctx) != VMI_SUCCESS) {
+  // Walk kernel network structures directly
+  if (walk_tcp_hash_table(vmi, &detection_context) != VMI_SUCCESS) {
     log_error("STATE_NETWORK_TRACE_CALLBACK: Failed to walk TCP hash tables");
-    result = VMI_FAILURE;
+    return VMI_FAILURE;
   }
 
-  // Report findings
-  if (det_ctx.suspicious_count > 0) {
+  if (detection_context.suspicious_count > 0) {
     log_warn(
         "STATE_NETWORK_TRACE_CALLBACK: Found %u suspicious network activities!",
-        det_ctx.suspicious_count);
+        detection_context.suspicious_count);
   } else {
     log_info("STATE_NETWORK_TRACE_CALLBACK: No immediate threats detected");
   }
 
-  log_info("STATE_NETWORK_TRACE_CALLBACK: CONNECTIONS found: %u kernel, %u visible",
-           det_ctx.kernel_connections->len,
-           g_hash_table_size(det_ctx.visible_connections));
+  log_info("STATE_NETWORK_TRACE_CALLBACK: CONNECTIONS found: %u kernel",
+           detection_context.kernel_connections->len);
 
-  cleanup_detection_context(&det_ctx);
+  cleanup_detection_context(&detection_context);
 
-  return result;
+  return VMI_SUCCESS;
 }
