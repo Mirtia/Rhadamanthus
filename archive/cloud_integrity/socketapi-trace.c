@@ -51,7 +51,7 @@ int socket_event_type = 0;
 /**
  * callback function for accept_step_event
  */
-event_response_t socket_step_cb(vmi_instance_t vmi, vmi_event_t *event) {
+event_response_t socket_step_cb(vmi_instance_t vmi, vmi_event_t* event) {
   /**
    * enable the accept_enter_event, connect_enter_event or accept_leave_event
    */
@@ -90,7 +90,7 @@ event_response_t socket_step_cb(vmi_instance_t vmi, vmi_event_t *event) {
  * callback function for accept_enter_event, connect_enter_event and
  * accept_leave_event
  */
-event_response_t socket_enter_cb(vmi_instance_t vmi, vmi_event_t *event) {
+event_response_t socket_enter_cb(vmi_instance_t vmi, vmi_event_t* event) {
   addr_t event_addr;
 #ifdef MEM_EVENT
   event_addr = event->mem_event.gla;
@@ -285,7 +285,7 @@ event_response_t socket_enter_cb(vmi_instance_t vmi, vmi_event_t *event) {
   return 0;
 }
 
-int introspect_socketapi_trace(char *name) {
+int introspect_socketapi_trace(char* name) {
 
   struct sigaction act;
   act.sa_handler = close_handler;
@@ -300,7 +300,7 @@ int introspect_socketapi_trace(char *name) {
    * Initialize the vmi instance
    */
   vmi_instance_t vmi = NULL;
-  vmi_init_data_t *init_data = NULL;
+  vmi_init_data_t* init_data = NULL;
 
   if (VMI_FAILURE == vmi_init_complete(&vmi, domain_name, VMI_INIT_DOMAINNAME,
                                        init_data, VMI_CONFIG_GLOBAL_FILE_ENTRY,

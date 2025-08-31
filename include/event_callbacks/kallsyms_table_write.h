@@ -20,6 +20,6 @@
  * @return event_response_t VMI_EVENT_RESPONSE_NONE (general monitoring).
  */
 event_response_t event_kallsyms_write_callback(vmi_instance_t vmi,
-                                                      vmi_event_t* event);
+                                               vmi_event_t* event);
 
 #endif  // KALLSYMS_TABLE_WRITE_H

@@ -1,8 +1,8 @@
+#include <cmocka.h>
+#include <log.h>
 #include <setjmp.h>
 #include <stdarg.h>
 #include <stddef.h>
-#include <cmocka.h>
-#include <log.h>
 #include "event_handler.h"
 
 void register_mock_tasks(event_handler_t* event_handler) {
@@ -60,8 +60,7 @@ static void test_event_handler_creation_valid(void** state) {
 int main(void) {
   const struct CMUnitTest tests[] = {
       cmocka_unit_test(test_event_handler_creation_valid),
-      cmocka_unit_test(test_event_handler_creation_invalid)
-  };
+      cmocka_unit_test(test_event_handler_creation_invalid)};
 
   return cmocka_run_group_tests(tests, NULL, NULL);
 }

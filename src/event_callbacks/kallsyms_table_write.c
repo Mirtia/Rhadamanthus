@@ -8,7 +8,8 @@ event_response_t event_kallsyms_write_callback(vmi_instance_t vmi,
   // Preconditions
   if (!event) {
     log_error(
-        "EVENT_KALLSYMS_WRITE: Invalid arguments to kallsyms table write callback.");
+        "EVENT_KALLSYMS_WRITE: Invalid arguments to kallsyms table write "
+        "callback.");
     return VMI_EVENT_INVALID;
   }
 

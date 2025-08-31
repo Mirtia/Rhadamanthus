@@ -1,7 +1,7 @@
-  #include "vmi.h"
 #include <assert.h>
 #include <libvmi/libvmi.h>
 #include <string.h>
+#include "vmi.h"
 
 vmi_event_t syscall_enter_event;
 vmi_event_t syscall_step_event;
@@ -10,13 +10,13 @@ reg_t virt_lstar;
 addr_t phys_lstar;
 
 int num_sys = 0;
-char **sys_index = NULL;
+char** sys_index = NULL;
 
 #ifndef MEM_EVENT
 uint32_t syscall_orig_data;
 #endif
 
-event_response_t syscall_step_cb(vmi_instance_t vmi, vmi_event_t *event) {
+event_response_t syscall_step_cb(vmi_instance_t vmi, vmi_event_t* event) {
   // TODO: Remove the assertion later on
   // assert(event);
 /**
@@ -39,7 +39,7 @@ event_response_t syscall_step_cb(vmi_instance_t vmi, vmi_event_t *event) {
   return 0;
 }
 
-event_response_t syscall_enter_cb(vmi_instance_t vmi, vmi_event_t *event) {
+event_response_t syscall_enter_cb(vmi_instance_t vmi, vmi_event_t* event) {
 #ifdef MEM_EVENT
   if (event->mem_event.gla == virt_lstar) {
 #else
@@ -57,7 +57,7 @@ event_response_t syscall_enter_cb(vmi_instance_t vmi, vmi_event_t *event) {
       printf("Process[%d]: unknown syscall id: %d\n", pid, _index);
 
     } else if (_index == 90) {
-      char *argname = NULL;
+      char* argname = NULL;
       argname = vmi_read_str_va(vmi, rdi, pid);
       printf("Process[%d]: Syscall %s happend, 1st argument=%s\n", pid,
              sys_index[_index], argname);
@@ -87,7 +87,7 @@ event_response_t syscall_enter_cb(vmi_instance_t vmi, vmi_event_t *event) {
   return 0;
 }
 
-int introspect_syscall_trace(const char *domain_name) {
+int introspect_syscall_trace(const char* domain_name) {
 
   struct sigaction act;
   act.sa_handler = close_handler;
@@ -102,7 +102,7 @@ int introspect_syscall_trace(const char *domain_name) {
   char _name[256];
   int _index[256];
 
-  FILE *_file;
+  FILE* _file;
   _file = fopen("data/syscall_index.linux", "r");
   if (_file == NULL) {
     printf("Failed to open file.");
@@ -110,15 +110,15 @@ int introspect_syscall_trace(const char *domain_name) {
   }
   while (fgets(_line, sizeof(_line), _file) != NULL) {
     sscanf(_line, "%d\t%s", _index, _name);
-    sys_index = realloc(sys_index, sizeof(char *) * ++num_sys);
-    sys_index[num_sys - 1] = (char *)malloc(256);
+    sys_index = realloc(sys_index, sizeof(char*) * ++num_sys);
+    sys_index[num_sys - 1] = (char*)malloc(256);
     strcpy(sys_index[num_sys - 1], _name);
   }
 
   fclose(_file);
 
   vmi_instance_t vmi = NULL;
-  vmi_init_data_t *init_data = NULL;
+  vmi_init_data_t* init_data = NULL;
 
   if (VMI_FAILURE == vmi_init_complete(&vmi, domain_name, VMI_INIT_DOMAINNAME,
                                        init_data, VMI_CONFIG_GLOBAL_FILE_ENTRY,

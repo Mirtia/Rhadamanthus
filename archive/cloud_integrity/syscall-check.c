@@ -1,11 +1,11 @@
 #include "vmi.h"
 
-int introspect_syscall_check(const char *domain_name) {
+int introspect_syscall_check(const char* domain_name) {
   vmi_instance_t vmi = {0};
   addr_t sys_call_table_addr, sys_call_addr, kernel_start, kernel_end = 0;
   int syscall_hit_count = 0;
 
-  char **sys_index = NULL;
+  char** sys_index = NULL;
   size_t syscall_number = 0;
   int retcode = 1;
 
@@ -13,7 +13,7 @@ int introspect_syscall_check(const char *domain_name) {
   char _name[256];
   int _index[256];
 
-  FILE *_file;
+  FILE* _file;
   // TODO: Check that the syscall index is correct.
   _file = fopen("data/syscall_index.linux", "r");
   if (!_file) {
@@ -24,14 +24,14 @@ int introspect_syscall_check(const char *domain_name) {
   // Parse the syscall file.
   while (fgets(_line, sizeof(_line), _file) != NULL) {
     sscanf(_line, "%d\t%s", _index, _name);
-    sys_index = realloc(sys_index, sizeof(char *) * ++syscall_number);
-    sys_index[syscall_number - 1] = (char *)malloc(256);
+    sys_index = realloc(sys_index, sizeof(char*) * ++syscall_number);
+    sys_index[syscall_number - 1] = (char*)malloc(256);
     strcpy(sys_index[syscall_number - 1], _name);
   }
   fclose(_file);
 
-  if (VMI_FAILURE == vmi_init_complete(&vmi, domain_name, VMI_INIT_DOMAINNAME, NULL,
-                                       VMI_CONFIG_GLOBAL_FILE_ENTRY, NULL,
+  if (VMI_FAILURE == vmi_init_complete(&vmi, domain_name, VMI_INIT_DOMAINNAME,
+                                       NULL, VMI_CONFIG_GLOBAL_FILE_ENTRY, NULL,
                                        NULL)) {
     printf("Failed to init LibVMI library.\n");
     return 1;

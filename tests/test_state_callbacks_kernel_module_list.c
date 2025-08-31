@@ -1,9 +1,9 @@
-#include <setjmp.h>
-#include <stdarg.h>
-#include <stddef.h>
 #include <cmocka.h>
 #include <libvmi/libvmi.h>
 #include <log.h>
+#include <setjmp.h>
+#include <stdarg.h>
+#include <stddef.h>
 
 #include "state_callbacks/kernel_module_list.h"
 

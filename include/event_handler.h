@@ -24,10 +24,10 @@ enum state_task_id {
   STATE_PROCESS_LIST,         ///< List of processes.
   STATE_MSR_REGISTERS,  ///< MSR register state check (are there any hooks?).
   // STATE_KERNEL_CODE_INTEGRITY_CHECK,  ///< Check kernel code integrity.
-  STATE_EBPF_ARTIFACTS,               ///< eBPF programs and maps state check.
-  STATE_IO_URING_ARTIFACTS,           ///< io_uring structures state check.,
-  STATE_KALLSYMS_SYMBOLS,             ///< kallsyms symbols state check.
-  STATE_TASK_ID_MAX                   ///< Maximum number of state tasks.
+  STATE_EBPF_ARTIFACTS,      ///< eBPF programs and maps state check.
+  STATE_IO_URING_ARTIFACTS,  ///< io_uring structures state check.,
+  STATE_KALLSYMS_SYMBOLS,    ///< kallsyms symbols state check.
+  STATE_TASK_ID_MAX          ///< Maximum number of state tasks.
 };
 
 /**

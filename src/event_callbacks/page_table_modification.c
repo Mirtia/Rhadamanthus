@@ -6,7 +6,8 @@ event_response_t event_page_table_modification_callback(vmi_instance_t vmi,
   // Preconditions
   if (!vmi || !event) {
     log_error(
-        "PAGE_TABLE_MODIFICATION: Invalid arguments to page table modification callback.");
+        "PAGE_TABLE_MODIFICATION: Invalid arguments to page table modification "
+        "callback.");
     return VMI_EVENT_RESPONSE_NONE;
   }
 

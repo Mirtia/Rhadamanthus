@@ -53,8 +53,8 @@ uint32_t state_kernel_module_list_callback(vmi_instance_t vmi, void* context) {
     gchar* modname = vmi_read_str_va(vmi, name_addr, 0);
     uint32_t state = 0;
 
-    if (vmi_read_32_va(vmi, module_base + LINUX_MODULE_STATE_OFFSET, 0, &state) !=
-        VMI_SUCCESS) {
+    if (vmi_read_32_va(vmi, module_base + LINUX_MODULE_STATE_OFFSET, 0,
+                       &state) != VMI_SUCCESS) {
       log_error(
           "STATE_KERNEL_MODULE_LIST: Failed to read module state at "
           "0x%" PRIx64,
@@ -90,9 +90,7 @@ uint32_t state_kernel_module_list_callback(vmi_instance_t vmi, void* context) {
         "list may be "
         "tampered or empty).");
   } else {
-    log_info(
-        "STATE_KERNEL_MODULE_LIST: Total kernel modules found: %d",
-        count);
+    log_info("STATE_KERNEL_MODULE_LIST: Total kernel modules found: %d", count);
   }
 
   log_info("STATE_KERNEL_MODULE_LIST callback completed.");

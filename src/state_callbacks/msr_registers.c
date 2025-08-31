@@ -73,8 +73,8 @@ uint32_t state_msr_registers_callback(vmi_instance_t vmi, void* context) {
     return VMI_FAILURE;
   }
 
-  log_info("STATE_MSR_REGISTERS: Kernel text range: [0x%" PRIx64
-           ", 0x%" PRIx64 "]",
+  log_info("STATE_MSR_REGISTERS: Kernel text range: [0x%" PRIx64 ", 0x%" PRIx64
+           "]",
            (uint64_t)kernel_start, (uint64_t)kernel_end);
 
   addr_t legitimate_syscall = 0;
@@ -91,9 +91,8 @@ uint32_t state_msr_registers_callback(vmi_instance_t vmi, void* context) {
     return VMI_FAILURE;
   }
 
-  log_info(
-      "STATE_MSR_REGISTERS: Reading MSR_LSTAR state from %u vCPU(s).",
-      num_vcpus);
+  log_info("STATE_MSR_REGISTERS: Reading MSR_LSTAR state from %u vCPU(s).",
+           num_vcpus);
 
   // Read and report MSR_LSTAR state on each vCPU (same as IDT).
   for (unsigned int cpu = 0; cpu < num_vcpus; cpu++) {

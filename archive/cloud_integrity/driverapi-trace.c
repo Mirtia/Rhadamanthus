@@ -42,7 +42,7 @@ int driver_event_type = 0;
 /**
  * callback function for module_setp_event
  */
-event_response_t driver_step_cb(vmi_instance_t vmi, vmi_event_t *event) {
+event_response_t driver_step_cb(vmi_instance_t vmi, vmi_event_t* event) {
   /**
    * enable the module_enter_event or chrdev_enter_event
    */
@@ -78,7 +78,7 @@ event_response_t driver_step_cb(vmi_instance_t vmi, vmi_event_t *event) {
 /**
  * callback function for module_event_enter and chrdev_enter_event
  */
-event_response_t driver_enter_cb(vmi_instance_t vmi, vmi_event_t *event) {
+event_response_t driver_enter_cb(vmi_instance_t vmi, vmi_event_t* event) {
   addr_t event_addr;
 #ifdef MEM_EVENT
   event_addr = event->mem_event.gla;
@@ -95,7 +95,7 @@ event_response_t driver_enter_cb(vmi_instance_t vmi, vmi_event_t *event) {
     vmi_get_vcpureg(vmi, &cr3, CR3, event->vcpu_id);
     vmi_pid_t pid = -1;
     vmi_dtb_to_pid(vmi, cr3, &pid);
-    char *argname = NULL;
+    char* argname = NULL;
     addr_t offset;
     uint32_t size;
 
@@ -124,14 +124,15 @@ event_response_t driver_enter_cb(vmi_instance_t vmi, vmi_event_t *event) {
 
     vmi_pid_t pid = -1;
     vmi_dtb_to_pid(vmi, cr3, &pid);
-    char *argname = NULL;
+    char* argname = NULL;
     addr_t inst;
 
     argname = vmi_read_str_va(vmi, rcx, 0);
     vmi_read_64_va(vmi, rsp, pid, &inst);
-    printf("Process [%d] registers a Character Device: %s with return address "
-           "0x%" PRIx64 "\n",
-           pid, argname, inst);
+    printf(
+        "Process [%d] registers a Character Device: %s with return address "
+        "0x%" PRIx64 "\n",
+        pid, argname, inst);
     free(argname);
 
     /**
@@ -191,7 +192,7 @@ event_response_t driver_enter_cb(vmi_instance_t vmi, vmi_event_t *event) {
   return 0;
 }
 
-int introspect_driverapi_trace(char *name) {
+int introspect_driverapi_trace(char* name) {
 
   struct sigaction act;
   act.sa_handler = close_handler;
@@ -207,7 +208,7 @@ int introspect_driverapi_trace(char *name) {
    */
 
   vmi_instance_t vmi = {0};
-  vmi_init_data_t *init_data = NULL;
+  vmi_init_data_t* init_data = NULL;
   if (VMI_FAILURE == vmi_init_complete(&vmi, domain_name, VMI_INIT_DOMAINNAME,
                                        init_data, VMI_CONFIG_GLOBAL_FILE_ENTRY,
                                        NULL, NULL)) {

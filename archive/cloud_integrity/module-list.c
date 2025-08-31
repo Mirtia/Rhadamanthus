@@ -24,14 +24,14 @@
  * along with LibVMI.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "utils.h"
 #include <libvmi/libvmi.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
+#include "utils.h"
 
-int introspect_module_list(const char *domain_name) {
+int introspect_module_list(const char* domain_name) {
   vmi_instance_t vmi = {0};
   addr_t next_module = 0;
   addr_t list_head = 0;
@@ -82,7 +82,7 @@ int introspect_module_list(const char *domain_name) {
      * can just add the length of 2 address fields to get the name.
      * See include/linux/module.h for mode details
      */
-    char *modname = NULL;
+    char* modname = NULL;
     // 64-bit paging
     if (VMI_PM_IA32E == vmi_get_page_mode(vmi, 0)) {
       modname = vmi_read_str_va(vmi, next_module + 16, 0);

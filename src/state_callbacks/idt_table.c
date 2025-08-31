@@ -252,7 +252,7 @@ static int check_idt_for_vcpu(vmi_instance_t vmi,
 
     if (!result) {
       log_debug("Failed to read IDT entry %u at 0x%" PRIx64 " (vCPU %u)", vec,
-               (uint64_t)(idt_base + (addr_t)vec * gate_size), vcpu_id);
+                (uint64_t)(idt_base + (addr_t)vec * gate_size), vcpu_id);
       continue;
     }
 
@@ -274,7 +274,7 @@ static int check_idt_for_vcpu(vmi_instance_t vmi,
         hooked++;
       } else {
         log_debug("vCPU %u: Vector %u (%s) handler at 0x%" PRIx64, vcpu_id, vec,
-                 name, (uint64_t)handler);
+                  name, (uint64_t)handler);
       }
     }
   }
@@ -308,7 +308,9 @@ uint32_t state_idt_table_callback(vmi_instance_t vmi, void* context) {
   // Get number of vCPUs
   unsigned int num_vcpus = vmi_get_num_vcpus(vmi);
   if (num_vcpus == 0) {
-    log_error("STATE_IDT_TABLE: Failed to get number of vCPUs or no vCPUs available.");
+    log_error(
+        "STATE_IDT_TABLE: Failed to get number of vCPUs or no vCPUs "
+        "available.");
     return VMI_FAILURE;
   }
 
@@ -319,7 +321,8 @@ uint32_t state_idt_table_callback(vmi_instance_t vmi, void* context) {
   if (!vec_names || vec_names->len != 256) {
     // Highly unexpected, but guard anyway
     log_warn(
-        "STATE_IDT_TABLE: Interrupt index table not fully initialized; proceeding with "
+        "STATE_IDT_TABLE: Interrupt index table not fully initialized; "
+        "proceeding with "
         "best-effort.");
   }
 
@@ -333,7 +336,8 @@ uint32_t state_idt_table_callback(vmi_instance_t vmi, void* context) {
                                     kernel_end_addr, vec_names);
 
     if (hooked < 0) {
-      log_warn("STATE_IDT_TABLE: Skipping vCPU %u due to IDT read failure.", cpu);
+      log_warn("STATE_IDT_TABLE: Skipping vCPU %u due to IDT read failure.",
+               cpu);
       continue;
     }
 
@@ -355,20 +359,23 @@ uint32_t state_idt_table_callback(vmi_instance_t vmi, void* context) {
   }
 
   if (total_hooked == 0) {
-    log_info("STATE_IDT_TABLE: No unexpected interrupt handler addresses detected.");
+    log_info(
+        "STATE_IDT_TABLE: No unexpected interrupt handler addresses detected.");
   } else {
-    log_info("STATE_IDT_TABLE: Total interrupt handlers flagged across all vCPUs: %d",
-             total_hooked);
+    log_info(
+        "STATE_IDT_TABLE: Total interrupt handlers flagged across all vCPUs: "
+        "%d",
+        total_hooked);
   }
 
   if (vcpu_inconsistency) {
     log_warn(
-        "STATE_IDT_TABLE: IDT inconsistency detected across vCPUs - possible targeted attack.");
+        "STATE_IDT_TABLE: IDT inconsistency detected across vCPUs - possible "
+        "targeted attack.");
   }
 
   if (vec_names)
     g_ptr_array_free(vec_names, TRUE);
-
 
   log_info("STATE_IDT_TABLE callback completed.");
   return VMI_SUCCESS;

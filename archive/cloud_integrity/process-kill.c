@@ -15,7 +15,7 @@ reg_t rax_orig, rbx_orig, rcx_orig, rdx_orig, rbp_orig, rsi_orig, rsp_orig,
 
 int KILL_PID;
 
-void save_context(vmi_instance_t vmi, vmi_event_t *event) {
+void save_context(vmi_instance_t vmi, vmi_event_t* event) {
 
   /* Save the registers */
   vmi_get_vcpureg(vmi, &rax_orig, RAX, event->vcpu_id);
@@ -28,7 +28,7 @@ void save_context(vmi_instance_t vmi, vmi_event_t *event) {
   vmi_get_vcpureg(vmi, &rip_orig, RIP, event->vcpu_id);
 }
 
-void restore_context(vmi_instance_t vmi, vmi_event_t *event) {
+void restore_context(vmi_instance_t vmi, vmi_event_t* event) {
   /* Restore the registers */
   vmi_set_vcpureg(vmi, rax_orig, RAX, event->vcpu_id);
   vmi_set_vcpureg(vmi, rbx_orig, RBX, event->vcpu_id);
@@ -39,7 +39,7 @@ void restore_context(vmi_instance_t vmi, vmi_event_t *event) {
   vmi_set_vcpureg(vmi, rsp_orig, RSP, event->vcpu_id);
 }
 
-event_response_t kill_step_cb(vmi_instance_t vmi, vmi_event_t *event) {
+event_response_t kill_step_cb(vmi_instance_t vmi, vmi_event_t* event) {
 
   if (kill_flag == 0) {
 
@@ -68,7 +68,7 @@ event_response_t kill_step_cb(vmi_instance_t vmi, vmi_event_t *event) {
   return 0;
 }
 
-event_response_t kill_enter_cb(vmi_instance_t vmi, vmi_event_t *event) {
+event_response_t kill_enter_cb(vmi_instance_t vmi, vmi_event_t* event) {
   event->interrupt_event.reinject = 0;
 
   if (event->interrupt_event.gla == virt_schedule) {
@@ -90,7 +90,7 @@ event_response_t kill_enter_cb(vmi_instance_t vmi, vmi_event_t *event) {
   return 0;
 }
 
-int introspect_process_kill(char *name, char *arg) {
+int introspect_process_kill(char* name, char* arg) {
 
   KILL_PID = atoi(arg);
 
@@ -104,7 +104,7 @@ int introspect_process_kill(char *name, char *arg) {
   sigaction(SIGALRM, &act, NULL);
 
   vmi_instance_t vmi = NULL;
-  vmi_init_data_t *init_data = NULL;
+  vmi_init_data_t* init_data = NULL;
   /* initialize the libvmi library */
   if (VMI_FAILURE == vmi_init_complete(&vmi, domain_name, VMI_INIT_DOMAINNAME,
                                        init_data, VMI_CONFIG_GLOBAL_FILE_ENTRY,

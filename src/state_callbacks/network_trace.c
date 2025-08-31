@@ -108,7 +108,7 @@ static bool is_suspicious_port(uint16_t port) {
       31337,  ///< Back Orifice backdoor default port (LEET).
       0,      ///< Port 0 is invalid.
       65535   ///< Highest port, invalid.
-      // TODO: Add more after checking out the EBPF rootkit samples.
+              // TODO: Add more after checking out the EBPF rootkit samples.
   };
 
   size_t count = sizeof(suspicious_ports) / sizeof(suspicious_ports[0]);
@@ -524,8 +524,9 @@ static uint32_t check_netfilter_hooks(vmi_instance_t vmi,
         continue;
 
       uint16_t num_hook_entries = 0;
-      if (vmi_read_16_va(vmi, hook_entries_addr + LINUX_NF_HOOK_ENTRIES_NUM_OFFSET, 0,
-                         &num_hook_entries) != VMI_SUCCESS)
+      if (vmi_read_16_va(vmi,
+                         hook_entries_addr + LINUX_NF_HOOK_ENTRIES_NUM_OFFSET,
+                         0, &num_hook_entries) != VMI_SUCCESS)
         continue;
 
       if (num_hook_entries == 0 || num_hook_entries > 100)

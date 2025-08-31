@@ -1,11 +1,11 @@
-#include "vmi.h"
 #include <openssl/evp.h>
 #include <stdio.h>
+#include "vmi.h"
 
-int introspect_kernel_check(char *name) {
+int introspect_kernel_check(char* name) {
   vmi_instance_t vmi;
   addr_t kernel_start, kernel_end;
-  vmi_init_data_t *init_data = NULL;
+  vmi_init_data_t* init_data = NULL;
   status_t status;
 
   if (VMI_FAILURE == vmi_init_complete(&vmi, domain_name, VMI_INIT_DOMAINNAME,
@@ -29,8 +29,8 @@ int introspect_kernel_check(char *name) {
   }
 
   // Modern OpenSSL EVP interface
-  EVP_MD_CTX *mdctx;
-  const EVP_MD *md;
+  EVP_MD_CTX* mdctx;
+  const EVP_MD* md;
   unsigned char hash[EVP_MAX_MD_SIZE];
   unsigned int hash_len;
   char buf[512];
@@ -55,7 +55,7 @@ int introspect_kernel_check(char *name) {
     status = vmi_read_va(vmi, i, 0, 512, buf, &bytes);
     if (status == VMI_FAILURE) {
       printf("Failed to read memory at address 0x%lx\n", i);
-      continue; // Skip failed reads rather than abort
+      continue;  // Skip failed reads rather than abort
     }
 
     if (EVP_DigestUpdate(mdctx, buf, bytes) != 1) {

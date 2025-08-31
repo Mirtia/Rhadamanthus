@@ -21,7 +21,7 @@ const char* state_task_id_to_str(state_task_id_t task_id) {
     case STATE_MSR_REGISTERS:
       return "STATE_MSR_REGISTERS";
     // case STATE_KERNEL_CODE_INTEGRITY_CHECK:
-      // return "STATE_KERNEL_CODE_INTEGRITY_CHECK";
+    // return "STATE_KERNEL_CODE_INTEGRITY_CHECK";
     case STATE_EBPF_ARTIFACTS:
       return "STATE_EBPF_ARTIFACTS";
     case STATE_IO_URING_ARTIFACTS:

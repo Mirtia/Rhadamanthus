@@ -21,7 +21,7 @@ struct idt_entry64 {
                       ///<   bit 7: P (Present);
                       ///<   bits 6–5: DPL;
                       ///<   bit 4: 0 (must be zero for interrupt/trap gates);
-      ///<   bits 3–0: gate type (0xE = 64-bit interrupt gate, 0xF = 64-bit trap gate).
+  ///<   bits 3–0: gate type (0xE = 64-bit interrupt gate, 0xF = 64-bit trap gate).
   uint16_t offset_middle;  ///< Handler RIP bits 31:16.
   uint32_t offset_high;    ///< Handler RIP bits 63:32.
   uint32_t zero;           ///< Reserved; must be zero.

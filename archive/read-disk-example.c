@@ -22,170 +22,168 @@
 
 #define _GNU_SOURCE
 
+#include <fcntl.h>
+#include <getopt.h>
+#include <libvmi/libvmi.h>
+#include <limits.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
-#include <limits.h>
-#include <getopt.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-#include <fcntl.h>
 #include <unistd.h>
-#include <libvmi/libvmi.h>
 
 #define SECTOR_SIZE 512
 
-static void print_usage(char *arg0)
-{
-    printf("Usage: %s\n", arg0);
-    printf("\t -n/--name <domain name>\n");
-    printf("\t -d/--domid <domain id>\n\n");
-    printf("\t -f/--file <file name>\n");
+static void print_usage(char* arg0) {
+  printf("Usage: %s\n", arg0);
+  printf("\t -n/--name <domain name>\n");
+  printf("\t -d/--domid <domain id>\n\n");
+  printf("\t -f/--file <file name>\n");
 }
 
-static bool read_boorable_disk_mbr(vmi_instance_t vmi, const char *filename)
-{
-    unsigned int number_of_disks = 0;
-    bool ret = false;
-    unsigned char MBR[SECTOR_SIZE] = {0};
+static bool read_boorable_disk_mbr(vmi_instance_t vmi, const char* filename) {
+  unsigned int number_of_disks = 0;
+  bool ret = false;
+  unsigned char MBR[SECTOR_SIZE] = {0};
 
-    /* open the file for writing */
-    int fd = open(filename, O_CREAT | O_WRONLY, S_IRUSR);
-    if (fd == -1) {
-        printf("Failed to open file for writing.\n");
-        return false;
+  /* open the file for writing */
+  int fd = open(filename, O_CREAT | O_WRONLY, S_IRUSR);
+  if (fd == -1) {
+    printf("Failed to open file for writing.\n");
+    return false;
+  }
+
+  /* Get VM disks identificators */
+  char** devices_ids = vmi_get_disks(vmi, &number_of_disks);
+  if (!devices_ids) {
+    printf("Failed to get VM disks list.\n");
+    goto close_file;
+  }
+
+  /* Iterate over disks to find bootable and read MBR sector */
+  for (unsigned int i = 0; i < number_of_disks; i++) {
+    bool bootable = false;
+
+    if (VMI_FAILURE == vmi_disk_is_bootable(vmi, devices_ids[i], &bootable)) {
+      printf("Failed to check bootable flag.\n");
+      goto free_devices_list;
     }
 
-    /* Get VM disks identificators */
-    char **devices_ids = vmi_get_disks(vmi, &number_of_disks);
-    if (!devices_ids) {
-        printf("Failed to get VM disks list.\n");
-        goto close_file;
-    }
-
-    /* Iterate over disks to find bootable and read MBR sector */
-    for (unsigned int i = 0; i < number_of_disks; i++) {
-        bool bootable = false;
-
-        if (VMI_FAILURE == vmi_disk_is_bootable(vmi, devices_ids[i], &bootable)) {
-            printf("Failed to check bootable flag.\n");
-            goto free_devices_list;
+    if (bootable) {
+      if (VMI_SUCCESS ==
+          vmi_read_disk(vmi, devices_ids[i], 0, SECTOR_SIZE, MBR)) {
+        if (SECTOR_SIZE == write(fd, MBR, SECTOR_SIZE)) {
+          printf("MBR successfuly dumped\n");
+          ret = true;
+          break;
         }
-
-        if (bootable) {
-            if (VMI_SUCCESS == vmi_read_disk(vmi, devices_ids[i], 0, SECTOR_SIZE, MBR)) {
-                if (SECTOR_SIZE == write(fd, MBR, SECTOR_SIZE)) {
-                    printf("MBR successfuly dumped\n");
-                    ret = true;
-                    break;
-                }
-            } else {
-                printf("Faied to read disk %u MBR.\n", i);
-                break;
-            }
-        }
+      } else {
+        printf("Faied to read disk %u MBR.\n", i);
+        break;
+      }
     }
+  }
 
 free_devices_list:
-    for (unsigned int i = 0; i < number_of_disks; i++)
-        free(devices_ids[i]);
-    free(devices_ids);
+  for (unsigned int i = 0; i < number_of_disks; i++)
+    free(devices_ids[i]);
+  free(devices_ids);
 
 close_file:
-    close(fd);
+  close(fd);
 
-    return ret;
+  return ret;
 }
 
-int main(int argc, char **argv)
-{
-    vmi_init_data_t *init_data = NULL;
-    uint64_t domid = 0;
-    uint8_t init = VMI_INIT_DOMAINNAME;
-    void *domain = NULL;
-    void *filename = NULL;
-    int retcode = 1;
+int main(int argc, char** argv) {
+  vmi_init_data_t* init_data = NULL;
+  uint64_t domid = 0;
+  uint8_t init = VMI_INIT_DOMAINNAME;
+  void* domain = NULL;
+  void* filename = NULL;
+  int retcode = 1;
 
-    if ( argc <= 2 ) {
-        print_usage(argv[0]);
+  if (argc <= 2) {
+    print_usage(argv[0]);
+    return false;
+  }
+
+  const struct option long_opts[] = {{"name", required_argument, NULL, 'n'},
+                                     {"domid", required_argument, NULL, 'd'},
+                                     {"file", required_argument, NULL, 'f'},
+                                     {NULL, 0, NULL, 0}};
+  const char* opts = "n:d:f:";
+  int c;
+  int long_index = 0;
+
+  while ((c = getopt_long(argc, argv, opts, long_opts, &long_index)) != -1)
+    switch (c) {
+      case 'n':
+        init = VMI_INIT_DOMAINNAME;
+        domain = optarg;
+        break;
+      case 'd':
+        init = VMI_INIT_DOMAINID;
+        domid = strtoull(optarg, NULL, 0);
+        domain = (void*)&domid;
+        break;
+      case 'f':
+        filename = optarg;
+        break;
+      default:
+        printf("Unknown option\n");
         return false;
     }
 
-    const struct option long_opts[] = {
-        {"name", required_argument, NULL, 'n'},
-        {"domid", required_argument, NULL, 'd'},
-        {"file", required_argument, NULL, 'f'},
-        {NULL, 0, NULL, 0}
-    };
-    const char* opts = "n:d:f:";
-    int c;
-    int long_index = 0;
+  if (!domain) {
+    fprintf(stderr, "You have to specify --name or --domid!\n");
+    print_usage(argv[0]);
+    return 1;
+  }
 
-    while ((c = getopt_long (argc, argv, opts, long_opts, &long_index)) != -1)
-        switch (c) {
-            case 'n':
-                init = VMI_INIT_DOMAINNAME;
-                domain = optarg;
-                break;
-            case 'd':
-                init = VMI_INIT_DOMAINID;
-                domid = strtoull(optarg, NULL, 0);
-                domain = (void*)&domid;
-                break;
-            case 'f':
-                filename = optarg;
-                break;
-            default:
-                printf("Unknown option\n");
-                return false;
-        }
+  if (!filename) {
+    fprintf(stderr, "You have to specify --file to save result!\n");
+    print_usage(argv[0]);
+    return 1;
+  }
 
-    if (!domain) {
-        fprintf(stderr, "You have to specify --name or --domid!\n");
-        print_usage(argv[0]);
-        return 1;
-    }
+  vmi_mode_t mode;
+  if (VMI_FAILURE ==
+      vmi_get_access_mode(NULL, domain, init, init_data, &mode)) {
+    goto free_setup_info;
+  }
 
-    if (!filename) {
-        fprintf(stderr, "You have to specify --file to save result!\n");
-        print_usage(argv[0]);
-        return 1;
-    }
+  if (VMI_XEN != mode) {
+    printf("Disk reading available only for Xen VM.\n");
+    goto free_setup_info;
+  }
 
-    vmi_mode_t mode;
-    if (VMI_FAILURE == vmi_get_access_mode(NULL, domain, init, init_data, &mode) ) {
-        goto free_setup_info;
-    }
+  /* initialize the libvmi library */
+  vmi_instance_t vmi = NULL;
+  if (VMI_FAILURE ==
+      vmi_init(&vmi, mode, (void*)domain, init, init_data, NULL)) {
+    printf("Failed to initialize LibVMI library.\n");
+    goto free_setup_info;
+  }
 
-    if (VMI_XEN != mode) {
-        printf("Disk reading available only for Xen VM.\n");
-        goto free_setup_info;
-    }
+  if (VMI_FAILURE == vmi_pause_vm(vmi)) {
+    printf("Failed to pause the VM.\n");
+    goto destroy_vmi;
+  }
 
-    /* initialize the libvmi library */
-    vmi_instance_t vmi = NULL;
-    if (VMI_FAILURE == vmi_init(&vmi, mode, (void*)domain, init, init_data, NULL)) {
-        printf("Failed to initialize LibVMI library.\n");
-        goto free_setup_info;
-    }
+  if (read_boorable_disk_mbr(vmi, filename))
+    retcode = 0;
 
-    if (VMI_FAILURE == vmi_pause_vm(vmi)) {
-        printf("Failed to pause the VM.\n");
-        goto destroy_vmi;
-    }
-
-    if (read_boorable_disk_mbr(vmi, filename))
-        retcode = 0;
-
-    vmi_resume_vm(vmi);
+  vmi_resume_vm(vmi);
 
 destroy_vmi:
-    vmi_destroy(vmi);
+  vmi_destroy(vmi);
 
 free_setup_info:
-    if (init_data) {
-        free(init_data->entry[0].data);
-        free(init_data);
-    }
-    return retcode;
+  if (init_data) {
+    free(init_data->entry[0].data);
+    free(init_data);
+  }
+  return retcode;
 }

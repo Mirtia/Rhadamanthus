@@ -1,12 +1,12 @@
 #include "vmi.h"
 
-int introspect_procfs_check(const char *domain_name) {
+int introspect_procfs_check(const char* domain_name) {
   vmi_instance_t vmi;
   addr_t init_net_addr, pde_addr, name_addr, tcp_addr, show_addr;
   addr_t stext, etext;
-  char *filename = NULL;
+  char* filename = NULL;
   int got_tcp = 0;
-  vmi_init_data_t *init_data = NULL;
+  vmi_init_data_t* init_data = NULL;
 
   if (VMI_FAILURE == vmi_init_complete(&vmi, domain_name, VMI_INIT_DOMAINNAME,
                                        init_data, VMI_CONFIG_GLOBAL_FILE_ENTRY,
@@ -64,8 +64,8 @@ int introspect_procfs_check(const char *domain_name) {
   /**
    * get the kernel function boundary
    */
-  vmi_translate_ksym2v(vmi, "_stext", &stext );
-  vmi_translate_ksym2v(vmi, "_etext", &etext );
+  vmi_translate_ksym2v(vmi, "_stext", &stext);
+  vmi_translate_ksym2v(vmi, "_etext", &etext);
 
   if (show_addr < stext || show_addr > etext) {
     printf("TCP4 seq_ops show has been changed to 0x%x\n",

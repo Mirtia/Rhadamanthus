@@ -21,7 +21,9 @@ uint32_t syscall1_orig_data;
 
 static int interrupted = 0;
 
-static void close_handler(int sig) { interrupted = sig; }
+static void close_handler(int sig) {
+  interrupted = sig;
+}
 
 int flag = -1;
 
@@ -43,10 +45,10 @@ uint8_t str_orig[100];
 /**
  * Currently cannot get stdout
  */
-char *argv[] = {"/home/nootkit/hello", "hello", "world"};
+char* argv[] = {"/home/nootkit/hello", "hello", "world"};
 uint64_t argv_ptr[4] = {BASE_ADDR, BASE_ADDR + 20, BASE_ADDR + 26, 0x0};
 
-void save_context(vmi_instance_t vmi, vmi_event_t *event) {
+void save_context(vmi_instance_t vmi, vmi_event_t* event) {
 
   /* Save the registers */
   vmi_get_vcpureg(vmi, &rax_orig, RAX, event->vcpu_id);
@@ -70,7 +72,7 @@ void save_context(vmi_instance_t vmi, vmi_event_t *event) {
   }
 }
 
-void restore_context(vmi_instance_t vmi, vmi_event_t *event) {
+void restore_context(vmi_instance_t vmi, vmi_event_t* event) {
   /* Restore the registers */
   vmi_set_vcpureg(vmi, rax_orig, RAX, event->vcpu_id);
   vmi_set_vcpureg(vmi, rbx_orig, RBX, event->vcpu_id);
@@ -92,7 +94,7 @@ void restore_context(vmi_instance_t vmi, vmi_event_t *event) {
   }
 }
 
-void print_reg(vmi_instance_t vmi, vmi_event_t *event) {
+void print_reg(vmi_instance_t vmi, vmi_event_t* event) {
   reg_t val;
   printf("--------------------------------------------------------\n");
   vmi_get_vcpureg(vmi, &val, RAX, event->vcpu_id);
@@ -262,7 +264,7 @@ static int set_breakpoint(vmi_instance_t vmi, addr_t addr, pid_t pid) {
   return 0;
 }
 
-event_response_t syscall_step_cb(vmi_instance_t vmi, vmi_event_t *event) {
+event_response_t syscall_step_cb(vmi_instance_t vmi, vmi_event_t* event) {
 
   if (flag == 0) {
 
@@ -314,7 +316,7 @@ event_response_t syscall_step_cb(vmi_instance_t vmi, vmi_event_t *event) {
   return 0;
 }
 
-event_response_t syscall_enter_cb(vmi_instance_t vmi, vmi_event_t *event) {
+event_response_t syscall_enter_cb(vmi_instance_t vmi, vmi_event_t* event) {
   event->interrupt_event.reinject = 0;
 
   if (event->interrupt_event.gla == virt_lstar) {
@@ -340,9 +342,9 @@ event_response_t syscall_enter_cb(vmi_instance_t vmi, vmi_event_t *event) {
   return 0;
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
 
-  char *name = argv[1];
+  char* name = argv[1];
 
   struct sigaction act;
   act.sa_handler = close_handler;

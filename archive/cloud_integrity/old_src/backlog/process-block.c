@@ -23,13 +23,13 @@ unsigned long iname_offset;
     mkdir /mnt/vm3
 
 */
-const char *mount_src = "/dev/mapper/uvm3-root";
-const char *mount_dest = "/mnt/vm3";
+const char* mount_src = "/dev/mapper/uvm3-root";
+const char* mount_dest = "/mnt/vm3";
 
-unsigned char **sig_list;
+unsigned char** sig_list;
 int num_sig;
 
-int cal_hash(char *exec_path, unsigned char *hash_val) {
+int cal_hash(char* exec_path, unsigned char* hash_val) {
   char mount_path[256] = "";
   strcpy(mount_path, mount_dest);
   strcat(mount_path, exec_path);
@@ -61,18 +61,18 @@ int cal_hash(char *exec_path, unsigned char *hash_val) {
   return 0;
 }
 
-int find_absolute_path(vmi_instance_t vmi, vmi_pid_t pid, char *executable,
-                       char *exec_path) {
-  char **dirs = NULL;
-  char *p = strtok(executable, "/");
+int find_absolute_path(vmi_instance_t vmi, vmi_pid_t pid, char* executable,
+                       char* exec_path) {
+  char** dirs = NULL;
+  char* p = strtok(executable, "/");
   int n = 0, i;
   while (p) {
-    dirs = realloc(dirs, sizeof(char *) * ++n);
+    dirs = realloc(dirs, sizeof(char*) * ++n);
     dirs[n - 1] = p;
     p = strtok(NULL, "/");
   }
 
-  char **abs_path = NULL;
+  char** abs_path = NULL;
   int abs_n = 0;
   int flag = 0;
   for (i = n - 1; i >= 0; i--) {
@@ -83,8 +83,8 @@ int find_absolute_path(vmi_instance_t vmi, vmi_pid_t pid, char *executable,
       continue;
     }
     if (flag == 0) {
-      abs_path = realloc(abs_path, sizeof(char *) * ++abs_n);
-      abs_path[abs_n - 1] = (char *)malloc(256);
+      abs_path = realloc(abs_path, sizeof(char*) * ++abs_n);
+      abs_path[abs_n - 1] = (char*)malloc(256);
       strcpy(abs_path[abs_n - 1], dirs[i]);
     }
   }
@@ -102,7 +102,7 @@ int find_absolute_path(vmi_instance_t vmi, vmi_pid_t pid, char *executable,
 
     do {
       current_process = next_list_entry - tasks_offset;
-      vmi_read_32_va(vmi, current_process + pid_offset, 0, (uint32_t *)&pid1);
+      vmi_read_32_va(vmi, current_process + pid_offset, 0, (uint32_t*)&pid1);
       if (pid1 == pid) {
         char *procname = NULL, *dirname = NULL;
         procname = vmi_read_str_va(vmi, current_process + name_offset, 0);
@@ -120,8 +120,8 @@ int find_absolute_path(vmi_instance_t vmi, vmi_pid_t pid, char *executable,
           if (flag == 1) {
             flag = 0;
           } else {
-            abs_path = realloc(abs_path, sizeof(char *) * ++abs_n);
-            abs_path[abs_n - 1] = (char *)malloc(100);
+            abs_path = realloc(abs_path, sizeof(char*) * ++abs_n);
+            abs_path[abs_n - 1] = (char*)malloc(100);
             strcpy(abs_path[abs_n - 1], dirname);
           }
           vmi_read_addr_va(vmi, dentry_addr + parent_offset, 0, &dentry_addr);
@@ -147,7 +147,7 @@ int find_absolute_path(vmi_instance_t vmi, vmi_pid_t pid, char *executable,
   return 0;
 }
 
-event_response_t execve_step_cb(vmi_instance_t vmi, vmi_event_t *event) {
+event_response_t execve_step_cb(vmi_instance_t vmi, vmi_event_t* event) {
   /**
    * enable the syscall entry interrupt
    */
@@ -168,7 +168,7 @@ event_response_t execve_step_cb(vmi_instance_t vmi, vmi_event_t *event) {
   return 0;
 }
 
-event_response_t execve_enter_cb(vmi_instance_t vmi, vmi_event_t *event) {
+event_response_t execve_enter_cb(vmi_instance_t vmi, vmi_event_t* event) {
 #ifdef MEM_EVENT
   if (event->mem_event.gla == virt_do_execve) {
 #else
@@ -181,7 +181,7 @@ event_response_t execve_enter_cb(vmi_instance_t vmi, vmi_event_t *event) {
 
     vmi_pid_t pid = -1;
     vmi_dtb_to_pid(vmi, cr3, &pid);
-    char *executable = NULL;
+    char* executable = NULL;
     char exec_path[256] = "";
 
     /**
@@ -263,7 +263,7 @@ event_response_t execve_enter_cb(vmi_instance_t vmi, vmi_event_t *event) {
   return 0;
 }
 
-int introspect_process_block(char *name) {
+int introspect_process_block(char* name) {
 
   struct sigaction act;
   act.sa_handler = close_handler;
@@ -275,7 +275,7 @@ int introspect_process_block(char *name) {
   sigaction(SIGALRM, &act, NULL);
 
   vmi_instance_t vmi = NULL;
-  vmi_init_data_t *init_data = NULL;
+  vmi_init_data_t* init_data = NULL;
 
   if (VMI_FAILURE == vmi_init_complete(&vmi, domain_name, VMI_INIT_DOMAINNAME,
                                        init_data, VMI_CONFIG_GLOBAL_FILE_ENTRY,
@@ -291,13 +291,13 @@ int introspect_process_block(char *name) {
   num_sig = 0;
   char _line[256];
   char _name[256];
-  char *data;
+  char* data;
 
   int offset;
   unsigned char sig[MD5_DIGEST_LENGTH];
 
   int i, j;
-  FILE *_file = fopen("blacklist.txt", "r");
+  FILE* _file = fopen("blacklist.txt", "r");
   while (fgets(_line, sizeof(_line), _file) != NULL) {
     data = _line;
     sscanf(data, "%s%n", _name, &offset);
@@ -306,8 +306,8 @@ int introspect_process_block(char *name) {
       sscanf(data, " %hhu%n", &(sig[i]), &offset);
       data += offset;
     }
-    sig_list = realloc(sig_list, sizeof(char *) * ++num_sig);
-    sig_list[num_sig - 1] = (unsigned char *)malloc(MD5_DIGEST_LENGTH);
+    sig_list = realloc(sig_list, sizeof(char*) * ++num_sig);
+    sig_list[num_sig - 1] = (unsigned char*)malloc(MD5_DIGEST_LENGTH);
     strncpy(sig_list[num_sig - 1], sig, MD5_DIGEST_LENGTH);
   }
   fclose(_file);
@@ -315,9 +315,9 @@ int introspect_process_block(char *name) {
   /**
    * get the offsets from the libvmi config file
    */
-   vmi_get_offset(vmi, "linux_tasks", &tasks_offset);
-   vmi_get_offset(vmi, "linux_name", &name_offset);
-   vmi_get_offset(vmi, "linux_pid", &pid_offset);
+  vmi_get_offset(vmi, "linux_tasks", &tasks_offset);
+  vmi_get_offset(vmi, "linux_name", &name_offset);
+  vmi_get_offset(vmi, "linux_pid", &pid_offset);
 
   /**
    * file struct offsets can be obtained by running findpwd

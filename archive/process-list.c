@@ -33,22 +33,22 @@
 
 #include <libvmi/libvmi.h>
 
-int main(int argc, char **argv) {
+int main(int argc, char** argv) {
   vmi_instance_t vmi = {0};
   addr_t list_head = 0, cur_list_entry = 0, next_list_entry = 0;
   addr_t current_process = 0;
-  char *procname = NULL;
+  char* procname = NULL;
   vmi_pid_t pid = 0;
   unsigned long tasks_offset = 0, pid_offset = 0, name_offset = 0;
   status_t status = VMI_FAILURE;
-  vmi_init_data_t *init_data = NULL;
+  vmi_init_data_t* init_data = NULL;
   uint64_t domid = 0;
   uint8_t init = VMI_INIT_DOMAINNAME,
           config_type = VMI_CONFIG_GLOBAL_FILE_ENTRY;
   void *input = NULL, *config = NULL;
   int retcode = 1;
 
-  if(argc < 2) {
+  if (argc < 2) {
     printf("Usage: %s\n", argv[0]);
     printf("\t -n/--name <domain name>\n");
     printf("\t -d/--domid <domain id>\n");
@@ -57,70 +57,70 @@ int main(int argc, char **argv) {
   }
 
   // left for compatibility
-  if(argc == 2)
+  if (argc == 2)
     input = argv[1];
 
-  if(argc > 2) {
+  if (argc > 2) {
     const struct option long_opts[] = {{"name", required_argument, NULL, 'n'},
                                        {"json", required_argument, NULL, 'j'},
                                        {NULL, 0, NULL, 0}};
-    const char *opts = "n:d:j:";
+    const char* opts = "n:d:j:";
     int c;
     int long_index = 0;
 
-    while((c = getopt_long(argc, argv, opts, long_opts, &long_index)) != -1)
-      switch(c) {
-      case 'n':
-        input = optarg;
-        break;
-      case 'd':
-        init = VMI_INIT_DOMAINID;
-        domid = strtoull(optarg, NULL, 0);
-        input = (void *) &domid;
-        break;
-      case 'j':
-        config_type = VMI_CONFIG_JSON_PATH;
-        config = (void *) optarg;
-        break;
-      default:
-        printf("Unknown option\n");
-        if(init_data) {
-          free(init_data->entry[0].data);
-          free(init_data);
-        }
-        return retcode;
+    while ((c = getopt_long(argc, argv, opts, long_opts, &long_index)) != -1)
+      switch (c) {
+        case 'n':
+          input = optarg;
+          break;
+        case 'd':
+          init = VMI_INIT_DOMAINID;
+          domid = strtoull(optarg, NULL, 0);
+          input = (void*)&domid;
+          break;
+        case 'j':
+          config_type = VMI_CONFIG_JSON_PATH;
+          config = (void*)optarg;
+          break;
+        default:
+          printf("Unknown option\n");
+          if (init_data) {
+            free(init_data->entry[0].data);
+            free(init_data);
+          }
+          return retcode;
       }
   }
 
   /* initialize the libvmi library */
-  if(VMI_FAILURE == vmi_init_complete(&vmi, input, init, init_data, config_type,
-                                      config, NULL)) {
+  if (VMI_FAILURE == vmi_init_complete(&vmi, input, init, init_data,
+                                       config_type, config, NULL)) {
     printf("Failed to init LibVMI library.\n");
     goto error_exit;
   }
 
   /* init the offset values */
-  if(VMI_FAILURE == vmi_get_offset(vmi, "linux_tasks", &tasks_offset))
+  if (VMI_FAILURE == vmi_get_offset(vmi, "linux_tasks", &tasks_offset))
     goto error_exit;
-  if(VMI_FAILURE == vmi_get_offset(vmi, "linux_name", &name_offset))
+  if (VMI_FAILURE == vmi_get_offset(vmi, "linux_name", &name_offset))
     goto error_exit;
-  if(VMI_FAILURE == vmi_get_offset(vmi, "linux_pid", &pid_offset))
+  if (VMI_FAILURE == vmi_get_offset(vmi, "linux_pid", &pid_offset))
     goto error_exit;
 
   /* pause the vm for consistent memory access */
-  if(vmi_pause_vm(vmi) != VMI_SUCCESS) {
+  if (vmi_pause_vm(vmi) != VMI_SUCCESS) {
     printf("Failed to pause VM\n");
     goto error_exit;
   }
 
   /* demonstrate name and id accessors */
-  char *name2 = vmi_get_name(vmi);
+  char* name2 = vmi_get_name(vmi);
   vmi_mode_t mode;
 
-  if(VMI_FAILURE == vmi_get_access_mode(vmi, NULL, 0, NULL, &mode))
+  if (VMI_FAILURE == vmi_get_access_mode(vmi, NULL, 0, NULL, &mode))
     goto error_exit;
 
-  if(VMI_FILE != mode) {
+  if (VMI_FILE != mode) {
     uint64_t id = vmi_get_vmid(vmi);
 
     printf("Process listing for VM %s (id=%" PRIu64 ")\n", name2, id);
@@ -131,7 +131,7 @@ int main(int argc, char **argv) {
 
   os_t os = vmi_get_ostype(vmi);
 
-  if(VMI_OS_LINUX != os) {
+  if (VMI_OS_LINUX != os) {
     fprintf(stderr, "Unsupported OS. Only Linux supported.");
     goto error_exit;
   }
@@ -140,20 +140,20 @@ int main(int argc, char **argv) {
    *  utilities, but it is indeed part of the task list and useful to
    *  display as such.
    */
-  if(VMI_FAILURE == vmi_translate_ksym2v(vmi, "init_task", &list_head))
+  if (VMI_FAILURE == vmi_translate_ksym2v(vmi, "init_task", &list_head))
     goto error_exit;
 
   list_head += tasks_offset;
 
   cur_list_entry = list_head;
-  if(VMI_FAILURE ==
-     vmi_read_addr_va(vmi, cur_list_entry, 0, &next_list_entry)) {
+  if (VMI_FAILURE ==
+      vmi_read_addr_va(vmi, cur_list_entry, 0, &next_list_entry)) {
     printf("Failed to read next pointer at %" PRIx64 "\n", cur_list_entry);
     goto error_exit;
   }
 
   /* Walk the task list. */
-  while(1) {
+  while (1) {
 
     current_process = cur_list_entry - tasks_offset;
 
@@ -166,11 +166,11 @@ int main(int argc, char **argv) {
      * want to do this a little more robust :-)  See
      * include/linux/sched.h for mode details */
 
-    vmi_read_32_va(vmi, current_process + pid_offset, 0, (uint32_t *) &pid);
+    vmi_read_32_va(vmi, current_process + pid_offset, 0, (uint32_t*)&pid);
 
     procname = vmi_read_str_va(vmi, current_process + name_offset, 0);
 
-    if(!procname) {
+    if (!procname) {
       printf("Failed to find procname\n");
       goto error_exit;
     }
@@ -178,7 +178,7 @@ int main(int argc, char **argv) {
     /* print out the process name */
     printf("[%5d] %s (struct addr:%" PRIx64 ")\n", pid, procname,
            current_process);
-    if(procname) {
+    if (procname) {
       free(procname);
       procname = NULL;
     }
@@ -186,7 +186,7 @@ int main(int argc, char **argv) {
     /* Follow the next pointer */
     cur_list_entry = next_list_entry;
     status = vmi_read_addr_va(vmi, cur_list_entry, 0, &next_list_entry);
-    if(status == VMI_FAILURE) {
+    if (status == VMI_FAILURE) {
       printf("Failed to read next pointer in loop at %" PRIx64 "\n",
              cur_list_entry);
       goto error_exit;
@@ -195,7 +195,7 @@ int main(int argc, char **argv) {
      * In Linux, we should stop the loop when coming back to the first element
      * of the loop
      */
-    if(cur_list_entry == list_head) {
+    if (cur_list_entry == list_head) {
       break;
     }
   };
@@ -208,7 +208,7 @@ error_exit:
   /* cleanup any memory associated with the LibVMI instance */
   vmi_destroy(vmi);
 
-  if(init_data) {
+  if (init_data) {
     free(init_data->entry[0].data);
     free(init_data);
   }

@@ -1,9 +1,9 @@
-#include <setjmp.h>
-#include <stdarg.h>
-#include <stddef.h>
 #include <cmocka.h>
 #include <libvmi/libvmi.h>
 #include <log.h>
+#include <setjmp.h>
+#include <stdarg.h>
+#include <stddef.h>
 
 #include "event_callbacks/cr0_write.h"
 
@@ -18,7 +18,6 @@ static void test_cr0_write_callback(void** state) {
                                        NULL)) {
     fail_msg("Failed to initialize LibVMI for test domain: %s", domain_name);
   }
-  
 
   uint32_t result = event_cr0_write_callback(vmi, NULL);
   assert_int_equal(result, VMI_SUCCESS);

@@ -1,14 +1,14 @@
 #include "vmi.h"
 
-int introspect_process_list(const char *domain_name) {
+int introspect_process_list(const char* domain_name) {
   vmi_instance_t vmi = {0};
   addr_t list_head = 0, cur_list_entry = 0, next_list_entry = 0;
   addr_t current_process = 0;
-  char *procname = NULL;
+  char* procname = NULL;
   vmi_pid_t pid = 0;
   unsigned long tasks_offset = 0, pid_offset = 0, name_offset = 0;
   status_t status = VMI_FAILURE;
-  vmi_init_data_t *init_data = NULL;
+  vmi_init_data_t* init_data = NULL;
   uint64_t domid = 0;
   uint8_t init = VMI_INIT_DOMAINNAME,
           config_type = VMI_CONFIG_GLOBAL_FILE_ENTRY;
@@ -17,7 +17,7 @@ int introspect_process_list(const char *domain_name) {
 
   init_data = malloc(sizeof(vmi_init_data_t) + sizeof(vmi_init_data_entry_t));
 
-  if (VMI_FAILURE == vmi_init_complete(&vmi, (void *)domain_name,
+  if (VMI_FAILURE == vmi_init_complete(&vmi, (void*)domain_name,
                                        VMI_INIT_DOMAINNAME | VMI_INIT_EVENTS,
                                        init_data, VMI_CONFIG_GLOBAL_FILE_ENTRY,
                                        NULL, NULL)) {
@@ -33,25 +33,25 @@ int introspect_process_list(const char *domain_name) {
    */
 
   switch (vmi_get_ostype(vmi)) {
-  case VMI_OS_LINUX:
-    vmi_get_offset(vmi, "linux_tasks", &tasks_offset);
-    vmi_get_offset(vmi, "linux_name", &name_offset);
-    vmi_get_offset(vmi, "linux_pid", &pid_offset);
+    case VMI_OS_LINUX:
+      vmi_get_offset(vmi, "linux_tasks", &tasks_offset);
+      vmi_get_offset(vmi, "linux_name", &name_offset);
+      vmi_get_offset(vmi, "linux_pid", &pid_offset);
 
-    vmi_translate_ksym2v(vmi, "init_task", &list_head);
-    list_head += tasks_offset;
-    
-    break;
-  case VMI_OS_WINDOWS:
-    vmi_get_offset(vmi, "win_tasks", &tasks_offset);
-    vmi_get_offset(vmi, "win_pname", &name_offset);
-    vmi_get_offset(vmi, "win_pid", &pid_offset);
+      vmi_translate_ksym2v(vmi, "init_task", &list_head);
+      list_head += tasks_offset;
 
-    vmi_translate_ksym2v(vmi, "PsActiveProcessHead", &list_head);
+      break;
+    case VMI_OS_WINDOWS:
+      vmi_get_offset(vmi, "win_tasks", &tasks_offset);
+      vmi_get_offset(vmi, "win_pname", &name_offset);
+      vmi_get_offset(vmi, "win_pid", &pid_offset);
 
-    break;
-  default:
-    goto exit;
+      vmi_translate_ksym2v(vmi, "PsActiveProcessHead", &list_head);
+
+      break;
+    default:
+      goto exit;
   }
 
   if (tasks_offset == 0 || pid_offset == 0 || name_offset == 0) {
@@ -66,7 +66,7 @@ int introspect_process_list(const char *domain_name) {
    */
   do {
     current_process = next_list_entry - tasks_offset;
-    vmi_read_32_va(vmi, current_process + pid_offset, 0, (uint32_t *)&pid);
+    vmi_read_32_va(vmi, current_process + pid_offset, 0, (uint32_t*)&pid);
     procname = vmi_read_str_va(vmi, current_process + name_offset, 0);
     if (!procname) {
       printf("Failed to find procname\n");

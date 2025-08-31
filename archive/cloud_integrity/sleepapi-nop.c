@@ -22,7 +22,7 @@ uint32_t sys_nanosleep_orig_data;
 uint32_t sys_clock_nanosleep_orig_data;
 #endif
 
-char **list;
+char** list;
 int num_proc;
 
 /**
@@ -38,7 +38,7 @@ int find_name(vmi_instance_t vmi, vmi_pid_t pid) {
 
   do {
     current_process = next_list_entry - tasks_offset;
-    vmi_read_32_va(vmi, current_process + pid_offset, 0, (uint32_t *)&pid1);
+    vmi_read_32_va(vmi, current_process + pid_offset, 0, (uint32_t*)&pid1);
     if (pid1 == pid) {
       int i;
       for (i = 0; i < num_proc; i++) {
@@ -60,7 +60,7 @@ int find_name(vmi_instance_t vmi, vmi_pid_t pid) {
 }
 
 event_response_t clock_nanosleep_step_cb(vmi_instance_t vmi,
-                                         vmi_event_t *event) {
+                                         vmi_event_t* event) {
   /**
    * enable the syscall entry interrupt
    */
@@ -81,7 +81,7 @@ event_response_t clock_nanosleep_step_cb(vmi_instance_t vmi,
   return 0;
 }
 
-event_response_t nanosleep_step_cb(vmi_instance_t vmi, vmi_event_t *event) {
+event_response_t nanosleep_step_cb(vmi_instance_t vmi, vmi_event_t* event) {
   /**
    * enable the syscall entry interrupt
    */
@@ -103,7 +103,7 @@ event_response_t nanosleep_step_cb(vmi_instance_t vmi, vmi_event_t *event) {
 }
 
 event_response_t clock_nanosleep_enter_cb(vmi_instance_t vmi,
-                                          vmi_event_t *event) {
+                                          vmi_event_t* event) {
   if (event->mem_event.gla == virt_sys_clock_nanosleep) {
     reg_t rax, cr3, rsp;
     vmi_get_vcpureg(vmi, &rax, RAX, event->vcpu_id);
@@ -151,7 +151,7 @@ event_response_t clock_nanosleep_enter_cb(vmi_instance_t vmi,
   return 0;
 }
 
-event_response_t nanosleep_enter_cb(vmi_instance_t vmi, vmi_event_t *event) {
+event_response_t nanosleep_enter_cb(vmi_instance_t vmi, vmi_event_t* event) {
 #ifdef MEM_EVENT
   if (event->mem_event.gla == virt_sys_nanosleep) {
     reg_t rax, cr3, rsp;
@@ -227,7 +227,7 @@ event_response_t nanosleep_enter_cb(vmi_instance_t vmi, vmi_event_t *event) {
   return 0;
 }
 
-int introspect_sleepapi_nop(char *name) {
+int introspect_sleepapi_nop(char* name) {
 
   struct sigaction act;
   act.sa_handler = close_handler;
@@ -239,7 +239,7 @@ int introspect_sleepapi_nop(char *name) {
   sigaction(SIGALRM, &act, NULL);
 
   vmi_instance_t vmi = NULL;
-  vmi_init_data_t *init_data = NULL;
+  vmi_init_data_t* init_data = NULL;
   if (VMI_FAILURE == vmi_init_complete(&vmi, domain_name, VMI_INIT_DOMAINNAME,
                                        init_data, VMI_CONFIG_GLOBAL_FILE_ENTRY,
                                        NULL, NULL)) {
@@ -255,11 +255,11 @@ int introspect_sleepapi_nop(char *name) {
   char _name[256];
   char _val[256];
 
-  FILE *_file = fopen("blacklist.txt", "r");
+  FILE* _file = fopen("blacklist.txt", "r");
   while (fgets(_line, sizeof(_line), _file) != NULL) {
     sscanf(_line, "%s\t%s", _name, _val);
-    list = realloc(list, sizeof(char *) * ++num_proc);
-    list[num_proc - 1] = (char *)malloc(256);
+    list = realloc(list, sizeof(char*) * ++num_proc);
+    list[num_proc - 1] = (char*)malloc(256);
     strcpy(list[num_proc - 1], _name);
   }
   fclose(_file);
