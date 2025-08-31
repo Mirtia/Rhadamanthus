@@ -1,24 +1,12 @@
-data
-=======
+# Data
 
-This folder contains data for VMI. Move them to the same folder with the executable
+## interrupt_index.linux
 
+## known_files.linux
 
-blacklist.txt
-------
+This list contains files and directories observed in rootkit samples, whose existence is verified through VMI-Introspector 
+by inspecting inodes to detect if they are being hidden by malicious actors.
 
-This file contains the program's name, and its MD5 hash values, which will be blocked
-
-It is used by:
-	process-block
-	sleepapi-nop
+## syscall_index.linux
 
 
-syscall\_index
-------
-
-This file stores the mapping between the index and syscall name.
-
-It is used by:
-	syscall-check
-	syscall-trace

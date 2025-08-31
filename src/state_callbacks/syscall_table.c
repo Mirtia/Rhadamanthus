@@ -87,7 +87,6 @@ uint32_t state_syscall_table_callback(vmi_instance_t vmi, void* context) {
     log_error("STATE_SYSCALL_TABLE: Invalid input parameters.");
     return VMI_FAILURE;
   }
-  (void)context;
   // Check if vm is paused by checking the context (event_handler).
   event_handler_t* event_handler = (event_handler_t*)context;
   // Note: By not having a paused VM we risk inconsistent state between information gathering (reads).

@@ -16,11 +16,18 @@
 /**
  * @brief Callback function for handling MSR write events.
  *
- * @param vmi The VMI instance.P
+ * @details This event was inspired by the LSTAR PoC https://vvdveen.com/data/lstar.txt. 
+ * The main idea is that every time there is a syscall instruction, the processor stores RIP in RCX
+ * and goes to the LSTAR MSR register address, which is the system call entry point. In other words, the 
+ * target is to modify the system call entry point.
+ *
+ * @todo Fix PoC. Adjust the way to retrieve OLD_RSP and KERNEL_STACK addresses.
+ *
+ * @param vmi The VMI instance.
  * @param event The event that triggered the callback.
  * @return event_response_t VMI_EVENT_RESPONSE_NONE (general monitoring).
  */
 event_response_t event_msr_write_callback(vmi_instance_t vmi,
-                                           vmi_event_t* event);
+                                          vmi_event_t* event);
 
 #endif  // MSR_WRITE_H

@@ -23,7 +23,7 @@ uint32_t state_kernel_module_list_callback(vmi_instance_t vmi, void* context) {
 
   log_info("Executing STATE_KERNEL_MODULE_LIST callback.");
 
-  addr_t modules_head = 0;  // address of global 'modules' (struct list_head)
+  addr_t modules_head = 0;
   if (vmi_read_addr_ksym(vmi, "modules", &modules_head) != VMI_SUCCESS) {
     log_error(
         "STATE_KERNEL_MODULE_LIST: Failed to resolve kernel symbol 'modules'.");

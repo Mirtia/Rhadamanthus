@@ -245,7 +245,6 @@ uint32_t state_kallsyms_symbols_callback(vmi_instance_t vmi, void* context) {
     }
   }
 
-  // Summary
   log_info(
       "STATE_KALLSYMS_SYMBOLS: kallsyms summary: total=%u, reachable=%u, "
       "zero=%u, "

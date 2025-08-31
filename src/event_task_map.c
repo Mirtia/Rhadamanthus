@@ -221,7 +221,6 @@ static vmi_event_t* create_event_page_table_modification(vmi_instance_t vmi) {
         (unsigned long)ctx->pml4_pa);
   }
 
-  /* Attach context so the callback can diff. */
   event->data = ctx;
   return event;
 }
@@ -249,6 +248,7 @@ static vmi_event_t* create_event_netfilter_hook_write(vmi_instance_t vmi) {
 
 static vmi_event_t* create_event_msr_write(vmi_instance_t vmi) {
   // Monitor all MSR writes
+  (void)vmi;
   return setup_register_event(MSR_ALL, VMI_REGACCESS_W,
                               event_msr_write_callback);
 }
@@ -264,7 +264,7 @@ static vmi_event_t* create_event_code_section_modify(vmi_instance_t vmi) {
   size_t text_size = text_end - text_start;
   size_t page_count = (text_size + PAGE_SIZE - 1) / PAGE_SIZE;
 
-  for (size_t i = 0; i < page_count; i++) {
+  for (size_t i = 0; i < page_count; ++i) {
     addr_t page_addr = text_start + i * PAGE_SIZE;
     vmi_event_t* event = setup_memory_event(page_addr, VMI_MEMACCESS_W,
                                             event_code_section_modify_callback);
@@ -365,7 +365,7 @@ int register_all_event_tasks(event_handler_t* event_handler) {
 
   int registered_count = 0;
 
-  for (size_t i = 0; i < event_task_map_size; i++) {
+  for (size_t i = 0; i < event_task_map_size; ++i) {
     const event_task_map_entry_t* entry = &event_task_map[i];
 
     log_info("Registering event task: %s", entry->description);
@@ -393,7 +393,7 @@ int register_event_task_by_id(event_handler_t* event_handler,
     return -1;
   }
 
-  for (size_t i = 0; i < event_task_map_size; i++) {
+  for (size_t i = 0; i < event_task_map_size; ++i) {
     const event_task_map_entry_t* entry = &event_task_map[i];
 
     if (entry->task_id == task_id) {

@@ -43,8 +43,8 @@ event_response_t event_page_table_modification_callback(vmi_instance_t vmi,
     log_info(
         "PML4E[%3u] changed: old=0x%016llx new=0x%016llx  "
         "P:%d→%d RW:%d→%d US:%d→%d NX:%d→%d",
-        i, oldv, newv, old_p, new_p,
-        old_rw, new_rw, old_us, new_us, old_nx, new_nx);
+        i, oldv, newv, old_p, new_p, old_rw, new_rw, old_us, new_us, old_nx,
+        new_nx);
 
     /* Update shadow so subsequent writes diff against newest state. */
     ctx->shadow[i] = newv;

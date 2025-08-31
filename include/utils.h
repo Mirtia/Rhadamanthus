@@ -3,7 +3,7 @@
 #include <libvmi/libvmi.h>
 
 /**
- * @brief Get the kernel text section range object
+ * @brief Get the kernel .text section start and end address.
  * 
  * @param vmi The VMI instance.
  * @param start_addr The output start address of the kernel text section.
@@ -14,11 +14,11 @@ uint32_t get_kernel_text_section_range(vmi_instance_t vmi, addr_t* start_addr,
                                        addr_t* end_addr);
 
 /**
- * @brief Check if an address lies within the kernel .text section.
+ * @brief Check if an address lies within the kernel .text section bounds.
  *
  * @param vmi The VMI instance.
- * @param addr The address to check.
- * @return true if the address is within the kernel .text section, false otherwise.
+ * @param addr The address to check if in bounds.
+ * @return true if the address is within bounds, false otherwise.
  */
 bool is_in_kernel_text(vmi_instance_t vmi, addr_t addr);
 
