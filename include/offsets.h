@@ -2,7 +2,7 @@
  * @file offsets.h
  * @author Myrsini Gkolemi
  * @brief This file contains offsets used for introspection.
- * @version 0.1
+ * @version 0.0
  * @date 2025-08-31
  * 
  * @copyright Copyright (c) 2025

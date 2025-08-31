@@ -1,11 +1,11 @@
 // What can I say for the includes needed...
-#include <cmocka.h>
 #include <glib.h>
 #include <log.h>
 #include <setjmp.h>
 #include <stdarg.h>
 #include <stddef.h>
 #include <unistd.h>
+#include <cmocka.h>
 #include "config_parser.h"
 
 /**

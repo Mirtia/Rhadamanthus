@@ -1,9 +1,9 @@
-#include <cmocka.h>
 #include <libvmi/libvmi.h>
 #include <log.h>
 #include <setjmp.h>
 #include <stdarg.h>
 #include <stddef.h>
+#include <cmocka.h>
 
 #include "state_callbacks/syscall_table.h"
 

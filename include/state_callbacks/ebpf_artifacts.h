@@ -1,8 +1,8 @@
 #ifndef EBPF_ARTIFACTS_H
 #define EBPF_ARTIFACTS_H
 
-#include <libvmi/libvmi.h>
 #include <stdint.h>
+#include <libvmi/events.h>
 
 /**
  * @brief 

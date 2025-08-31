@@ -470,7 +470,6 @@ static vmi_event_t* create_event_ebpf_map_update(vmi_instance_t vmi) {
   // Would need to hook bpf_map_update_elem function or similar
   log_warn("eBPF map monitoring requires dynamic map tracking");
 
-  // Placeholder - would need to track BPF syscalls and monitor created maps
   return NULL;
 }
 

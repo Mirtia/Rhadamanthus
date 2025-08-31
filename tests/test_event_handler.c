@@ -1,8 +1,8 @@
-#include <cmocka.h>
 #include <log.h>
 #include <setjmp.h>
 #include <stdarg.h>
 #include <stddef.h>
+#include <cmocka.h>
 #include "event_handler.h"
 
 void register_mock_tasks(event_handler_t* event_handler) {
