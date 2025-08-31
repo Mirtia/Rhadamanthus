@@ -59,6 +59,7 @@ event_handler_t* event_handler_initialize_from_config(const char* config_path) {
   for (GList* list_iter = config.state_tasks; list_iter != NULL;
        list_iter = list_iter->next) {
     state_task_id_t task_id = (state_task_id_t)GPOINTER_TO_INT(list_iter->data);
+    // TODO: real functor assignment, map from task_id to functor.
     // Mapping from task_id to a callback function should be done here.
     void* functor = get_state_task_functor(task_id);
     event_handler_register_state_task(event_handler, task_id, functor);

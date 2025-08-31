@@ -45,7 +45,7 @@ typedef struct {
 /**
  * @brief Context for network detection operations.
  * 
- * This structure holds the state and results of network rootkit detection.
+ * This structure holds the state and results of network tracing.
  */
 typedef struct {
   GArray* kernel_connections;  ///< Direct kernel connections.
@@ -108,6 +108,7 @@ static bool is_suspicious_port(uint16_t port) {
       31337,  ///< Back Orifice backdoor default port (LEET).
       0,      ///< Port 0 is invalid.
       65535   ///< Highest port, invalid.
+      // TODO: Add more after checking out the EBPF rootkit samples.
   };
 
   size_t count = sizeof(suspicious_ports) / sizeof(suspicious_ports[0]);
@@ -132,7 +133,6 @@ static bool is_suspicious_port(uint16_t port) {
 static inline bool ipv4_is_public(uint32_t ip_be) {
   uint32_t ip_addr = ntohl(ip_be);
 
-// Helper: test if ip is inside CIDR (base/maskbits in host order)
 #define IN(ip_addr_, base_, maskbits_)                              \
   (((ip_addr_) &                                                    \
     ((maskbits_) == 0 ? 0u : 0xFFFFFFFFu << (32 - (maskbits_)))) == \
@@ -524,7 +524,7 @@ static uint32_t check_netfilter_hooks(vmi_instance_t vmi,
         continue;
 
       uint16_t num_hook_entries = 0;
-      if (vmi_read_16_va(vmi, hook_entries_addr + NF_HOOK_ENTRIES_NUM_OFFSET, 0,
+      if (vmi_read_16_va(vmi, hook_entries_addr + LINUX_NF_HOOK_ENTRIES_NUM_OFFSET, 0,
                          &num_hook_entries) != VMI_SUCCESS)
         continue;
 
@@ -534,10 +534,10 @@ static uint32_t check_netfilter_hooks(vmi_instance_t vmi,
       log_debug("%s HOOK=%d -> %u entries @ 0x%" PRIx64, hook_arrays[arr].name,
                 hook, num_hook_entries, hook_entries_addr);
 
-      addr_t hooks_start = hook_entries_addr + NF_HOOK_ENTRIES_PAD;
+      addr_t hooks_start = hook_entries_addr + LINUX_NF_HOOK_ENTRIES_PAD;
 
       for (uint16_t i = 0; i < num_hook_entries; i++) {
-        addr_t entry_addr = hooks_start + i * NF_HOOK_ENTRY_SIZE;
+        addr_t entry_addr = hooks_start + i * LINUX_NF_HOOK_ENTRY_SIZE;
         addr_t hook_func = 0, hook_priv = 0;
 
         if (vmi_read_addr_va(vmi, entry_addr, 0, &hook_func) != VMI_SUCCESS ||
@@ -584,13 +584,13 @@ static void cleanup_detection_context(detection_context_t* ctx) {
 uint32_t state_network_trace_callback(vmi_instance_t vmi, void* context) {
   // Preconditions
   if (!context || !vmi) {
-    log_error("STATE_NETWORK_TRACE_CALLBACK: Invalid context or VMI instance");
+    log_error("STATE_NETWORK_TRACE: Invalid context or VMI instance");
     return VMI_FAILURE;
   }
 
   event_handler_t* event_handler = (event_handler_t*)context;
   if (!event_handler->is_paused) {
-    log_error("STATE_NETWORK_TRACE_CALLBACK: Callback requires a paused VM.");
+    log_error("STATE_NETWORK_TRACE: Callback requires a paused VM.");
     return VMI_FAILURE;
   }
 
@@ -603,25 +603,25 @@ uint32_t state_network_trace_callback(vmi_instance_t vmi, void* context) {
   detection_context.suspicious_count = 0;
 
   if (check_netfilter_hooks(vmi, &detection_context) != VMI_SUCCESS) {
-    log_error("STATE_NETWORK_TRACE_CALLBACK: Failed to check netfilter hooks");
+    log_error("STATE_NETWORK_TRACE: Failed to check netfilter hooks");
     return VMI_FAILURE;
   }
 
   if (walk_tcp_hash_table(vmi, &detection_context) != VMI_SUCCESS) {
-    log_error("STATE_NETWORK_TRACE_CALLBACK: Failed to walk TCP hash tables");
+    log_error("STATE_NETWORK_TRACE: Failed to walk TCP hash tables");
     return VMI_FAILURE;
   }
 
   if (detection_context.suspicious_count > 0) {
     log_warn(
-        "STATE_NETWORK_TRACE_CALLBACK: Found %u suspicious network "
+        "STATE_NETWORK_TRACE: Found %u suspicious network "
         "activities!",
         detection_context.suspicious_count);
   } else {
-    log_info("STATE_NETWORK_TRACE_CALLBACK: No immediate threats detected");
+    log_info("STATE_NETWORK_TRACE: No immediate threats detected");
   }
 
-  log_info("STATE_NETWORK_TRACE_CALLBACK: CONNECTIONS found: %u kernel",
+  log_info("STATE_NETWORK_TRACE: CONNECTIONS found: %u kernel",
            detection_context.kernel_connections->len);
 
   cleanup_detection_context(&detection_context);

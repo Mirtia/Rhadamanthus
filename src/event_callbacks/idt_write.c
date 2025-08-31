@@ -6,8 +6,9 @@
 
 event_response_t event_idt_write_callback(vmi_instance_t vmi,
                                           vmi_event_t* event) {
+  // Preconditions
   if (!vmi || !event) {
-    log_error("Invalid arguments to IDT write callback.");
+    log_error("EVENT_IDT_WRITE: Invalid arguments to IDT write callback.");
     return VMI_EVENT_INVALID;
   }
 
@@ -18,7 +19,7 @@ event_response_t event_idt_write_callback(vmi_instance_t vmi,
 
   vmi_get_vcpureg(vmi, &rip, RIP, vcpu_id);
 
-  log_warn("IDT WRITE Event: VCPU: %u RIP: 0x%" PRIx64 " GLA: 0x%" PRIx64
+  log_warn("EVENT_IDT_WRITE: VCPU: %u RIP: 0x%" PRIx64 " GLA: 0x%" PRIx64
            " GPA: 0x%" PRIx64,
            vcpu_id, rip, write_gla, write_gpa);
 

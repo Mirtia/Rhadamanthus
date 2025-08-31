@@ -20,7 +20,7 @@ static bool get_legitimate_syscall_entry(vmi_instance_t vmi,
   // Try common syscall entry symbols.
   const char* syscall_symbols[] = {
       "entry_SYSCALL_64",  ///< Modern kernels
-      "system_call",       ///< Older kernels (as mentioned in vvdveen's document)
+      "system_call",  ///< Older kernels (as mentioned in vvdveen's document)
       "entry_SYSCALL_64_after_hwframe", NULL};
 
   for (int i = 0; syscall_symbols[i] != NULL; i++) {
@@ -68,12 +68,13 @@ uint32_t state_msr_registers_callback(vmi_instance_t vmi, void* context) {
   if (get_kernel_text_section_range(vmi, &kernel_start, &kernel_end) !=
       VMI_SUCCESS) {
     log_error(
-        "STATE_MSR_REGISTERS: Failed to get kernel .text section boundaries.");
+        "STATE_MSR_REGISTERS: Failed to get kernel .text section "
+        "boundaries.");
     return VMI_FAILURE;
   }
 
-  log_info("STATE_MSR_REGISTERS: Kernel text range: [0x%" PRIx64 ", 0x%" PRIx64
-           "]",
+  log_info("STATE_MSR_REGISTERS: Kernel text range: [0x%" PRIx64
+           ", 0x%" PRIx64 "]",
            (uint64_t)kernel_start, (uint64_t)kernel_end);
 
   addr_t legitimate_syscall = 0;
@@ -84,21 +85,25 @@ uint32_t state_msr_registers_callback(vmi_instance_t vmi, void* context) {
   unsigned int num_vcpus = vmi_get_num_vcpus(vmi);
   if (num_vcpus == 0) {
     log_error(
-        "STATE_MSR_REGISTERS: Failed to get number of vCPUs or no vCPUs "
+        "STATE_MSR_REGISTERS: Failed to get number of vCPUs or no "
+        "vCPUs "
         "available.");
     return VMI_FAILURE;
   }
 
-  log_info("STATE_MSR_REGISTERS: Reading MSR_LSTAR state from %u vCPU(s).",
-           num_vcpus);
+  log_info(
+      "STATE_MSR_REGISTERS: Reading MSR_LSTAR state from %u vCPU(s).",
+      num_vcpus);
 
   // Read and report MSR_LSTAR state on each vCPU (same as IDT).
   for (unsigned int cpu = 0; cpu < num_vcpus; cpu++) {
     addr_t lstar_value = 0;
 
     if (!read_msr_lstar(vmi, cpu, &lstar_value)) {
-      log_warn("STATE_MSR_REGISTERS: Failed to read MSR_LSTAR from vCPU %u.",
-               cpu);
+      log_warn(
+          "STATE_MSR_REGISTERS: Failed to read MSR_LSTAR from vCPU "
+          "%u.",
+          cpu);
       continue;
     }
 
@@ -107,19 +112,22 @@ uint32_t state_msr_registers_callback(vmi_instance_t vmi, void* context) {
 
     if (!is_in_kernel_text(vmi, lstar_value)) {
       log_info(
-          "STATE_MSR_REGISTERS: vCPU %u MSR_LSTAR points outside kernel text "
+          "STATE_MSR_REGISTERS: vCPU %u MSR_LSTAR points outside "
+          "kernel text "
           "section (0x%" PRIx64 " not in [0x%" PRIx64 ", 0x%" PRIx64 "])",
           cpu, (uint64_t)lstar_value, (uint64_t)kernel_start,
           (uint64_t)kernel_end);
     } else {
       log_info(
-          "STATE_MSR_REGISTERS: vCPU %u MSR_LSTAR within kernel text bounds",
+          "STATE_MSR_REGISTERS: vCPU %u MSR_LSTAR within kernel text "
+          "bounds",
           cpu);
     }
 
     if (has_legitimate_ref && lstar_value != legitimate_syscall) {
       log_info(
-          "STATE_MSR_REGISTERS: vCPU %u MSR_LSTAR differs from expected "
+          "STATE_MSR_REGISTERS: vCPU %u MSR_LSTAR differs from "
+          "expected "
           "syscall entry (0x%" PRIx64 " vs 0x%" PRIx64 ")",
           cpu, (uint64_t)lstar_value, (uint64_t)legitimate_syscall);
     }

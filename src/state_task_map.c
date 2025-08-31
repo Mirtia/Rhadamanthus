@@ -28,8 +28,10 @@ uint32_t (*get_state_task_functor(state_task_id_t task_id))(vmi_instance_t,
       return state_io_uring_artifacts_callback;
     case STATE_KALLSYMS_SYMBOLS:
       return state_kallsyms_symbols_callback;
+    // This was stupid, the hash changes every boot.
+    // TODO: Add a history of hashes for each run.
     // case STATE_KERNEL_CODE_INTEGRITY_CHECK:
-      // return state_kernel_code_integrity_check_callback;
+    // return state_kernel_code_integrity_check_callback;
     case STATE_KERNEL_MODULE_LIST:
       return state_kernel_module_list_callback;
     case STATE_MSR_REGISTERS:

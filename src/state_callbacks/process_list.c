@@ -128,12 +128,12 @@ static void print_process_info(const process_info_t* proc_info) {
 uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
   // Preconditions
   if (!vmi || !context) {
-    log_error("STATE_SYSCALL_TABLE: Invalid input parameters.");
+    log_error("STATE_PROCESS_LIST: Invalid input parameters.");
     return VMI_FAILURE;
   }
   event_handler_t* event_handler = (event_handler_t*)context;
   if (!event_handler || !event_handler->is_paused) {
-    log_error("STATE_PROCESS_LIST_CALLBACK: Callback requires a paused VM.");
+    log_error("STATE_PROCESS_LIST: Callback requires a paused VM.");
     return VMI_FAILURE;
   }
 
@@ -146,7 +146,7 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
   uint32_t total_processes = 0, kernel_threads = 0, user_processes = 0;
 
   if (vmi_translate_ksym2v(vmi, "init_task", &list_head) != VMI_SUCCESS) {
-    log_error("STATE_PROCESS_LIST_CALLBACK: Failed to resolve init_task");
+    log_error("STATE_PROCESS_LIST: Failed to resolve init_task");
     return VMI_FAILURE;
   }
 
@@ -159,7 +159,7 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
       vmi_get_offset(vmi, "linux_mm", &mm_offset) != VMI_SUCCESS) {
 
     log_error(
-        "STATE_PROCESS_LIST_CALLBACK: Failed to retrieve required task_struct "
+        "STATE_PROCESS_LIST: Failed to retrieve required task_struct "
         "offsets from profile");
     return VMI_FAILURE;
   }
@@ -167,11 +167,11 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
   list_head += linux_tasks_offset;
 
   if (vmi_read_addr_va(vmi, list_head, 0, &next_list_entry) != VMI_SUCCESS) {
-    log_error("STATE_PROCESS_LIST_CALLBACK: Failed to read first task pointer");
+    log_error("STATE_PROCESS_LIST: Failed to read first task pointer");
     return VMI_FAILURE;
   }
 
-  log_info("STATE_PROCESS_LIST_CALLBACK: Starting kernel task list walk...");
+  log_info("STATE_PROCESS_LIST: Starting kernel task list walk...");
   cur_list_entry = list_head;
 
   do {
@@ -183,7 +183,7 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
     // Read PID
     if (vmi_read_32_va(vmi, current_process + pid_offset, 0,
                        (uint32_t*)&proc_info.pid) != VMI_SUCCESS) {
-      log_warn("STATE_PROCESS_LIST_CALLBACK: Failed to read PID at 0x%" PRIx64,
+      log_warn("STATE_PROCESS_LIST: Failed to read PID at 0x%" PRIx64,
                current_process);
       process_valid = false;
     }
@@ -193,7 +193,7 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
       proc_info.name = vmi_read_str_va(vmi, current_process + name_offset, 0);
       if (!proc_info.name) {
         log_warn(
-            "STATE_PROCESS_LIST_CALLBACK: Failed to read process name for PID "
+            "STATE_PROCESS_LIST: Failed to read process name for PID "
             "%u",
             proc_info.pid);
         process_valid = false;
@@ -205,7 +205,7 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
       if (vmi_read_32_va(vmi, current_process + LINUX_STATE_OFFSET, 0,
                          &proc_info.state) != VMI_SUCCESS) {
         log_warn(
-            "STATE_PROCESS_LIST_CALLBACK: Failed to read process state for PID "
+            "STATE_PROCESS_LIST: Failed to read process state for PID "
             "%u",
             proc_info.pid);
         // Unknown state.
@@ -219,7 +219,7 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
         if (!read_process_credentials(vmi, current_process, LINUX_CRED_OFFSET,
                                       &proc_info)) {
           log_warn(
-              "STATE_PROCESS_LIST_CALLBACK: Failed to read credentials for PID "
+              "STATE_PROCESS_LIST: Failed to read credentials for PID "
               "%u",
               proc_info.pid);
           // Continue anyway, just mark credentials as invalid.
@@ -243,7 +243,7 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
     if (vmi_read_addr_va(vmi, cur_list_entry, 0, &next_list_entry) !=
         VMI_SUCCESS) {
       log_error(
-          "STATE_PROCESS_LIST_CALLBACK: Failed to read next task pointer at "
+          "STATE_PROCESS_LIST: Failed to read next task pointer at "
           "0x%" PRIx64,
           cur_list_entry);
       return VMI_FAILURE;
@@ -253,9 +253,9 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
 
   } while (cur_list_entry != list_head);
 
-  log_info("STATE_PROCESS_LIST_CALLBACK: Finished walking kernel task list");
+  log_info("STATE_PROCESS_LIST: Finished walking kernel task list");
   log_info(
-      "STATE_PROCESS_LIST_CALLBACK: Summary: %u total processes (%u user, %u "
+      "STATE_PROCESS_LIST: Summary: %u total processes (%u user, %u "
       "kernel threads)",
       total_processes, user_processes, kernel_threads);
 

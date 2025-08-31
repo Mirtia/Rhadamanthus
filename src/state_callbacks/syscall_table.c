@@ -4,6 +4,7 @@
 #include <log.h>
 #include "event_handler.h"
 #include "utils.h"
+
 /**
  * @brief Frees the syscall index array.
  * 
@@ -137,7 +138,7 @@ uint32_t state_syscall_table_callback(vmi_instance_t vmi, void* context) {
           i);
       continue;
     }
-    
+
     // It is suspicious that the hook is outside the kernel text section.
     if (sys_call_addr < kernel_start || sys_call_addr > kernel_end) {
       log_warn("STATE_SYSCALL_TABLE: Hook detected: syscall %s at 0x%" PRIx64,

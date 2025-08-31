@@ -14,6 +14,18 @@
 #include <libvmi/events.h>
 
 /**
+ * @brief Context for the planted breakpoint on nf_register_net_hook(s).
+ */
+struct nf_bp_ctx_t {
+  addr_t kaddr;         ///< Kernel VA of the function entry.
+  uint8_t orig;         ///< Original first byte at entry.
+  const char* symname;  ///< Symbol name for logging.
+  vmi_event_t ss_evt;   ///< One-shot SINGLESTEP event to re-arm INT3.
+};
+
+typedef struct nf_bp_ctx_t nf_bp_ctx_t;
+
+/**
  * @brief Callback function for handling netfilter hook write events.
  *
  * @param vmi The VMI instance.
@@ -21,6 +33,6 @@
  * @return event_response_t VMI_EVENT_RESPONSE_NONE (general monitoring).
  */
 event_response_t event_netfilter_hook_write_callback(vmi_instance_t vmi,
-                                                      vmi_event_t* event);
+                                                     vmi_event_t* event);
 
 #endif  // NETFILTER_HOOK_WRITE_H

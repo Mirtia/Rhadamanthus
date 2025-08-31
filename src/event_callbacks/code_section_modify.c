@@ -6,9 +6,9 @@
 #include <stdint.h>
 
 /**
- * @brief Resolve the nearest kernel symbol for a given virtual address.
+ * @brief Resolve the first-match kernel symbol for a given virtual address.
  * 
- * @param vmi LibVMI instance.
+ * @param vmi The LibVMI instance.
  * @param virtual_addr Virtual address to resolve.
  * @return const char* Nearest (first-match) kernel symbol name, or NULL if not found.
  */
@@ -23,12 +23,13 @@ static inline const char* resolve_kernel_symbol(vmi_instance_t vmi,
 
 event_response_t event_code_section_modify_callback(vmi_instance_t vmi,
                                                     vmi_event_t* event) {
+  // Preconditions
   if (!vmi || !event) {
-    log_error("CODE_SECTION_WRITE: Invalid callback arguments");
+    log_error("EVENT_CODE_SECTION_MODIFY: Invalid callback arguments");
     return VMI_EVENT_RESPONSE_NONE;
   }
 
-  log_warn("CODE_SECTION_WRITE event triggered.");
+  log_warn("CODE_SECTION_MODIFY event triggered.");
 
   const uint32_t vcpu_id = event->vcpu_id;
 

@@ -5,7 +5,7 @@
 uint32_t get_kernel_text_section_range(vmi_instance_t vmi, addr_t* start_addr,
                                        addr_t* end_addr) {
   if (!vmi) {
-    log_debug("Vmi instance is uninitialized.");
+    log_debug("VMI instance is uninitialized.");
     return VMI_FAILURE;
   }
 
@@ -21,7 +21,7 @@ uint32_t get_kernel_text_section_range(vmi_instance_t vmi, addr_t* start_addr,
 bool is_in_kernel_text(vmi_instance_t vmi, addr_t addr) {
 
   if (!vmi) {
-    log_debug("Vmi instance is uninitialized.");
+    log_debug("VMI instance is uninitialized.");
     return false;
   }
 
@@ -32,6 +32,6 @@ bool is_in_kernel_text(vmi_instance_t vmi, addr_t addr) {
     log_debug("Unable to get kernel text section range for address check.");
     return false;
   }
-
+  // [start_addr, end_addr)
   return (addr >= start_addr && addr < end_addr);
 }

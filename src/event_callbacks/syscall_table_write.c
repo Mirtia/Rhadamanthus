@@ -4,7 +4,6 @@
 
 event_response_t event_syscall_table_write_callback(vmi_instance_t vmi,
                                                     vmi_event_t* event) {
-
   // Preconditions
   if (!vmi || !event) {
     log_error(

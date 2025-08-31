@@ -4,27 +4,19 @@
 #include <log.h>
 #include <string.h>
 #include "event_handler.h"
+#include "offsets.h"
 #include "utils.h"
 
-// Exact offsets from pahole's output for linux-5.15.0-139-generic kernel.
-#define FTRACE_OPS_FUNC_OFFSET 0
-#define FTRACE_OPS_NEXT_OFFSET 8
-#define FTRACE_OPS_FLAGS_OFFSET 16
-#define FTRACE_OPS_PRIVATE_OFFSET 24
-#define FTRACE_OPS_SAVED_FUNC_OFFSET 32
-#define FTRACE_OPS_FUNC_HASH_OFFSET 88
-#define FTRACE_OPS_TRAMPOLINE_OFFSET 144
-#define FTRACE_OPS_TRAMPOLINE_SIZE_OFFSET 152
-#define FTRACE_OPS_LIST_OFFSET 160
-
 /**
- * @brief Ftrace flags from the PoC that indicate hooking
+ * @brief Ftrace flags from the PoC that indicate hooking 
+ * See ftrace-hook: https://github.com/ilammy/ftrace-hook/blob/master/ftrace_hook.c
  */
 #define FTRACE_OPS_FL_SAVE_REGS (1 << 1)
 #define FTRACE_OPS_FL_RECURSION (1 << 13)
 #define FTRACE_OPS_FL_IPMODIFY (1 << 12)
 
 // Hooking signature: SAVE_REGS | RECURSION | IPMODIFY
+// https://github.com/ilammy/ftrace-hook/blob/ff7bad4cd3de3d5ed8fe2baf8a1676d1cec7b5d8/ftrace_hook.c#L141C1-L144C43
 #define HOOKING_FLAGS_SIGNATURE \
   (FTRACE_OPS_FL_SAVE_REGS | FTRACE_OPS_FL_RECURSION | FTRACE_OPS_FL_IPMODIFY)
 
@@ -33,23 +25,23 @@
  * TODO: Expand list according to the dataset samples.
  */
 static const char* commonly_hooked_syscalls[] = {
-    "__x64_sys_clone",       // From the PoC
-    "__x64_sys_execve",      // From the PoC
+    "__x64_sys_clone",       // PoC
+    "__x64_sys_execve",      // PoC
     "__x64_sys_openat",      // Commonly targeted
     "__x64_sys_read",        // File operations
     "__x64_sys_write",       // File operations
     "__x64_sys_getdents64",  // Directory hiding
     "__x64_sys_kill",        // Process hiding
-    //  TODO: add more, maybe whole list?
+    // TODO: add more, maybe a list provided from a file.
     "sys_clone",   // Legacy naming
     "sys_execve",  // Legacy naming
     NULL};
 
 /**
- * @brief Check if ftrace flags indicate malicious hooking
+ * @brief Check if ftrace flags indicate malicious hooking.
  *
- * @param flags Ftrace operation flags
- * @return true if suspicious flags detected
+ * @param flags Ftrace operation flags.
+ * @return true if suspicious flags detected else false.
  */
 static bool is_hooking_flags_pattern(unsigned long flags) {
   // The PoC uses exactly this combination for IP modification
@@ -57,7 +49,7 @@ static bool is_hooking_flags_pattern(unsigned long flags) {
     return true;
   }
 
-  // IPMODIFY without SAVE_REGS is also suspicious
+  // IPMODIFY without SAVE_REGS.
   if ((flags & FTRACE_OPS_FL_IPMODIFY) && !(flags & FTRACE_OPS_FL_SAVE_REGS)) {
     return true;
   }
@@ -68,12 +60,12 @@ static bool is_hooking_flags_pattern(unsigned long flags) {
 /**
  * @brief Analyze a single ftrace_ops structure for hooking patterns
  *
- * @param vmi LibVMI instance
- * @param ops_addr Address of ftrace_ops structure
- * @param ops_num Operation number for logging
- * @param kernel_start Start of kernel text section
- * @param kernel_end End of kernel text section
- * @return true if hooking pattern detected
+ * @param vmi The ibVMI instance.
+ * @param ops_addr Address of ftrace_ops structure.
+ * @param ops_num Operation number for logging.
+ * @param kernel_start Start of kernel text section.
+ * @param kernel_end End of kernel text section.
+ * @return true if hooking pattern detected else false.
  */
 static bool analyze_ftrace_ops_for_hooks(vmi_instance_t vmi, addr_t ops_addr,
                                          // NOLINTNEXTLINE
@@ -81,30 +73,30 @@ static bool analyze_ftrace_ops_for_hooks(vmi_instance_t vmi, addr_t ops_addr,
                                          addr_t kernel_end) {
   // Read ftrace function pointer (offset 0)
   addr_t func_addr = 0;
-  if (vmi_read_addr_va(vmi, ops_addr + FTRACE_OPS_FUNC_OFFSET, 0, &func_addr) !=
-      VMI_SUCCESS) {
+  if (vmi_read_addr_va(vmi, ops_addr + LINUX_FTRACE_OPS_FUNC_OFFSET, 0,
+                       &func_addr) != VMI_SUCCESS) {
     log_warn("Failed to read ftrace func at 0x%" PRIx64,
-             ops_addr + FTRACE_OPS_FUNC_OFFSET);
+             ops_addr + LINUX_FTRACE_OPS_FUNC_OFFSET);
     return false;
   }
 
   // Read flags (offset 16)
   unsigned long flags = 0;
-  if (vmi_read_64_va(vmi, ops_addr + FTRACE_OPS_FLAGS_OFFSET, 0, &flags) !=
-      VMI_SUCCESS) {
+  if (vmi_read_64_va(vmi, ops_addr + LINUX_FTRACE_OPS_FLAGS_OFFSET, 0,
+                     &flags) != VMI_SUCCESS) {
     log_warn("Failed to read ftrace flags at 0x%" PRIx64,
-             ops_addr + FTRACE_OPS_FLAGS_OFFSET);
+             ops_addr + LINUX_FTRACE_OPS_FLAGS_OFFSET);
     return false;
   }
 
   // Read trampoline address (offset 144) - this is often used in hooks
   addr_t trampoline_addr = 0;
-  vmi_read_addr_va(vmi, ops_addr + FTRACE_OPS_TRAMPOLINE_OFFSET, 0,
+  vmi_read_addr_va(vmi, ops_addr + LINUX_FTRACE_OPS_TRAMPOLINE_OFFSET, 0,
                    &trampoline_addr);
 
   // Read saved_func (offset 32) - original function before hooking
   addr_t saved_func = 0;
-  vmi_read_addr_va(vmi, ops_addr + FTRACE_OPS_SAVED_FUNC_OFFSET, 0,
+  vmi_read_addr_va(vmi, ops_addr + LINUX_FTRACE_OPS_SAVED_FUNC_OFFSET, 0,
                    &saved_func);
 
   log_info("Ftrace Operation %d [0x%" PRIx64 "]:", ops_num, (uint64_t)ops_addr);
@@ -250,7 +242,7 @@ static int walk_ftrace_ops_list(vmi_instance_t vmi, addr_t kernel_start,
 
     // Read next pointer
     addr_t next_ops = 0;
-    if (vmi_read_addr_va(vmi, current_ops + FTRACE_OPS_NEXT_OFFSET, 0,
+    if (vmi_read_addr_va(vmi, current_ops + LINUX_FTRACE_OPS_NEXT_OFFSET, 0,
                          &next_ops) != VMI_SUCCESS) {
       log_warn("Failed to read next ftrace_ops pointer");
       break;

@@ -157,7 +157,6 @@ static void inspect_io_uring_for_task(vmi_instance_t vmi,
 
   // Both rings are sized to powers of two (rounded up by kernel).
   //   - man7 (rounded to next power of two): https://man7.org/linux/man-pages/man2/io_uring_setup.2.html
-  //   - implementation notes: https://lxr.missinglinkelectronics.com/linux/fs/io_uring.c
   if (!is_power_of_two_u32(sq_entries)) {
     log_debug("PID %u (%s): SQ entries (%u) not power-of-two.", pid,
               procname ? procname : "?", sq_entries);
@@ -195,8 +194,10 @@ uint32_t state_io_uring_artifacts_callback(vmi_instance_t vmi, void* context) {
   /* Weak corroboration only; do not classify based on these counters.
    * Thread naming references:
    *   - SQPOLL worker naming (iou-sqp*): https://man7.org/linux/man-pages/man2/io_uring_setup.2.html (IORING_SETUP_SQPOLL)
-   *   - Worker pool discussion: https://blog.cloudflare.com/missing-manuals-io_uring-worker-pool/
+   *   - Worker pool: https://blog.cloudflare.com/missing-manuals-io_uring-worker-pool/
    */
+
+  // Using IORING_SETUP_SQPOLL will, by default, create two threads in your process, one named iou-sqp-TID, and the other named iou-wrk-TID.
   uint64_t iou_worker_count = 0; /* threads named "iou-wrk*" */
   uint64_t iou_sqp_count = 0;    /* threads named "iou-sqp*" */
 
@@ -226,7 +227,7 @@ uint32_t state_io_uring_artifacts_callback(vmi_instance_t vmi, void* context) {
 
   /* Loop safety: cap the number of visited tasks to avoid hangs if the list is corrupt. */
   /* Safety cap: abort if >1,048,576 tasks visited.
-   * Real systems rarely exceed ~10^5 (hoho) processes/threads; this upper bound
+   * Real systems rarely exceed ~10^5 (hihi) processes/threads; this upper bound
    * is far above practical counts but prevents infinite loops if the
    * task list is corrupted.
    */
@@ -252,7 +253,7 @@ uint32_t state_io_uring_artifacts_callback(vmi_instance_t vmi, void* context) {
 
     procname = vmi_read_str_va(vmi, current_task + name_offset, 0);
 
-    /* These names often belong to io_uring worker/sqpoll threads. Weak signal only. */
+    // These names often belong to io_uring worker/sqpoll threads. Weak signal only.
     if (procname) {
       if (g_str_has_prefix(procname, "iou-wrk"))
         iou_worker_count++;

@@ -15,7 +15,7 @@
 #include <stdint.h>
 
 /**
- * @brief Enumerate per-task io_uring artifacts from guest memory (read-only).
+ * @brief Enumerate per-task io_uring artifacts. Performs sanity-checks.
  *
  * Iterates the Linux task list (init_task->tasks) using profile offsets
  * (linux_tasks, linux_pid, linux_name). For each task_struct, inspects
@@ -27,7 +27,7 @@
  * regenerated (e.g., `pahole --hex vmlinux`) if the target kernel changes.
  *
  * @param vmi The VMI instance.
- * @param context  User-defined context (unused).
+ * @param context User-defined context [unused].
  * @return VMI_SUCCESS on successful inspection, else VMI_FAILURE.
  */
 uint32_t state_io_uring_artifacts_callback(vmi_instance_t vmi, void* context);

@@ -28,7 +28,7 @@
  *   network patterns commonly used by malicious kernel modules
  * 
  * Known Kernel Rootkit Ports:
- * * Port 666: Reptile rootkit default SRCPORT for port-knocking mechanism
+ * * Port 666: Reptile rootkit default for port-knocking mechanism
  *
  * @todo: Add more known rootkit ports / backdoors.
  * 

@@ -27,6 +27,7 @@
 
 event_response_t event_cr0_write_callback(vmi_instance_t vmi,
                                           vmi_event_t* event) {
+  // Preconditions
   if (!vmi || !event) {
     log_error("Invalid arguments to CR0 write callback.");
     return VMI_EVENT_INVALID;

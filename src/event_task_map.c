@@ -139,9 +139,13 @@ static vmi_event_t* setup_register_event(
 }
 
 static vmi_event_t* create_event_ftrace_hook(vmi_instance_t vmi) {
-  // Monitor writes to ftrace_ops structures
-  // This requires identifying ftrace registration functions
+  // Preconditions
+  if (!vmi) {
+    log_error("Invalid VMI instance at event registration.");
+    return NULL;
+  }
   addr_t ftrace_ops_addr = 0;
+  // Just monitor writes to ftrace_ops_list.
   if (vmi_translate_ksym2v(vmi, "ftrace_ops_list", &ftrace_ops_addr) !=
       VMI_SUCCESS) {
     log_warn(
@@ -154,6 +158,11 @@ static vmi_event_t* create_event_ftrace_hook(vmi_instance_t vmi) {
 }
 
 static vmi_event_t* create_event_syscall_table_write(vmi_instance_t vmi) {
+  // Preconditions
+  if (!vmi) {
+    log_error("Invalid VMI instance at event registration.");
+    return NULL;
+  }
   addr_t sys_call_table = 0;
   if (vmi_translate_ksym2v(vmi, "sys_call_table", &sys_call_table) !=
       VMI_SUCCESS) {
@@ -167,6 +176,11 @@ static vmi_event_t* create_event_syscall_table_write(vmi_instance_t vmi) {
 }
 
 static vmi_event_t* create_event_idt_write(vmi_instance_t vmi) {
+  // Preconditions
+  if (!vmi) {
+    log_error("Invalid VMI instance at event registration.");
+    return NULL;
+  }
   uint64_t idtr_base = 0;
   uint32_t vcpu_count = vmi_get_num_vcpus(vmi);
 
@@ -186,12 +200,22 @@ static vmi_event_t* create_event_idt_write(vmi_instance_t vmi) {
 }
 
 static vmi_event_t* create_event_cr0_write(vmi_instance_t vmi) {
+  // Preconditions
+  if (!vmi) {
+    log_error("Invalid VMI instance at event registration.");
+    return NULL;
+  }
   return setup_register_event(CR0, VMI_REGACCESS_W, event_cr0_write_callback);
 }
 
 static vmi_event_t* create_event_page_table_modification(vmi_instance_t vmi) {
+  // Preconditions
+  if (!vmi) {
+    log_error("Invalid VMI instance at event registration.");
+    return NULL;
+  }
   // Hypervisor shit
-  /* Get current CR3 (kernel CR3 on vCPU 0 is fine for a single baseline). */
+  // Get current CR3 (kernel CR3 on vCPU 0 is fine for a single baseline).
   uint64_t cr3 = 0;
   if (vmi_get_vcpureg(vmi, &cr3, CR3, 0) != VMI_SUCCESS) {
     log_error("PT watch: failed to read CR3");
@@ -229,28 +253,102 @@ static vmi_event_t* create_event_page_table_modification(vmi_instance_t vmi) {
   return event;
 }
 
+/**
+ * @brief Create the breakpoint on nf_register_net_hook / nf_register_net_hooks.
+ *
+ * Replaces the old memory-write watcher. Returns the first successfully
+ * registered BREAKPOINT event; caller registers it with LibVMI and keeps it alive.
+ */
 static vmi_event_t* create_event_netfilter_hook_write(vmi_instance_t vmi) {
-  // Monitor netfilter hook registration
-  addr_t nf_hooks = 0;
-  // nf_hooks is deprecated for newer kernels.
-  if (vmi_translate_ksym2v(vmi, "nf_hooks", &nf_hooks) != VMI_SUCCESS) {
-    log_warn("Failed to resolve nf_hooks symbol");
-    // Try alternative symbol
-    if (vmi_translate_ksym2v(vmi, "nf_hook_entries", &nf_hooks) !=
-        VMI_SUCCESS) {
-      log_error("Failed to repsolve netfilter hooks symbol");
-      return NULL;
-    }
+  // Preconditions
+  if (!vmi) {
+    log_error("Invalid VMI instance at event registration.");
+    return NULL;
   }
 
-  // Monitor netfilter hooks area
-  // TODO: Confirm 13 protocol families * 5 hook points
-  size_t nf_hooks_size = 13UL * 5 * sizeof(addr_t);
-  return setup_memory_event(nf_hooks, VMI_MEMACCESS_W,
-                            event_netfilter_hook_write_callback);
+  const char* candidates[] = {"nf_register_net_hook", "nf_register_net_hooks"};
+
+  for (size_t i = 0; i < sizeof(candidates) / sizeof(candidates[0]); i++) {
+    addr_t kaddr = 0;
+    if (vmi_translate_ksym2v(vmi, candidates[i], &kaddr) != VMI_SUCCESS ||
+        !kaddr) {
+      log_debug("Symbol not found: %s", candidates[i]);
+      continue;
+    }
+
+    uint8_t orig = 0;
+    if (vmi_read_8_va(vmi, kaddr, 0, &orig) != VMI_SUCCESS) {
+      log_warn("Failed reading first byte at %s @0x%" PRIx64, candidates[i],
+               (uint64_t)kaddr);
+      continue;
+    }
+
+    uint8_t cc = 0xCC;
+    if (vmi_write_8_va(vmi, kaddr, 0, &cc) != VMI_SUCCESS) {
+      log_warn("Failed planting INT3 at %s @0x%" PRIx64, candidates[i],
+               (uint64_t)kaddr);
+      continue;
+    }
+
+    // Allocate context and breakpoint event
+    nf_bp_ctx_t* ctx = (nf_bp_ctx_t*)g_malloc0(sizeof(*ctx));
+    if (!ctx) {
+      log_error("Failed to allocate nf_bp_ctx_t");
+      // Try to restore the byte we just patched (best-effort)
+      {
+        uint8_t val = orig;
+        (void)vmi_write_8_va(vmi, kaddr, 0, &val);
+      }
+      continue;
+    }
+    ctx->kaddr = kaddr;
+    ctx->orig = orig;
+    ctx->symname = candidates[i];
+
+    vmi_event_t* bp_evt = (vmi_event_t*)g_malloc0(sizeof(*bp_evt));
+    if (!bp_evt) {
+      log_error("Failed to allocate vmi_event_t");
+      {
+        uint8_t val = orig;
+        (void)vmi_write_8_va(vmi, kaddr, 0, &val);
+      }
+      g_free(ctx);
+      continue;
+    }
+
+    memset(bp_evt, 0, sizeof(*bp_evt));
+    bp_evt->version = VMI_EVENTS_VERSION;
+    bp_evt->type = VMI_EVENT_SINGLESTEP;
+    bp_evt->callback =
+        event_netfilter_hook_write_callback;  // exported name used in map
+    bp_evt->data = ctx;
+
+    if (vmi_register_event(vmi, bp_evt) != VMI_SUCCESS) {
+      log_warn("Failed to register BREAKPOINT event for %s", candidates[i]);
+      // Restore original byte on failure
+      {
+        uint8_t val = orig;
+        (void)vmi_write_8_va(vmi, kaddr, 0, &val);
+      }
+      g_free(ctx);
+      g_free(bp_evt);
+      continue;
+    }
+
+    log_info("Planted INT3 on %s @0x%" PRIx64, candidates[i], (uint64_t)kaddr);
+    return bp_evt;
+  }
+
+  log_error("No netfilter registration symbols could be hooked.");
+  return NULL;
 }
 
 static vmi_event_t* create_event_msr_write(vmi_instance_t vmi) {
+  // Preconditions
+  if (!vmi) {
+    log_error("Invalid VMI instance at event registration.");
+    return NULL;
+  }
   // Monitor all MSR writes
   (void)vmi;
   return setup_register_event(MSR_ALL, VMI_REGACCESS_W,
@@ -258,6 +356,11 @@ static vmi_event_t* create_event_msr_write(vmi_instance_t vmi) {
 }
 
 static vmi_event_t* create_event_code_section_modify(vmi_instance_t vmi) {
+  // Preconditions
+  if (!vmi) {
+    log_error("Invalid VMI instance at event registration.");
+    return NULL;
+  }
   addr_t text_start = 0, text_end = 0;
   if (vmi_translate_ksym2v(vmi, "_text", &text_start) != VMI_SUCCESS ||
       vmi_translate_ksym2v(vmi, "_etext", &text_end) != VMI_SUCCESS) {
@@ -289,6 +392,11 @@ static vmi_event_t* create_event_code_section_modify(vmi_instance_t vmi) {
 }
 
 static vmi_event_t* create_event_io_uring_ring_write(vmi_instance_t vmi) {
+  // Preconditions
+  if (!vmi) {
+    log_error("Invalid VMI instance at event registration.");
+    return NULL;
+  }
   addr_t kaddr = 0;
   const char* chosen_sym = NULL;
 
@@ -353,6 +461,11 @@ static vmi_event_t* create_event_io_uring_ring_write(vmi_instance_t vmi) {
 }
 
 static vmi_event_t* create_event_ebpf_map_update(vmi_instance_t vmi) {
+  // Preconditions
+  if (!vmi) {
+    log_error("Invalid VMI instance at event registration.");
+    return NULL;
+  }
   // Monitor eBPF map operations - complex as maps are dynamically allocated
   // Would need to hook bpf_map_update_elem function or similar
   log_warn("eBPF map monitoring requires dynamic map tracking");
@@ -362,6 +475,7 @@ static vmi_event_t* create_event_ebpf_map_update(vmi_instance_t vmi) {
 }
 
 int register_all_event_tasks(event_handler_t* event_handler) {
+  // Preconditions
   if (!event_handler) {
     log_error("Event handler is NULL");
     return -1;

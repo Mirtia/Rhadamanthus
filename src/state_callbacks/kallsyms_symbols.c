@@ -121,10 +121,9 @@ uint32_t state_kallsyms_symbols_callback(vmi_instance_t vmi, void* context) {
     }
   }
 
-  // Stats.
+  // Statistics to relatively match the Clueless-Admin's framework output.
   uint32_t total = 0, reachable = 0, zero_addr = 0, name_fail = 0,
            addr_fail = 0;
-  // TODO: Investigate outside_text further, on its own it's not a clear indicator.
   uint32_t in_text = 0, outside_text = 0;
   const bool have_text = (ktext_s && ktext_e && ktext_e > ktext_s);
 
@@ -138,7 +137,7 @@ uint32_t state_kallsyms_symbols_callback(vmi_instance_t vmi, void* context) {
     uint8_t comp_len = 0;
     if (vmi_read_8_va(vmi, names_cursor, 0, &comp_len) != VMI_SUCCESS) {
       name_fail++;
-      names_cursor += 1;  // try to advance minimally to avoid lock-up
+      names_cursor += 1;
       continue;
     }
     addr_t comp_codes = names_cursor + 1;
@@ -152,7 +151,7 @@ uint32_t state_kallsyms_symbols_callback(vmi_instance_t vmi, void* context) {
         name_ok = false;
         break;
       }
-      // Expand token => append chars from token_table until NUL.
+      // Expand token => append chars from token_table until NULL.
       uint16_t off = token_index[code];
       addr_t tcur = a_ttab + (addr_t)off;
       for (;;) {

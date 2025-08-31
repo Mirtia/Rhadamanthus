@@ -19,7 +19,8 @@
 struct pt_watch_ctx_t {
   addr_t
       pml4_pa;  ///< Physical address of PML4 page (CR3 base) (PML4 -> PDPT -> PD -> PT).
-  uint64_t shadow[512];  ///< Last-seen PML4 entries.
+  uint64_t shadow
+      [512];  ///< Last-seen PML4 entries (detect modifications over time, comparison with snapshot).
   uint8_t shadow_valid;  ///< 0 until we successfully snapshot once.
 };
 
@@ -28,7 +29,7 @@ typedef struct pt_watch_ctx_t pt_watch_ctx_t;
 /**
  * @brief Callback function for handling page table modification events.
  *
- * @details It is applicable for rootkits targeting hypervisors in x86_64 (see BluePill).
+ * @details It is applicable for rootkits targeting hypervisors in x86_64 (e.g. BluePill).
  *
  * @param vmi The VMI instance.
  * @param event The event that triggered the callback.
