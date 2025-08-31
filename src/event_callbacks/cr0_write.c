@@ -4,8 +4,8 @@
 #include <log.h>
 
 /*
- * CR0 control register semantics and attacker relevance. These definitions were taken from Intel® 64 and IA-32 Architectures
- * Software Developer’s Manual.
+ * CR0 control register semantics and attacker relevance. These definitions were taken from "Intel® 64 and IA-32 Architectures
+ * Software Developer’s Manual" (https://cdrdv2.intel.com/v1/dl/getContent/671200).
  *
  * * CR0.PE (bit 0): Enables protected-mode operation. Clearing this bit switches to real mode. 
  *   This flag does not enable paging directly. It only enables segment-level protection. To enable paging,
@@ -50,6 +50,7 @@ event_response_t event_cr0_write_callback(vmi_instance_t vmi,
            paging_enabled, write_protect, cache_disabled, alignment_mask);
 
   // Rootkits often clear write protection bit to modify read-only kernel structures (e.g. syscall table).
+  // TODO: Is there a scenario where a malicious actor modifies the CR0_CD?
   if (!(cr0_value & CR0_WP)) {
     log_warn(
         "Write protection disabled (WP=0)—possible kernel modification in "

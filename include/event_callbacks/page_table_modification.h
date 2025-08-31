@@ -1,7 +1,7 @@
 /**
  * @file page_table_modification.h
  * @author Myrsini Gkolemi
- * @brief 
+ * @brief This file monitors the page table modifications by tracking changes in the PML4 entries.
  * @version 0.0
  * @date 2025-08-24
  * 
@@ -13,15 +13,22 @@
 
 #include <libvmi/events.h>
 
-/* Tracks the PML4 page (CR3 & ~0xFFF) and a shadow copy of its 512 entries. */
-typedef struct {
-  addr_t pml4_pa;       /* physical address of PML4 page (CR3 base) */
-  uint64_t shadow[512]; /* last-seen PML4 entries */
-  uint8_t shadow_valid; /* 0 until we successfully snapshot once */
-} pt_watch_ctx_t;
+/**
+ * @brief Tracks the PML4 page (CR3 & ~0xFFF) and a shadow copy of its 512 entries 
+ */
+struct pt_watch_ctx_t {
+  addr_t
+      pml4_pa;  ///< Physical address of PML4 page (CR3 base) (PML4 -> PDPT -> PD -> PT).
+  uint64_t shadow[512];  ///< Last-seen PML4 entries.
+  uint8_t shadow_valid;  ///< 0 until we successfully snapshot once.
+};
+
+typedef struct pt_watch_ctx_t pt_watch_ctx_t;
 
 /**
  * @brief Callback function for handling page table modification events.
+ *
+ * @details It is applicable for rootkits targeting hypervisors in x86_64 (see BluePill).
  *
  * @param vmi The VMI instance.
  * @param event The event that triggered the callback.

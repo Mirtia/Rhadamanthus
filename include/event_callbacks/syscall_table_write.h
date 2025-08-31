@@ -1,7 +1,7 @@
 /**
  * @file syscall_table_write.h
  * @author Myrsini Gkolemi
- * @brief 
+ * @brief The file monitors the syscall table modifications.
  * @version 0.0
  * @date 2025-08-24
  * 

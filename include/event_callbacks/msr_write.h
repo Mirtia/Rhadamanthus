@@ -1,7 +1,7 @@
 /**
  * @file msr_write.h
  * @author Myrsini Gkolemi
- * @brief
+ * @brief The file monitors MSR register write events.
  * @version 0.0
  * @date 2025-08-24
  *

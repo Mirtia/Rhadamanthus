@@ -8,7 +8,7 @@
  * @brief Get the legitimate syscall entry point symbol
  *
  * @param vmi LibVMI instance
- * @param syscall_entry Output: legitimate syscall entry address
+ * @param syscall_entry legitimate syscall entry address
  * @return true on success, false on failure
  */
 static bool get_legitimate_syscall_entry(vmi_instance_t vmi,
@@ -17,10 +17,10 @@ static bool get_legitimate_syscall_entry(vmi_instance_t vmi,
     return false;
   }
 
-  // Try common syscall entry symbols (kernel version dependent)
+  // Try common syscall entry symbols.
   const char* syscall_symbols[] = {
-      "entry_SYSCALL_64",  // Modern kernels
-      "system_call",       // Older kernels (as mentioned in vvdveen's document)
+      "entry_SYSCALL_64",  ///< Modern kernels
+      "system_call",       ///< Older kernels (as mentioned in vvdveen's document)
       "entry_SYSCALL_64_after_hwframe", NULL};
 
   for (int i = 0; syscall_symbols[i] != NULL; i++) {
@@ -76,7 +76,6 @@ uint32_t state_msr_registers_callback(vmi_instance_t vmi, void* context) {
            "]",
            (uint64_t)kernel_start, (uint64_t)kernel_end);
 
-  // Get legitimate syscall entry point for comparison
   addr_t legitimate_syscall = 0;
   bool has_legitimate_ref =
       get_legitimate_syscall_entry(vmi, &legitimate_syscall);
@@ -93,7 +92,7 @@ uint32_t state_msr_registers_callback(vmi_instance_t vmi, void* context) {
   log_info("STATE_MSR_REGISTERS: Reading MSR_LSTAR state from %u vCPU(s).",
            num_vcpus);
 
-  // Read and report MSR_LSTAR state on each vCPU
+  // Read and report MSR_LSTAR state on each vCPU (same as IDT).
   for (unsigned int cpu = 0; cpu < num_vcpus; cpu++) {
     addr_t lstar_value = 0;
 
@@ -106,11 +105,7 @@ uint32_t state_msr_registers_callback(vmi_instance_t vmi, void* context) {
     log_info("STATE_MSR_REGISTERS: vCPU %u MSR_LSTAR: 0x%" PRIx64, cpu,
              (uint64_t)lstar_value);
 
-    // Check if MSR_LSTAR points within kernel text bounds
-    bool within_kernel_text =
-        (lstar_value >= kernel_start && lstar_value <= kernel_end);
-
-    if (!within_kernel_text) {
+    if (!is_in_kernel_text(vmi, lstar_value)) {
       log_info(
           "STATE_MSR_REGISTERS: vCPU %u MSR_LSTAR points outside kernel text "
           "section (0x%" PRIx64 " not in [0x%" PRIx64 ", 0x%" PRIx64 "])",
@@ -122,7 +117,6 @@ uint32_t state_msr_registers_callback(vmi_instance_t vmi, void* context) {
           cpu);
     }
 
-    // Report if differs from expected syscall entry
     if (has_legitimate_ref && lstar_value != legitimate_syscall) {
       log_info(
           "STATE_MSR_REGISTERS: vCPU %u MSR_LSTAR differs from expected "

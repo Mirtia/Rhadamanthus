@@ -22,7 +22,10 @@ typedef struct {
 /**
  * @brief Check if a task_struct represents a kernel thread.
  *
- * Kernel threads have their mm field set to NULL.
+ * @note Kernel threads have their mm field set to NULL."tsk->mm" points to the "real address space". 
+ * For an anonymous process, tsk->mm will be NULL, for the logical reason that an anonymous process
+ * really doesn't have a real address space at all.
+ * https://docs.kernel.org/mm/active_mm.html
  *
  * @param vmi VMI instance.
  * @param task_struct Address of the task_struct.
@@ -32,11 +35,6 @@ typedef struct {
 static bool is_kernel_thread(vmi_instance_t vmi, addr_t task_struct,
                              unsigned long mm_offset) {
   addr_t mm_addr = 0;
-  // Kernel threads have mm == NULL
-  // Note: "tsk->mm" points to the "real address space". For an anonymous process,
-  // tsk->mm will be NULL, for the logical reason that an anonymous process
-  // really doesn't _have_ a real address space at all.
-  // https://docs.kernel.org/mm/active_mm.html
   if (vmi_read_addr_va(vmi, task_struct + mm_offset, 0, &mm_addr) !=
       VMI_SUCCESS) {
     log_debug("Failed to read mm field at 0x%" PRIx64, task_struct);
@@ -147,7 +145,6 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
 
   uint32_t total_processes = 0, kernel_threads = 0, user_processes = 0;
 
-  // Get init_task address
   if (vmi_translate_ksym2v(vmi, "init_task", &list_head) != VMI_SUCCESS) {
     log_error("STATE_PROCESS_LIST_CALLBACK: Failed to resolve init_task");
     return VMI_FAILURE;
@@ -169,7 +166,6 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
 
   list_head += linux_tasks_offset;
 
-  // Read first task pointer
   if (vmi_read_addr_va(vmi, list_head, 0, &next_list_entry) != VMI_SUCCESS) {
     log_error("STATE_PROCESS_LIST_CALLBACK: Failed to read first task pointer");
     return VMI_FAILURE;
@@ -179,7 +175,6 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
   cur_list_entry = list_head;
 
   do {
-    // Initialize for this iteration
     memset(&proc_info, 0, sizeof(proc_info));
     current_process = cur_list_entry - tasks_offset;
     proc_info.task_struct_addr = current_process;
@@ -217,11 +212,9 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
         proc_info.state = 0xFFFFFFFF;
       }
 
-      // Determine if kernel thread
       proc_info.is_kernel_thread =
           is_kernel_thread(vmi, current_process, mm_offset);
 
-      // Read credentials for user processes
       if (!proc_info.is_kernel_thread) {
         if (!read_process_credentials(vmi, current_process, LINUX_CRED_OFFSET,
                                       &proc_info)) {
@@ -229,7 +222,7 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
               "STATE_PROCESS_LIST_CALLBACK: Failed to read credentials for PID "
               "%u",
               proc_info.pid);
-          // Continue anyway, just mark credentials as invalid
+          // Continue anyway, just mark credentials as invalid.
           proc_info.uid = proc_info.gid = proc_info.euid = proc_info.egid =
               0xFFFFFFFF;
         }

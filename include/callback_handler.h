@@ -3,9 +3,8 @@
 
 #include "event_handler.h"
 
-// Type definitions for state and event task IDs.
-typedef uint32_t (*state_task_callback_t)(vmi_instance_t, void*);
-typedef event_response_t (*event_task_callback_t)(vmi_instance_t, vmi_event_t*);
+// typedef uint32_t (*state_task_callback_t)(vmi_instance_t, void*);
+// typedef event_response_t (*event_task_callback_t)(vmi_instance_t, vmi_event_t*);
 
 /**
  * @brief Get the callback function for a given state task ID.

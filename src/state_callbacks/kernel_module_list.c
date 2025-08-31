@@ -68,7 +68,6 @@ uint32_t state_kernel_module_list_callback(vmi_instance_t vmi, void* context) {
       g_free(modname);
     }
 
-    // Advance: read next list node (list_head.next) from the current node
     if (vmi_read_addr_va(vmi, cur_node, 0, &cur_node) != VMI_SUCCESS) {
       log_warn(
           "STATE_KERNEL_MODULE_LIST: Failed to read list->next at 0x%" PRIx64,

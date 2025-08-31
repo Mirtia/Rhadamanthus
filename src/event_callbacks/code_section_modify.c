@@ -7,13 +7,10 @@
 
 /**
  * @brief Resolve the nearest kernel symbol for a given virtual address.
- *
- * @details LibVMI exposes vmi_translate_v2ksym() which looks up
- * the closest symbol from the loaded System.map (KASLR handled by LibVMI).
  * 
  * @param vmi LibVMI instance.
  * @param virtual_addr Virtual address to resolve.
- * @return const char* Nearest kernel symbol name, or NULL if not found.
+ * @return const char* Nearest (first-match) kernel symbol name, or NULL if not found.
  */
 static inline const char* resolve_kernel_symbol(vmi_instance_t vmi,
                                                 addr_t virtual_addr) {
@@ -39,7 +36,7 @@ event_response_t event_code_section_modify_callback(vmi_instance_t vmi,
   (void)vmi_get_vcpureg(vmi, &rip, RIP, vcpu_id);
 
   const addr_t write_gla = event->mem_event.gla;
-  // On x86-64 with 4 KiB pages, the lowest 12 bits (page offset) are
+  // On x86_64 with 4 KiB pages, the lowest 12 bits (page offset) are
   // preserved by the MMU translation, GFN indexes 4 KiB frames.
   const addr_t write_gpa = (event->mem_event.gfn << 12)  // 4 KiB page base.
                            |

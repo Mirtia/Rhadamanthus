@@ -10,7 +10,6 @@
 
 /**
 * @brief TCP connection states.
-* TODO: Check if more states are needed (kernel dependent).
 */
 typedef enum {
   TCP_ESTABLISHED = 1,
@@ -38,7 +37,7 @@ typedef struct {
   uint32_t remote_ip;    ///< Remote IP address.
   uint16_t local_port;   ///< Local port number.
   uint16_t remote_port;  ///< Remote port number.
-  uint32_t state;        ///< State (e.g tcp_state_t).
+  uint32_t state;        ///< State (tcp_state_t).
   vmi_pid_t pid;         //< Process ID associated with the connection.
   addr_t sock_addr;      ///< Socket address in kernel memory.
 } network_connection_t;
@@ -114,6 +113,7 @@ static bool is_suspicious_port(uint16_t port) {
   size_t count = sizeof(suspicious_ports) / sizeof(suspicious_ports[0]);
   for (size_t i = 0; i < count; i++) {
     if (port == suspicious_ports[i]) {
+      // TODO: Very frequent logging. May comment out in the future.
       // log_debug("Suspicious port detected: %u", port);
       return true;
     }
@@ -121,6 +121,7 @@ static bool is_suspicious_port(uint16_t port) {
 
   // High ports that are unusual for legitimate services.
   if (port >= 60000 && port <= 65534) {
+    // TODO: Very frequent logging. May comment out in the future.
     // log_debug("High range suspicious port detected: %u", port);
     return true;
   }
@@ -129,7 +130,7 @@ static bool is_suspicious_port(uint16_t port) {
 }
 
 static inline bool ipv4_is_public(uint32_t ip_be) {
-  uint32_t ip_addr = ntohl(ip_be);  // compare in host byte order
+  uint32_t ip_addr = ntohl(ip_be);
 
 // Helper: test if ip is inside CIDR (base/maskbits in host order)
 #define IN(ip_addr_, base_, maskbits_)                              \
@@ -137,7 +138,7 @@ static inline bool ipv4_is_public(uint32_t ip_be) {
     ((maskbits_) == 0 ? 0u : 0xFFFFFFFFu << (32 - (maskbits_)))) == \
    ((base_) & ((maskbits_) == 0 ? 0u : 0xFFFFFFFFu << (32 - (maskbits_)))))
 
-  // ---- Non-public ranges per IANA Special-Purpose Address Registry & RFCs ----
+  // Non-public ranges per IANA Special-Purpose Address Registry & RFCs:
   // IANA IPv4 Special-Purpose Address Registry (authoritative index):
   // https://www.iana.org/assignments/iana-ipv4-special-registry  (covers many items below)
   // RFC 6890 (Special-Purpose IP Address Registries): https://datatracker.ietf.org/doc/html/rfc6890
@@ -266,8 +267,7 @@ static bool is_suspicious_ip(uint32_t ip_addr) {
 /**
  * @brief Walk the TCP hash table to find hidden connections (improved version).
  * 
- * This version actually extracts connection details from socket structures
- * instead of just counting connections.
+ * @details The TCP hash table 
  * 
  * @param vmi The VMI instance.
  * @param ctx The detection context containing state and results.
@@ -602,13 +602,11 @@ uint32_t state_network_trace_callback(vmi_instance_t vmi, void* context) {
       g_array_new(FALSE, TRUE, sizeof(network_connection_t));
   detection_context.suspicious_count = 0;
 
-  // Check netfilter hooks for modifications
   if (check_netfilter_hooks(vmi, &detection_context) != VMI_SUCCESS) {
     log_error("STATE_NETWORK_TRACE_CALLBACK: Failed to check netfilter hooks");
     return VMI_FAILURE;
   }
 
-  // Walk kernel network structures directly
   if (walk_tcp_hash_table(vmi, &detection_context) != VMI_SUCCESS) {
     log_error("STATE_NETWORK_TRACE_CALLBACK: Failed to walk TCP hash tables");
     return VMI_FAILURE;

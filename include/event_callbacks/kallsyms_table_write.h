@@ -1,7 +1,7 @@
 /**
  * @file kallsyms_table_write.h
  * @author Myrsini Gkolemi
- * @brief 
+ * @brief The file monitors kernel symbols modifications.
  * @version 0.0
  * @date 2025-08-24
  * 
@@ -19,7 +19,7 @@
  * @param event The event that triggered the callback.
  * @return event_response_t VMI_EVENT_RESPONSE_NONE (general monitoring).
  */
-event_response_t event_kallsyms_table_write_callback(vmi_instance_t vmi,
+event_response_t event_kallsyms_write_callback(vmi_instance_t vmi,
                                                       vmi_event_t* event);
 
 #endif  // KALLSYMS_TABLE_WRITE_H

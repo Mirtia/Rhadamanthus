@@ -9,9 +9,7 @@
 #include "event_handler.h"
 #include "utils.h"
 
-#ifndef KSYM_MAX_NAME
-#define KSYM_MAX_NAME 1024
-#endif
+#define KSYM_MAX_NAME 1024  // Max symbol name length.
 
 // NOLINTNEXTLINE
 uint32_t state_kallsyms_symbols_callback(vmi_instance_t vmi, void* context) {
@@ -35,7 +33,6 @@ uint32_t state_kallsyms_symbols_callback(vmi_instance_t vmi, void* context) {
   // Detect guest pointer width.
   const bool is_64 = (vmi_get_page_mode(vmi, 0) == VMI_PM_IA32E);
 
-  // Resolve core kallsyms structures.
   addr_t a_num = 0, a_names = 0, a_ttab = 0, a_tidx = 0;
   if (vmi_translate_ksym2v(vmi, "kallsyms_num_syms", &a_num) != VMI_SUCCESS ||
       vmi_translate_ksym2v(vmi, "kallsyms_names", &a_names) != VMI_SUCCESS ||
@@ -87,7 +84,6 @@ uint32_t state_kallsyms_symbols_callback(vmi_instance_t vmi, void* context) {
     }
   }
 
-  // Optional: kernel text bounds for classification.
   addr_t ktext_s = 0, ktext_e = 0;
   if (get_kernel_text_section_range(vmi, &ktext_s, &ktext_e) != VMI_SUCCESS) {
     log_warn(

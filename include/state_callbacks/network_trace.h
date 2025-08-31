@@ -16,21 +16,21 @@
 /**
  * @brief Network rootkit detection callback for VMI-based security monitoring
  * 
- * This callback performs comprehensive network-level rootkit detection by analyzing
+ * This callback performs comprehensive network level rootkit detection by analyzing
  * kernel networking structures and identifying suspicious network activities that
  * may indicate the presence of kernel-mode rootkits.
  * 
- * Detection Methods:
- * - Netfilter hook analysis: Detects unauthorized or excessive netfilter hooks
+ * * Netfilter hook analysis: Detects unauthorized or excessive netfilter hooks
  *   that rootkits use to filter network traffic visibility
- * - Direct TCP hash table walking: Bypasses normal networking APIs to find
+ * * Direct TCP hash table walking: Bypasses normal networking APIs to find
  *   connections hidden from /proc/net/tcp by rootkit manipulation
- * - Suspicious pattern detection: Identifies known rootkit ports and unusual
+ * * Suspicious pattern detection: Identifies known rootkit ports and unusual
  *   network patterns commonly used by malicious kernel modules
  * 
- * Verified Kernel Rootkit Ports:
- * - Port 666: Reptile rootkit default SRCPORT for port-knocking mechanism
- * - TODO: Add more known rootkit ports.
+ * Known Kernel Rootkit Ports:
+ * * Port 666: Reptile rootkit default SRCPORT for port-knocking mechanism
+ *
+ * @todo: Add more known rootkit ports / backdoors.
  * 
  * @param vmi The VMI instance.
  * @param context User-defined context [unused].

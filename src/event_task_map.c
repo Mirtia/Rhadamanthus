@@ -16,7 +16,7 @@
 
 #define PAGE_SIZE 4096  ///< X86_64 page size
 
-// Event creation functions, early declarations for map.
+// Event creation functions, early declarations for the map later on.
 static vmi_event_t* create_event_ftrace_hook(vmi_instance_t vmi);
 static vmi_event_t* create_event_syscall_table_write(vmi_instance_t vmi);
 static vmi_event_t* create_event_idt_write(vmi_instance_t vmi);
@@ -36,7 +36,9 @@ static vmi_event_t* setup_register_event(
     reg_t reg, vmi_reg_access_t access_type,
     event_response_t (*callback)(vmi_instance_t, vmi_event_t*));
 
-// Event task mapping structure
+/**
+ * @brief Event task mapping structure
+ */
 typedef struct {
   event_task_id_t task_id;
   vmi_event_t* (*create_func)(vmi_instance_t vmi);
@@ -88,7 +90,7 @@ static const event_task_map_entry_t event_task_map[] = {
      .description = "eBPF map update detection"},
     {.task_id = EVENT_KALLSYMS_TABLE_WRITE,
      .create_func = create_event_kallsyms_table_write,
-     .callback = event_kallsyms_table_write_callback,
+     .callback = event_kallsyms_write_callback,
      .description = "Kernel symbol table modification detection"}};
 
 static const size_t event_task_map_size =
@@ -98,7 +100,8 @@ static vmi_event_t* setup_memory_event(
     //NOLINTNEXTLINE
     addr_t addr, vmi_mem_access_t access_type,
     event_response_t (*callback)(vmi_instance_t, vmi_event_t*)) {
-  vmi_event_t* event = g_malloc0(sizeof(vmi_event_t));
+
+  vmi_event_t* event = g_new0(vmi_event_t, 1);
   if (event == NULL) {
     log_error("Failed to allocate memory for vmi_event_t");
     return NULL;
@@ -119,7 +122,8 @@ static vmi_event_t* setup_register_event(
     // NOLINTNEXTLINE
     reg_t reg, vmi_reg_access_t access_type,
     event_response_t (*callback)(vmi_instance_t, vmi_event_t*)) {
-  vmi_event_t* event = g_malloc0(sizeof(vmi_event_t));
+  // g_new is encouraged for type safety
+  vmi_event_t* event = g_new0(vmi_event_t, 1);
   if (event == NULL) {
     log_error("Failed to allocate memory for vmi_event_t");
     return NULL;
@@ -469,7 +473,7 @@ static vmi_event_t* create_event_kallsyms_table_write(vmi_instance_t vmi) {
   }
 
   SETUP_MEM_EVENT(event, kallsyms_addresses, VMI_MEMACCESS_W,
-                  event_kallsyms_table_write_callback, kallsyms_size);
+                  event_kallsyms_write_callback, kallsyms_size);
 
   return event;
 }

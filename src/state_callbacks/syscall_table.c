@@ -87,9 +87,9 @@ uint32_t state_syscall_table_callback(vmi_instance_t vmi, void* context) {
     log_error("STATE_SYSCALL_TABLE: Invalid input parameters.");
     return VMI_FAILURE;
   }
-  // Check if vm is paused by checking the context (event_handler).
+
   event_handler_t* event_handler = (event_handler_t*)context;
-  // Note: By not having a paused VM we risk inconsistent state between information gathering (reads).
+  // By not having a paused VM we risk inconsistent state between information gathering (reads).
   if (!event_handler || !event_handler->is_paused) {
     log_error("STATE_SYSCALL_TABLE: Callback requires a paused VM.");
     return VMI_FAILURE;
@@ -98,7 +98,7 @@ uint32_t state_syscall_table_callback(vmi_instance_t vmi, void* context) {
   log_info("Executing STATE_SYSCALL_TABLE callback.");
 
   size_t syscall_number = 0;
-  // In data folder there is an index of the system calls available to the target system.
+  // In `data` folder, in the root repository, there is an index of the system calls available to the target system.
   char** sys_index = parse_syscall_index_file(&syscall_number);
   if (!sys_index)
     return VMI_FAILURE;
@@ -126,7 +126,8 @@ uint32_t state_syscall_table_callback(vmi_instance_t vmi, void* context) {
     return VMI_FAILURE;
   }
 
-  log_info(".text range: 0x%" PRIx64 " - 0x%" PRIx64, kernel_start, kernel_end);
+  log_info("STATE_SYSCALL_TABLE: .text range: 0x%" PRIx64 " - 0x%" PRIx64,
+           kernel_start, kernel_end);
 
   for (size_t i = 0; i < syscall_number; ++i) {
     if (vmi_read_addr_va(vmi, sys_call_table_addr + i * sizeof(addr_t), 0,
@@ -136,7 +137,8 @@ uint32_t state_syscall_table_callback(vmi_instance_t vmi, void* context) {
           i);
       continue;
     }
-
+    
+    // It is suspicious that the hook is outside the kernel text section.
     if (sys_call_addr < kernel_start || sys_call_addr > kernel_end) {
       log_warn("STATE_SYSCALL_TABLE: Hook detected: syscall %s at 0x%" PRIx64,
                sys_index[i], sys_call_addr);

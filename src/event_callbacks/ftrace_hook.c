@@ -1,10 +1,11 @@
 #include "event_callbacks/ftrace_hook.h"
 #include <log.h>
+#include <inttypes.h>
 
 event_response_t event_ftrace_hook_callback(vmi_instance_t vmi,
                                             vmi_event_t* event) {
-    if (!event) {
-        log_error("Ftrace hook event: null event pointer");
+    if (!vmi || !event) {
+        log_error("FTRACE_HOOK: Invalid callback arguments.");
         return VMI_EVENT_RESPONSE_NONE;
     }
 

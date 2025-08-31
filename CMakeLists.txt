@@ -22,7 +22,6 @@ add_library(vmi_event_handler STATIC
     src/event_handler.c
     src/config_parser.c
     src/serializer.c
-    src/callback_handler.c
     src/state_task_map.c
     src/event_task_map.c
     src/utils.c

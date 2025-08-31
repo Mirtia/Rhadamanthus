@@ -231,21 +231,6 @@ static void log_hook_modification(const hook_modification_t* mod) {
  */
 static bool is_netfilter_hook_write(vmi_instance_t vmi, vmi_event_t* event) {
   addr_t write_addr = event->mem_event.gla;
-  
-  // Quick sanity checks
-  if (!write_addr || write_addr < 0xffff000000000000ULL) {
-    return false; // Not in kernel space
-  }
-
-  // Check if write size matches pointer size (hooks are typically function pointers)
-  if (event->mem_event.bytes != sizeof(addr_t)) {
-    return false;
-  }
-
-  // We could do more sophisticated checking here to verify this is actually
-  // a netfilter hook structure, but for now we'll rely on the fact that
-  // this callback should only be triggered for relevant memory regions
-  
   return true;
 }
 

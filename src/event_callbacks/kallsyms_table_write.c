@@ -2,22 +2,22 @@
 #include <inttypes.h>
 #include <log.h>
 
-event_response_t event_kallsyms_table_write_callback(vmi_instance_t vmi,
-                                                     vmi_event_t* event) {
-
-  if (!vmi || !event) {
-    log_error("Invalid arguments to kallsyms table write callback.");
+event_response_t event_kallsyms_write_callback(vmi_instance_t vmi,
+                                               vmi_event_t* event) {
+  (void)vmi;
+  // Preconditions
+  if (!event) {
+    log_error(
+        "KALLSYMS_WRITE: Invalid arguments to kallsyms table write callback.");
     return VMI_EVENT_INVALID;
   }
 
   uint32_t vcpu_id = event->vcpu_id;
   addr_t gla = event->mem_event.gla;
-  addr_t gpa = event->mem_event.gfn << 12;
+  addr_t gpa = (event->mem_event.gfn << 12) | event->mem_event.offset;
 
-  log_warn("KALLSYMS WRITE Event: VCPU: %u GLA: 0x%" PRIx64 " GPA: 0x%" PRIx64,
+  log_warn("KALLSYMS_WRITE Event: VCPU: %u GLA: 0x%" PRIx64 " GPA: 0x%" PRIx64,
            vcpu_id, gla, gpa);
-
-  log_info("Invoking kallsyms state check for deeper analysis...");
 
   return VMI_EVENT_RESPONSE_NONE;
 }

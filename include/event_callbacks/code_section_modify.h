@@ -1,7 +1,7 @@
 /**
  * @file code_section_modify.h
  * @author Myrsini Gkolemi
- * @brief 
+ * @brief The file monitors code section modifications.
  * @version 0.0
  * @date 2025-08-24
  * 

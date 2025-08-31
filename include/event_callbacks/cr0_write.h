@@ -1,7 +1,7 @@
 /**
  * @file cr0_write.h
  * @author Myrsini Gkolemi
- * @brief
+ * @brief This file monitors CR0 register write events.
  * @version 0.0
  * @date 2025-08-24
  *
