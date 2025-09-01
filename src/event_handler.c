@@ -54,8 +54,8 @@ const char* event_task_id_to_str(event_task_id_t task_id) {
       return "EVENT_CODE_SECTION_MODIFY";
     case EVENT_IO_URING_RING_WRITE:
       return "EVENT_IO_URING_RING_WRITE";
-    case EVENT_EBPF_MAP_UPDATE:
-      return "EVENT_EBPF_MAP_UPDATE";
+    case EVENT_EBPF_PROBE:
+      return "EVENT_EBPF_PROBE";
     case EVENT_KALLSYMS_TABLE_WRITE:
       return "EVENT_KALLSYMS_TABLE_WRITE";
     default:
@@ -177,7 +177,6 @@ void event_handler_register_state_task(event_handler_t* event_handler,
   task->id = task_id;
   task->functor = functor;
 
-  // TODO: Each task_id should be associated with a specific functor (callback).
   event_handler->state_tasks[task_id] = task;
 }
 
@@ -337,8 +336,7 @@ void sample_state_tasks(event_handler_t* event_handler) {
     return;
   }
 
-  // TODO (improvement): State sampling if accessing separate kernel data structures could be split to threads.
-  // This would definitely be a performance issue.
+  // TODO: Investigate. This would definitely be a performance issue.
   for (int i = 0; i < STATE_TASK_ID_MAX; ++i) {
     state_task_t* task = event_handler->state_tasks[i];
     if (task && task->functor) {

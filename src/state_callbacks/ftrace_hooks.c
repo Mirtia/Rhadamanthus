@@ -9,7 +9,7 @@
 
 /**
  * @brief Ftrace flags from the PoC that indicate hooking 
- * See ftrace-hook: https://github.com/ilammy/ftrace-hook/blob/master/ftrace_hook.c
+ * See: https://github.com/ilammy/ftrace-hook/blob/master/ftrace_hook.c
  */
 #define FTRACE_OPS_FL_SAVE_REGS (1 << 1)
 #define FTRACE_OPS_FL_RECURSION (1 << 13)
@@ -60,7 +60,7 @@ static bool is_hooking_flags_pattern(unsigned long flags) {
 /**
  * @brief Analyze a single ftrace_ops structure for hooking patterns
  *
- * @param vmi The ibVMI instance.
+ * @param vmi The LibVMI instance.
  * @param ops_addr Address of ftrace_ops structure.
  * @param ops_num Operation number for logging.
  * @param kernel_start Start of kernel text section.
@@ -75,8 +75,8 @@ static bool analyze_ftrace_ops_for_hooks(vmi_instance_t vmi, addr_t ops_addr,
   addr_t func_addr = 0;
   if (vmi_read_addr_va(vmi, ops_addr + LINUX_FTRACE_OPS_FUNC_OFFSET, 0,
                        &func_addr) != VMI_SUCCESS) {
-    log_warn("Failed to read ftrace func at 0x%" PRIx64,
-             ops_addr + LINUX_FTRACE_OPS_FUNC_OFFSET);
+    log_debug("Failed to read ftrace func at 0x%" PRIx64,
+              ops_addr + LINUX_FTRACE_OPS_FUNC_OFFSET);
     return false;
   }
 
@@ -84,8 +84,8 @@ static bool analyze_ftrace_ops_for_hooks(vmi_instance_t vmi, addr_t ops_addr,
   unsigned long flags = 0;
   if (vmi_read_64_va(vmi, ops_addr + LINUX_FTRACE_OPS_FLAGS_OFFSET, 0,
                      &flags) != VMI_SUCCESS) {
-    log_warn("Failed to read ftrace flags at 0x%" PRIx64,
-             ops_addr + LINUX_FTRACE_OPS_FLAGS_OFFSET);
+    log_debug("Failed to read ftrace flags at 0x%" PRIx64,
+              ops_addr + LINUX_FTRACE_OPS_FLAGS_OFFSET);
     return false;
   }
 
@@ -99,21 +99,22 @@ static bool analyze_ftrace_ops_for_hooks(vmi_instance_t vmi, addr_t ops_addr,
   vmi_read_addr_va(vmi, ops_addr + LINUX_FTRACE_OPS_SAVED_FUNC_OFFSET, 0,
                    &saved_func);
 
-  log_info("Ftrace Operation %d [0x%" PRIx64 "]:", ops_num, (uint64_t)ops_addr);
-  log_info("Function: 0x%" PRIx64, (uint64_t)func_addr);
-  log_info("Flags: 0x%lx", flags);
+  log_debug("Ftrace Operation %d [0x%" PRIx64 "]:", ops_num,
+            (uint64_t)ops_addr);
+  log_debug("  Function: 0x%" PRIx64, (uint64_t)func_addr);
+  log_debug("  Flags: 0x%lx", flags);
   if (trampoline_addr != 0) {
-    log_info("  Trampoline: 0x%" PRIx64, (uint64_t)trampoline_addr);
+    log_debug("  Trampoline: 0x%" PRIx64, (uint64_t)trampoline_addr);
   }
   if (saved_func != 0) {
-    log_info("  Saved Function: 0x%" PRIx64, (uint64_t)saved_func);
+    log_debug("  Saved Function: 0x%" PRIx64, (uint64_t)saved_func);
   }
 
   bool suspicious = false;
 
   // Check for hooking flag pattern (like in the PoC)
   if (is_hooking_flags_pattern(flags)) {
-    log_warn(
+    log_debug(
         "  HOOK DETECTED: Flags match hooking pattern "
         "(SAVE_REGS|RECURSION|IPMODIFY)");
     suspicious = true;
@@ -121,23 +122,24 @@ static bool analyze_ftrace_ops_for_hooks(vmi_instance_t vmi, addr_t ops_addr,
 
   // Check if function is outside kernel text (indicates module hooking)
   if (func_addr < kernel_start || func_addr > kernel_end) {
-    log_warn("  HOOK DETECTED: Function 0x%" PRIx64
-             " is outside kernel text (likely module)",
-             (uint64_t)func_addr);
+    log_debug("  HOOK DETECTED: Function 0x%" PRIx64
+              " is outside kernel text (likely module)",
+              (uint64_t)func_addr);
     suspicious = true;
   }
 
   // Check trampoline legitimacy
   if (trampoline_addr != 0 &&
       (trampoline_addr < kernel_start || trampoline_addr > kernel_end)) {
-    log_warn("  HOOK DETECTED: Trampoline 0x%" PRIx64 " is outside kernel text",
-             (uint64_t)trampoline_addr);
+    log_debug("  HOOK DETECTED: Trampoline 0x%" PRIx64
+              " is outside kernel text",
+              (uint64_t)trampoline_addr);
     suspicious = true;
   }
 
   // Check for the specific thunk pattern from the PoC
   if (flags & FTRACE_OPS_FL_IPMODIFY) {
-    log_warn(
+    log_debug(
         "  HOOK DETECTED: Function modifies instruction pointer (IPMODIFY "
         "flag)");
     suspicious = true;
@@ -145,7 +147,7 @@ static bool analyze_ftrace_ops_for_hooks(vmi_instance_t vmi, addr_t ops_addr,
 
   // If we have both original and hook functions, that's very suspicious
   if (saved_func != 0 && func_addr != 0 && saved_func != func_addr) {
-    log_warn(
+    log_debug(
         "  HOOK DETECTED: Different function and saved_func addresses (clear "
         "hooking)");
     suspicious = true;
@@ -157,13 +159,13 @@ static bool analyze_ftrace_ops_for_hooks(vmi_instance_t vmi, addr_t ops_addr,
 /**
  * @brief Check if any commonly targeted syscalls are being traced
  *
- * @param vmi LibVMI instance
- * @return Number of hooked syscalls detected
+ * @param vmi LibVMI instance.
+ * @return Number of hooked syscalls detected.
  */
 static int check_commonly_hooked_syscalls(vmi_instance_t vmi) {
   int hooked_count = 0;
 
-  log_info("Checking if commonly targeted syscalls have active ftrace...");
+  log_debug("Checking if commonly targeted syscalls have active ftrace...");
 
   for (int i = 0; commonly_hooked_syscalls[i] != NULL; i++) {
     addr_t syscall_addr = 0;
@@ -171,8 +173,8 @@ static int check_commonly_hooked_syscalls(vmi_instance_t vmi) {
     // Try to resolve the syscall address
     if (vmi_translate_ksym2v(vmi, commonly_hooked_syscalls[i], &syscall_addr) ==
         VMI_SUCCESS) {
-      log_info("Found syscall %s at 0x%" PRIx64, commonly_hooked_syscalls[i],
-               (uint64_t)syscall_addr);
+      log_debug("Found syscall %s at 0x%" PRIx64, commonly_hooked_syscalls[i],
+                (uint64_t)syscall_addr);
 
       // TODO: Check if this specific function has ftrace enabled.
     }
@@ -196,29 +198,29 @@ static int walk_ftrace_ops_list(vmi_instance_t vmi, addr_t kernel_start,
   // Try to find the global ftrace ops list
   if (vmi_translate_ksym2v(vmi, "ftrace_ops_list", &ftrace_ops_list_addr) !=
       VMI_SUCCESS) {
-    log_warn("Failed to resolve ftrace_ops_list - trying alternative symbols");
+    log_debug("Failed to resolve ftrace_ops_list - trying alternative symbols");
 
     // Try alternative symbol names
     if (vmi_translate_ksym2v(vmi, "ftrace_global_list",
                              &ftrace_ops_list_addr) != VMI_SUCCESS) {
-      log_error("Could not find ftrace operations list");
+      log_debug("Could not find ftrace operations list");
       return 0;
     }
   }
 
-  log_info("Found ftrace_ops_list at: 0x%" PRIx64,
-           (uint64_t)ftrace_ops_list_addr);
+  log_debug("Found ftrace_ops_list at: 0x%" PRIx64,
+            (uint64_t)ftrace_ops_list_addr);
 
   // Read the first ftrace_ops pointer
   addr_t current_ops = 0;
   if (vmi_read_addr_va(vmi, ftrace_ops_list_addr, 0, &current_ops) !=
       VMI_SUCCESS) {
-    log_error("Failed to read first ftrace_ops pointer");
+    log_debug("Failed to read first ftrace_ops pointer");
     return 0;
   }
 
   if (current_ops == 0) {
-    log_info("No active ftrace operations found");
+    log_debug("No active ftrace operations found");
     return 0;
   }
 
@@ -226,8 +228,8 @@ static int walk_ftrace_ops_list(vmi_instance_t vmi, addr_t kernel_start,
   int ops_count = 0;
   addr_t first_ops = current_ops;
 
-  log_info("Walking ftrace operations list starting at 0x%" PRIx64,
-           (uint64_t)current_ops);
+  log_debug("Walking ftrace operations list starting at 0x%" PRIx64,
+            (uint64_t)current_ops);
 
   // Walk the linked list of ftrace_ops
   do {
@@ -242,7 +244,7 @@ static int walk_ftrace_ops_list(vmi_instance_t vmi, addr_t kernel_start,
     addr_t next_ops = 0;
     if (vmi_read_addr_va(vmi, current_ops + LINUX_FTRACE_OPS_NEXT_OFFSET, 0,
                          &next_ops) != VMI_SUCCESS) {
-      log_warn("Failed to read next ftrace_ops pointer");
+      log_debug("Failed to read next ftrace_ops pointer");
       break;
     }
 
@@ -255,8 +257,8 @@ static int walk_ftrace_ops_list(vmi_instance_t vmi, addr_t kernel_start,
 
   } while (current_ops != 0);
 
-  log_info("Analyzed %d ftrace operations, %d suspicious", ops_count,
-           suspicious_count);
+  log_debug("Analyzed %d ftrace operations, %d suspicious", ops_count,
+            suspicious_count);
   return suspicious_count;
 }
 
@@ -275,12 +277,12 @@ static int check_ftrace_global_state(vmi_instance_t vmi) {
       VMI_SUCCESS) {
     uint32_t enabled = 0;
     if (vmi_read_32_va(vmi, ftrace_enabled_addr, 0, &enabled) == VMI_SUCCESS) {
-      log_info("Global ftrace enabled: %s", enabled ? "YES" : "NO");
+      log_debug("Global ftrace enabled: %s", enabled ? "YES" : "NO");
 
       if (enabled) {
-        log_info("Ftrace is active - checking for malicious usage...");
+        log_debug("Ftrace is active - checking for malicious usage...");
       } else {
-        log_info("Ftrace is disabled globally");
+        log_debug("Ftrace is disabled globally");
       }
     }
   }
@@ -301,43 +303,42 @@ uint32_t state_ftrace_hooks_callback(vmi_instance_t vmi, void* context) {
     return VMI_FAILURE;
   }
 
-  log_info("Executing STATE_FTRACE_HOOKS callback.");
+  log_info("STATE_FTRACE_HOOKS: Executing STATE_FTRACE_HOOKS callback.");
 
   // Get kernel text bounds for validation
   addr_t kernel_start = 0, kernel_end = 0;
 
-  if (vmi_translate_ksym2v(vmi, "_stext", &kernel_start) != VMI_SUCCESS ||
-      vmi_translate_ksym2v(vmi, "_etext", &kernel_end) != VMI_SUCCESS) {
-    log_error("Failed to resolve kernel text boundaries");
+  if (get_kernel_text_section_range(vmi, &kernel_start, &kernel_end) !=
+      VMI_SUCCESS) {
+    log_error("STATE_FTRACE_HOOKS: Failed to resolve kernel text boundaries");
     return VMI_FAILURE;
   }
 
-  log_info("Kernel text section: [0x%" PRIx64 " - 0x%" PRIx64 "]",
+  log_info("STATE_FTRACE_HOOKS: Kernel text section: [0x%" PRIx64
+           " - 0x%" PRIx64 "]",
            (uint64_t)kernel_start, (uint64_t)kernel_end);
 
   // Check global ftrace state
-  int global_issues = check_ftrace_global_state(vmi);
+  int global_count = check_ftrace_global_state(vmi);
+  int syscall_count = check_commonly_hooked_syscalls(vmi);
 
-  // Check for commonly hooked syscalls
-  int syscall_issues = check_commonly_hooked_syscalls(vmi);
+  int hook_detections_count =
+      walk_ftrace_ops_list(vmi, kernel_start, kernel_end);
 
-  // Walk ftrace operations list for active hooks
-  int hook_detections = walk_ftrace_ops_list(vmi, kernel_start, kernel_end);
+  int total_count = global_count + syscall_count + hook_detections_count;
+  log_info("STATE_FTRACE_HOOKS: Global ftrace issues: %d", global_count);
+  log_info("STATE_FTRACE_HOOKS: Syscall-related issues: %d", syscall_count);
+  log_info("STATE_FTRACE_HOOKS: Active hooks detected: %d",
+           hook_detections_count);
+  log_info("STATE_FTRACE_HOOKS: Total suspicious findings: %d", total_count);
 
-  // Summary
-  int total_issues = global_issues + syscall_issues + hook_detections;
-  log_info("Global ftrace issues: %d", global_issues);
-  log_info("Syscall-related issues: %d", syscall_issues);
-  log_info("Active hooks detected: %d", hook_detections);
-  log_info("Total suspicious findings: %d", total_issues);
-
-  if (hook_detections > 0) {
-    log_warn("FTRACE HOOKS DETECTED: %d active function hooks found!",
-             hook_detections);
-  } else if (total_issues > 0) {
-    log_warn("FTRACE ANOMALIES: %d suspicious findings", total_issues);
+  if (hook_detections_count > 0) {
+    log_warn("STATE_FTRACE_HOOKS: %d active function hooks found!",
+             hook_detections_count);
+  } else if (total_count > 0) {
+    log_warn("STATE_FTRACE_HOOKS: %d suspicious findings", total_count);
   } else {
-    log_info("No ftrace-based hooks detected");
+    log_info("STATE_FTRACE_HOOKS: No ftrace-based hooks detected");
   }
 
   log_info("STATE_FTRACE_HOOKS callback completed.");

@@ -13,7 +13,7 @@ monitor:
 features:
   state:
     - id: STATE_KERNEL_MODULE_LIST # Enum key matching state_task_id_t
-    # TODO: Other options may be placed here, unique to the task.
+    # Other options may be placed here, unique to the task.
     # parameters:
     - id: STATE_NETWORK_TRACE # Another state‐polling task
 

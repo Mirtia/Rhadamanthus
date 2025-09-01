@@ -32,7 +32,6 @@ enum state_task_id {
 
 /**
  * @brief Task IDs for event tasks.
- * TODO: Remove some of those.
  */
 enum event_task_id {
   EVENT_FTRACE_HOOK,              ///< ftrace hook detection
@@ -44,9 +43,8 @@ enum event_task_id {
   EVENT_MSR_WRITE,                ///< MSR register access detection
   EVENT_CODE_SECTION_MODIFY,      ///< kernel code integrity
   EVENT_IO_URING_RING_WRITE,      ///< io_uring structure tampering
-  EVENT_EBPF_MAP_UPDATE,          ///< eBPF map or program overwrite
+  EVENT_EBPF_PROBE,          ///< eBPF map or program overwrite
   EVENT_KALLSYMS_TABLE_WRITE,     ///< kallsyms or symbol hijacking
-  // TODO: Add more event tasks as needed.
   EVENT_TASK_ID_MAX  ///< Maximum number of event tasks.
 };
 

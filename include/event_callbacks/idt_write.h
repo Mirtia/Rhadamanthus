@@ -1,7 +1,7 @@
 /**
  * @file idt_write.h
  * @author Myrsini Gkolemi
- * @brief 
+ * @brief The file monitors IDT table writes.
  * @version 0.0
  * @date 2025-08-24
  * 

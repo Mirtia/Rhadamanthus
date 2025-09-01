@@ -1,9 +1,11 @@
 .PHONY: vmi clean build test single_test format check-format
 CLANG_FORMAT ?= clang-format
 FORMAT_STYLE ?= file
+DOXYGEN ?= doxygen
+DOXYGEN_CONFIG ?= config/Doxyfile
 
 clean:
-	rm -rf build
+	rm -rf build docs/html docs/latex
 
 build:
 	conan install . --build=missing

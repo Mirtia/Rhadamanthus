@@ -2,7 +2,7 @@
 #include <log.h>
 
 #include "state_callbacks/dir_string_matching.h"
-#include "state_callbacks/ebpf_artifacts.h"
+#include "state_callbacks/ebpf_activity.h"
 #include "state_callbacks/ftrace_hooks.h"
 #include "state_callbacks/idt_table.h"
 #include "state_callbacks/io_uring_artifacts.h"
@@ -19,7 +19,7 @@ uint32_t (*get_state_task_functor(state_task_id_t task_id))(vmi_instance_t,
     case STATE_DIR_STRING_MATCHING:
       return state_dir_string_matching_callback;
     case STATE_EBPF_ARTIFACTS:
-      return state_ebpf_artifacts_callback;
+      return state_ebpf_activity_callback;
     case STATE_FTRACE_HOOKS:
       return state_ftrace_hooks_callback;
     case STATE_IDT_TABLE:

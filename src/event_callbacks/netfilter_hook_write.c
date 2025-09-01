@@ -9,43 +9,49 @@
 /**
  * @brief No-op free callback to pair with vmi_clear_event.
  */
-static void vmi_event_free_noop() {
+static void vmi_event_free_noop(vmi_event_t* evt, status_t rc) {
+  (void)evt;
+  (void)rc;
   log_debug("(҂ `з´) ︻╦̵̵̿╤──");
 }
 
 static event_response_t event_netfilter_hook_write_ss_callback(
     vmi_instance_t vmi, vmi_event_t* event) {
   nf_bp_ctx_t* ctx = (nf_bp_ctx_t*)event->data;
+  if (!ctx)
+    return VMI_EVENT_INVALID;
 
+  // Re-arm INT3 at function entry.
   uint8_t val = 0xCC;
   (void)vmi_write_8_va(vmi, ctx->kaddr, 0, &val);
 
-  reg_t rflags = 0;
-  (void)vmi_get_vcpureg(vmi, &rflags, RFLAGS, event->vcpu_id);
-  rflags &= ~(1ULL << 8);
-  (void)vmi_set_vcpureg(vmi, rflags, RFLAGS, event->vcpu_id);
+  // Disable single-step for this vCPU via LibVMI.
+  (void)vmi_toggle_single_step_vcpu(vmi, event, event->vcpu_id, false);
 
-  // One-shot SINGLESTEP event
   vmi_clear_event(vmi, event, vmi_event_free_noop);
+
   return VMI_EVENT_RESPONSE_NONE;
 }
 
 /**
- * @brief INT3 entry callback: logs args, restores first byte, enables TF, rewinds RIP, registers SS.
+ * @brief INT3 entry callback: logs args, restores first byte, rewinds RIP, enables SINGLESTEP.
  */
 event_response_t event_netfilter_hook_write_callback(vmi_instance_t vmi,
                                                      vmi_event_t* event) {
   // Preconditions
   if (!vmi || !event) {
     log_error("EVENT_NETFILTER_HOOK_WRITE: Invalid arguments to callback.");
+    return VMI_EVENT_INVALID;
   }
   nf_bp_ctx_t* ctx = (nf_bp_ctx_t*)event->data;
+  if (!ctx)
+    return VMI_EVENT_INVALID;
 
   // Expected calling convention (x86_64 SysV):
   //   RDI = struct net *net
   //   RSI = const struct nf_hook_ops *ops
   //   RDX = size_t n   (only for nf_register_net_hooks)
-  reg_t rdi = 0, rsi = 0, rdx = 0, rip = 0, rflags = 0;
+  reg_t rdi = 0, rsi = 0, rdx = 0, rip = 0;
   (void)vmi_get_vcpureg(vmi, &rdi, RDI, event->vcpu_id);
   (void)vmi_get_vcpureg(vmi, &rsi, RSI, event->vcpu_id);
   (void)vmi_get_vcpureg(vmi, &rdx, RDX, event->vcpu_id);
@@ -55,29 +61,39 @@ event_response_t event_netfilter_hook_write_callback(vmi_instance_t vmi,
            (uint64_t)ctx->kaddr, (uint64_t)rdi, (uint64_t)rsi,
            (unsigned long long)rdx);
 
-  uint8_t val = ctx->orig;
-  (void)vmi_write_8_va(vmi, ctx->kaddr, 0, &val);
+  // Restore original first byte so the real first instruction can execute.
+  {
+    uint8_t val = ctx->orig;
+    (void)vmi_write_8_va(vmi, ctx->kaddr, 0, &val);
+  }
 
-  // Enable TF and rewind RIP by 1 (INT3 advanced RIP by 1)
+  // Rewind RIP by 1 (INT3 advanced it by 1 byte on x86).
   (void)vmi_get_vcpureg(vmi, &rip, RIP, event->vcpu_id);
-  (void)vmi_get_vcpureg(vmi, &rflags, RFLAGS, event->vcpu_id);
   if (rip) {
     (void)vmi_set_vcpureg(vmi, rip - 1, RIP, event->vcpu_id);
   }
-  (void)vmi_set_vcpureg(vmi, rflags | (1ULL << 8), RFLAGS,
-                        event->vcpu_id);  // TF=1
 
-  // Register one-shot SINGLESTEP to re-arm INT3 and clear TF
+  // Ensure the SINGLESTEP event exists and is registered once.
   if (ctx->ss_evt.callback == NULL) {
     memset(&ctx->ss_evt, 0, sizeof(ctx->ss_evt));
     ctx->ss_evt.version = VMI_EVENTS_VERSION;
     ctx->ss_evt.type = VMI_EVENT_SINGLESTEP;
     ctx->ss_evt.callback = event_netfilter_hook_write_ss_callback;
     ctx->ss_evt.data = ctx;
+
+    if (vmi_register_event(vmi, &ctx->ss_evt) != VMI_SUCCESS) {
+      log_warn("%s: failed to register SINGLESTEP; INT3 may not be re-armed.",
+               ctx->symname ? ctx->symname : "nf_register_net_hook");
+      return VMI_EVENT_RESPONSE_NONE;
+    }
   }
-  if (vmi_register_event(vmi, &ctx->ss_evt) != VMI_SUCCESS) {
-    log_warn("%s: failed to register SINGLESTEP; INT3 may not be re-armed.",
-             ctx->symname ? ctx->symname : "nf_register_net_hook");
+
+  // Turn on single-step for this vCPU using the LibVMI API (no direct TF writes).
+  if (vmi_toggle_single_step_vcpu(vmi, &ctx->ss_evt, event->vcpu_id, true) !=
+      VMI_SUCCESS) {
+    log_warn(
+        "%s: failed to enable SINGLESTEP on vCPU %u; INT3 may not be re-armed.",
+        ctx->symname ? ctx->symname : "nf_register_net_hook", event->vcpu_id);
   }
 
   return VMI_EVENT_RESPONSE_NONE;

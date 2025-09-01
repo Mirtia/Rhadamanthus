@@ -4,7 +4,7 @@
 #include <stddef.h>
 #include "event_callbacks/code_section_modify.h"
 #include "event_callbacks/cr0_write.h"
-#include "event_callbacks/ebpf_map_update.h"
+#include "event_callbacks/ebpf_probe.h"
 #include "event_callbacks/ftrace_hook.h"
 #include "event_callbacks/idt_write.h"
 #include "event_callbacks/io_uring_ring_write.h"
@@ -26,7 +26,7 @@ static vmi_event_t* create_event_netfilter_hook_write(vmi_instance_t vmi);
 static vmi_event_t* create_event_msr_write(vmi_instance_t vmi);
 static vmi_event_t* create_event_code_section_modify(vmi_instance_t vmi);
 static vmi_event_t* create_event_io_uring_ring_write(vmi_instance_t vmi);
-static vmi_event_t* create_event_ebpf_map_update(vmi_instance_t vmi);
+static vmi_event_t* create_event_ebpf_probe(vmi_instance_t vmi);
 static vmi_event_t* create_event_kallsyms_table_write(vmi_instance_t vmi);
 
 static vmi_event_t* setup_memory_event(
@@ -84,10 +84,10 @@ static const event_task_map_entry_t event_task_map[] = {
      .create_func = create_event_io_uring_ring_write,
      .callback = event_io_uring_ring_write_callback,
      .description = "io_uring ring buffer modification detection"},
-    {.task_id = EVENT_EBPF_MAP_UPDATE,
-     .create_func = create_event_ebpf_map_update,
-     .callback = event_ebpf_map_update_callback,
-     .description = "eBPF map update detection"},
+    {.task_id = EVENT_EBPF_PROBE,
+     .create_func = create_event_ebpf_probe,
+     .callback = event_ebpf_probe_callback,
+     .description = "eBPF probe insertion detection."},
     {.task_id = EVENT_KALLSYMS_TABLE_WRITE,
      .create_func = create_event_kallsyms_table_write,
      .callback = event_kallsyms_write_callback,
@@ -107,7 +107,6 @@ static vmi_event_t* setup_memory_event(
     return NULL;
   }
 
-  // TODO: Confirm correctness
   event->version = VMI_EVENTS_VERSION;
   event->type = VMI_EVENT_MEMORY;
   event->mem_event.gfn = addr >> 12;
@@ -223,13 +222,13 @@ static vmi_event_t* create_event_page_table_modification(vmi_instance_t vmi) {
   }
   addr_t pml4_pa = (addr_t)(cr3 & ~0xFFFULL);
 
-  /* Create the memory write event on the PML4 page (GFN = PA >> 12). */
+  // Create the memory write event on the PML4 page (GFN = PA >> 12).
   vmi_event_t* event = setup_memory_event(
       pml4_pa, VMI_MEMACCESS_W, event_page_table_modification_callback);
   if (!event)
     return NULL;
 
-  /* Allocate and seed the context with an initial snapshot (if possible). */
+  // Allocate and seed the context with an initial snapshot (if possible).
   pt_watch_ctx_t* ctx = g_malloc0(sizeof(*ctx));
   if (!ctx) {
     log_error("PT watch: failed to allocate context");
@@ -460,16 +459,91 @@ static vmi_event_t* create_event_io_uring_ring_write(vmi_instance_t vmi) {
   return event;
 }
 
-static vmi_event_t* create_event_ebpf_map_update(vmi_instance_t vmi) {
-  // Preconditions
+static vmi_event_t* create_event_ebpf_probe(vmi_instance_t vmi) {
   if (!vmi) {
     log_error("Invalid VMI instance at event registration.");
     return NULL;
   }
-  // Monitor eBPF map operations - complex as maps are dynamically allocated
-  // Would need to hook bpf_map_update_elem function or similar
-  log_warn("eBPF map monitoring requires dynamic map tracking");
 
+  // Functions to monitor for eBPF/probe activity
+  const char* probe_functions[] = {
+      "register_kprobe",            // Kernel function hooks
+      "register_kretprobe",         // Return probes
+      "register_uprobe",            // User-space probes
+      "bpf_prog_attach",            // eBPF program attachment
+      "bpf_raw_tracepoint_open",    // Raw tracepoint attachment
+      "tracepoint_probe_register",  // Tracepoint probes
+      NULL};
+
+  // Try each function until we find one that works
+  for (int i = 0; probe_functions[i] != NULL; i++) {
+    addr_t func_addr = 0;
+    if (vmi_translate_ksym2v(vmi, probe_functions[i], &func_addr) !=
+            VMI_SUCCESS ||
+        !func_addr) {
+      log_debug("Symbol not found: %s", probe_functions[i]);
+      continue;
+    }
+
+    // Read original byte
+    uint8_t orig = 0;
+    if (vmi_read_8_va(vmi, func_addr, 0, &orig) != VMI_SUCCESS) {
+      log_warn("Failed reading byte at %s @0x%" PRIx64, probe_functions[i],
+               func_addr);
+      continue;
+    }
+
+    // Plant INT3 breakpoint
+    uint8_t cc = 0xCC;
+    if (vmi_write_8_va(vmi, func_addr, 0, &cc) != VMI_SUCCESS) {
+      log_warn("Failed planting INT3 at %s @0x%" PRIx64, probe_functions[i],
+               func_addr);
+      continue;
+    }
+
+    // Allocate context
+    ebpf_probe_ctx_t* ctx = g_malloc0(sizeof(*ctx));
+    if (!ctx) {
+      log_error("Failed to allocate probe context");
+      vmi_write_8_va(vmi, func_addr, 0, &orig);
+      continue;
+    }
+    ctx->kaddr = func_addr;
+    ctx->orig = orig;
+    ctx->symname = probe_functions[i];
+
+    // Allocate event
+    vmi_event_t* event = g_malloc0(sizeof(*event));
+    if (!event) {
+      log_error("Failed to allocate vmi_event_t");
+      vmi_write_8_va(vmi, func_addr, 0, &orig);
+      g_free(ctx);
+      continue;
+    }
+
+    // Setup breakpoint event
+    event->version = VMI_EVENTS_VERSION;
+    event->type = VMI_EVENT_SINGLESTEP;
+    event->callback = event_ebpf_probe_callback;
+    event->data = ctx;
+
+    // Register the event
+    if (vmi_register_event(vmi, event) != VMI_SUCCESS) {
+      log_warn("Failed to register event for %s", probe_functions[i]);
+      vmi_write_8_va(vmi, func_addr, 0, &orig);  // Restore
+      g_free(ctx);
+      g_free(event);
+      continue;
+    }
+
+    log_info("eBPF probe monitoring enabled on %s @0x%" PRIx64,
+             probe_functions[i], func_addr);
+    return event;
+  }
+
+  log_warn(
+      "No eBPF probe registration symbols could be hooked - monitoring "
+      "disabled");
   return NULL;
 }
 

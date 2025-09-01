@@ -85,3 +85,6 @@ logs/
 
 # Scripts
 scripts/calculate_hash_kernel
+
+# Cache from clangd
+.cache/
