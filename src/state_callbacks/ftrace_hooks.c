@@ -100,8 +100,8 @@ static bool analyze_ftrace_ops_for_hooks(vmi_instance_t vmi, addr_t ops_addr,
                    &saved_func);
 
   log_info("Ftrace Operation %d [0x%" PRIx64 "]:", ops_num, (uint64_t)ops_addr);
-  log_info("  Function: 0x%" PRIx64, (uint64_t)func_addr);
-  log_info("  Flags: 0x%lx", flags);
+  log_info("Function: 0x%" PRIx64, (uint64_t)func_addr);
+  log_info("Flags: 0x%lx", flags);
   if (trampoline_addr != 0) {
     log_info("  Trampoline: 0x%" PRIx64, (uint64_t)trampoline_addr);
   }
@@ -175,8 +175,6 @@ static int check_commonly_hooked_syscalls(vmi_instance_t vmi) {
                (uint64_t)syscall_addr);
 
       // TODO: Check if this specific function has ftrace enabled.
-      // This would require walking the ftrace filter hash tables, which is complex
-      // For now, we just log that we found these common targets.
     }
   }
 

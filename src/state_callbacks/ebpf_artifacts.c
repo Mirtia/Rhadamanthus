@@ -1,475 +1,335 @@
 #include "state_callbacks/ebpf_artifacts.h"
 #include <ctype.h>
+#include <glib-2.0/glib.h>
+#include <inttypes.h>
 #include <log.h>
-#include <stdlib.h>
+#include <math.h>
 #include <string.h>
 #include <time.h>
 
-// Structure to track eBPF program metadata
-typedef struct {
-  uint32_t id;
-  uint32_t type;
-  char name[64];
-  uint64_t load_time;
-  uint32_t map_ids[16];
-  uint32_t map_count;
-  uint32_t jited;
-  uint32_t tag[8];
-} ebpf_prog_info_t;
-
-// Structure to track eBPF map metadata
-typedef struct {
-  uint32_t id;
-  uint32_t type;
-  char name[64];
-  uint32_t key_size;
-  uint32_t value_size;
-  uint32_t max_entries;
-  uint32_t flags;
-} ebpf_map_info_t;
-
-// Detection context
-typedef struct {
-  ebpf_prog_info_t* programs;
-  uint32_t prog_count;
-  uint32_t prog_capacity;
-  ebpf_map_info_t* maps;
-  uint32_t map_count;
-  uint32_t map_capacity;
-  uint32_t suspicious_flags;
-} ebpf_detection_ctx_t;
-
-// Suspicious pattern flags
-#define EBPF_SUSPICIOUS_HIDDEN_PROG 0x0001
-#define EBPF_SUSPICIOUS_KPROBE_SYSCALL 0x0002
-#define EBPF_SUSPICIOUS_XDP_BACKDOOR 0x0004
-#define EBPF_SUSPICIOUS_TC_HIJACK 0x0008
-#define EBPF_SUSPICIOUS_TRACEPOINT_HOOK 0x0010
-#define EBPF_SUSPICIOUS_MAP_OVERFLOW 0x0020
-#define EBPF_SUSPICIOUS_BTF_TAMPERING 0x0040
-#define EBPF_SUSPICIOUS_OBFUSCATED_NAME 0x0080
-#define EBPF_SUSPICIOUS_PINNED_PERSIST 0x0100
-#define EBPF_SUSPICIOUS_GETDENTS_HOOK 0x0200
-
-// Known rootkit signatures
-static const char* known_rootkit_names[] = {"ebpfkit", "triplecross", "bpfdoor",
-                                            "badbpf",  "exechijack",  "pidhide",
-                                            "sudoadd", "textreplace", NULL};
-
-// Suspicious syscall hooks commonly used by rootkits
-static const char* suspicious_syscalls[] = {"sys_getdents",
-                                            "sys_getdents64",
-                                            "sys_kill",
-                                            "sys_openat",
-                                            "sys_read",
-                                            "sys_write",
-                                            "sys_execve",
-                                            "sys_ptrace",
-                                            "sys_bpf",
-                                            "sys_perf_event_open",
-                                            "sys_timerfd_settime",
-                                            NULL};
-
-// Static context for state comparison between calls
-static ebpf_detection_ctx_t previous_ctx = {0};
-static int first_run = 1;
+/**
+ * @brief Struct to keep information about an eBPF program.
+ */
+struct ebpf_prog_info_t {
+  uint32_t id;    //< Unique identifier for the program.
+  uint32_t type;  ///< Type of the program (e.g., kprobe, xdp).
+  char name[64];  ///< Name of the program (optional name).
+  uint32_t
+      jited;  ///< Whether the program is JIT-compiled (1) or interpreted (0).
+  uint32_t map_ids
+      [16];  ///< IDs of maps used by the program (up to 16 for simplicity).
+  uint32_t map_count;  ///< Number of maps used by the program.
+};
 
 /**
- * Initialize detection context
+ * @brief Struct to keep information about an eBPF map.
+ * An ebpf map is a key-value store used by eBPF programs to store and share data.
  */
-static void init_detection_context(ebpf_detection_ctx_t* ctx) {
+struct ebpf_map_info_t {
+  uint32_t id;           //< Unique identifier for the map.
+  uint32_t type;         ///< Type of the map (e.g., hash-table, array)
+  char name[64];         ///< Name of the map (optional name).
+  uint32_t key_size;     ///< Size of the keys in bytes.
+  uint32_t value_size;   ///< Size of the values in bytes.
+  uint32_t max_entries;  ///< Maximum number of elements the map can hold.
+  uint32_t flags;        ///< Flags associated with the map (e.g., read-only).
+};
+
+/**
+ * @brief The eBPF JIT-related toggles of interest.
+ */
+struct ebpf_toggle_info_t {
+  int present_enable, present_harden, present_kallsyms;
+  int val_enable, val_harden, val_kallsyms;
+};
+
+// Type declarations for ease of use.
+typedef struct ebpf_prog_info_t ebpf_prog_info_t;
+typedef struct ebpf_map_info_t ebpf_map_info_t;
+typedef struct ebpf_toggle_info_t ebpf_toggle_info_t;
+
+/**
+ * @brief The eBPF detection context.
+ * Holds arrays of programs and maps, their counts and capacities, and toggle info.
+ */
+struct ebpf_detection_ctx_t {
+  ebpf_prog_info_t* programs;
+  ebpf_map_info_t* maps;
+  uint32_t prog_count, prog_capacity;
+  uint32_t map_count, map_capacity;
+  ebpf_toggle_info_t toggles;
+};
+
+// Type declaration for ease of use.
+typedef struct ebpf_detection_ctx_t ebpf_detection_ctx_t;
+
+// Strings below are used for log-only hints, based on public PoCs.
+static const char* known_rootkit_names[] = {
+    "ebpfkit",    "triplecross", "bpfdoor", "badbpf",      "boopkit",
+    "exechijack", "pidhide",     "sudoadd", "textreplace", NULL};
+
+// Syscall names that, if found in a KPROBE program name, may indicate
+// syscall probing hooks.
+static const char* observed_syscalls[] = {"sys_getdents",
+                                          "sys_getdents64",
+                                          "sys_kill",
+                                          "sys_openat",
+                                          "sys_read",
+                                          "sys_write",
+                                          "sys_execve",
+                                          "sys_ptrace",
+                                          "sys_bpf",
+                                          "sys_perf_event_open",
+                                          "sys_timerfd_settime",
+                                          NULL};
+
+// Program type constants
+// See: https://man7.org/linux/man-pages/man2/bpf.2.html
+// Probes come in 5 different flavors: kprobe, kretprobe, uprobe, uretprobe, usdt. kprobe and kretprobe.
+// See: https://docs.ebpf.io/linux/program-type/BPF_PROG_TYPE_KPROBE/
+#define BPF_PROG_TYPE_KPROBE 2
+#define BPF_PROG_TYPE_TRACEPOINT 5
+#define BPF_PROG_TYPE_XDP 6
+
+// Some default capacities for the map and program arrays.
+#define PROG_CAPACITY 256
+#define MAP_CAPACITY 512
+
+/**
+ * @brief Initialize the eBPF detection context
+ * @param ctx Pointer to ebpf context to initialize.
+ */
+static void ebpf_detection_ctx_t_initialize(ebpf_detection_ctx_t* ctx) {
   ctx->prog_capacity = 256;
   ctx->map_capacity = 512;
-  ctx->programs = calloc(ctx->prog_capacity, sizeof(ebpf_prog_info_t));
-  ctx->maps = calloc(ctx->map_capacity, sizeof(ebpf_map_info_t));
+  ctx->programs = g_new0(ebpf_prog_info_t, ctx->prog_capacity);
+  ctx->maps = g_new0(ebpf_map_info_t, ctx->map_capacity);
   ctx->prog_count = 0;
   ctx->map_count = 0;
-  ctx->suspicious_flags = 0;
+  memset(&ctx->toggles, 0, sizeof(ctx->toggles));
 }
 
 /**
- * Clean up detection context
+ * @brief Free allocations inside the eBPF detection context.
+ * @param ctx Pointer to ebpf context to clean up.
  */
-static void cleanup_detection_context(ebpf_detection_ctx_t* ctx) {
+static void ebpf_detection_ctx_t_cleanup(ebpf_detection_ctx_t* ctx) {
   if (ctx->programs) {
-    free(ctx->programs);
+    g_free(ctx->programs);
     ctx->programs = NULL;
   }
   if (ctx->maps) {
-    free(ctx->maps);
+    g_free(ctx->maps);
     ctx->maps = NULL;
   }
 }
 
 /**
- * Check if a program name matches known rootkit patterns
+ * @brief Log if the program/map name resembles known public PoC rootkits.
+ * @details Names from public repositories (e.g., TripleCross, ebpfkit).
+ *
+ * @note See repositories:
+ * * https://github.com/h3xduck/TripleCross
+ * * https://github.com/Gui774ume/ebpfkit
  */
-static int check_known_rootkit_signature(const char* name) {
-  if (!name)
-    return 0;
-
+static void check_known_rootkit_signature(const char* name) {
+  if (!name) {
+    log_debug("Unnamed program (skipping rootkit name check)");
+    return;
+  }
   for (int i = 0; known_rootkit_names[i]; i++) {
     if (strstr(name, known_rootkit_names[i])) {
-      log_warn("Detected known rootkit signature: %s", name);
-      return 1;
+      log_debug("Known rootkit-like name detected: %s", name);
+      return;
     }
   }
-  return 0;
 }
 
 /**
- * Check for obfuscated or suspicious program names
+ * @brief Log if a KPROBE program name hints at syscall instrumentation. Includes both entry and return probes.
+ * @param prog Pointer to the eBPF program info structure.
  */
-static int check_obfuscated_name(const char* name) {
-  if (!name || strlen(name) == 0) {
-    return 1;  // Empty name is suspicious
+static void check_ebpf_kprobe_hooks(const ebpf_prog_info_t* prog) {
+  if (prog->type != BPF_PROG_TYPE_KPROBE) {
+    log_debug("Not a KPROBE program: %s", prog->name);
+    return;
   }
-
-  // Check for random-looking names (high entropy)
-  int non_alnum = 0;
-  int len = (int)strlen(name);
-
-  for (int i = 0; i < len; i++) {
-    if (!isalnum(name[i]) && name[i] != '_' && name[i] != '-') {
-      non_alnum++;
+  for (int i = 0; observed_syscalls[i]; i++)
+    if (strstr(prog->name, observed_syscalls[i])) {
+      log_debug("Program suggests syscall kprobe: %s", prog->name);
+      return;
     }
-  }
-
-  // If more than 30% non-alphanumeric, consider suspicious
-  return (non_alnum > len * 0.3) ? 1 : 0;
 }
 
 /**
- * Enumerate eBPF programs from kernel structures
+ * @brief Log if the program is a TRACEPOINT program.
+ * @details Tracepoints are legitimate but can be abused; this is a cue.
+ * For example, if a piece of malware wants to hook a kernel syscall, it can do so by loading an eBPF program of type BPF_PROG_TYPE_TRACEPOINT 
+ * if the kernel already offers a tracepoint to the desired syscall (see /sys/kernel/debug/tracing/events/syscalls).
+ * If the desired syscall does not have a tracepoint, the program can load a BPF_PROG_TYPE_KPROBE instead.
+ * @note See: https://www.trendmicro.com/vinfo/us/security/news/threat-landscape/how-bpf-enabled-malware-works-bracing-for-emerging-threats
+ * @param prog Pointer to the eBPF program info structure.
  */
-static int enumerate_ebpf_programs(vmi_instance_t vmi,
-                                   // NOLINTNEXTLINE
-                                   ebpf_detection_ctx_t* ctx) {
-  addr_t prog_idr_addr;
-
-  log_debug("Enumerating eBPF programs from kernel structures");
-
-  // Try to find prog_idr symbol
-  if (vmi_translate_ksym2v(vmi, "prog_idr", &prog_idr_addr) != VMI_SUCCESS) {
-    // Try alternative symbol names
-    if (vmi_translate_ksym2v(vmi, "prog_array", &prog_idr_addr) !=
-        VMI_SUCCESS) {
-      log_warn("Cannot locate eBPF program tracking structures");
-      return VMI_FAILURE;
-    }
+static void check_ebpf_tracepoint_hooks(const ebpf_prog_info_t* prog) {
+  if (prog->type != BPF_PROG_TYPE_TRACEPOINT) {
+    log_debug("Not a TRACEPOINT program: %s", prog->name);
+    return;
   }
-
-  // TODO: Implement actual IDR/radix tree walking
-  // For now, we simulate finding some programs for demonstration
-  // In production, this would walk the actual kernel data structures
-
-  log_debug("Found prog_idr at 0x%lx", prog_idr_addr);
-
-  // Placeholder: In real implementation, walk the IDR tree here
-  // and populate ctx->programs array
-
-  return VMI_SUCCESS;
+  log_debug("TRACEPOINT program detected: %s", prog->name);
 }
 
 /**
- * Enumerate eBPF maps from kernel structures  
+ * @brief Log if the program is XDP (high-impact in RX path).
+ * @details XDP runs at driver level, suitable for packet manipulation and
+ * should be reviewed in environments where XDP is uncommon.
+ * @note See: https://docs.cilium.io/en/stable/reference-guides/bpf/architecture.html
+ * @param prog Pointer to the eBPF program info structure.
  */
-static int enumerate_ebpf_maps(vmi_instance_t vmi) {
-  addr_t map_idr_addr;
-
-  log_debug("Enumerating eBPF maps from kernel structures");
-
-  if (vmi_translate_ksym2v(vmi, "map_idr", &map_idr_addr) != VMI_SUCCESS) {
-    log_warn("Cannot locate eBPF map tracking structures");
-    return VMI_FAILURE;
-  }
-
-  // TODO: Implement actual IDR walking for maps
-
-  return VMI_SUCCESS;
-}
-
-/**
- * Check for suspicious kprobe attachments
- */
-static int check_kprobe_hooks(ebpf_prog_info_t* prog) {
-  // Check if program type is BPF_PROG_TYPE_KPROBE
-  if (prog->type != 2) {  // BPF_PROG_TYPE_KPROBE = 2
-    return 0;
-  }
-
-  // Check attachment point name for suspicious syscalls
-  for (int i = 0; suspicious_syscalls[i]; i++) {
-    if (strstr(prog->name, suspicious_syscalls[i])) {
-      log_warn("Suspicious kprobe on syscall: %s", prog->name);
-      return 1;
-    }
-  }
-
-  return 0;
-}
-
-/**
- * Check for XDP programs that might be backdoors
- */
-static int check_xdp_backdoor(ebpf_prog_info_t* prog) {
-  // XDP programs (type 6) on main interfaces are suspicious
-  if (prog->type != 6) {  // BPF_PROG_TYPE_XDP = 6
-    return 0;
-  }
-
-  log_info("Found XDP program: %s (potential backdoor vector)", prog->name);
-
-  // Check associated maps for C2 patterns
+static void check_xdp_backdoor(const ebpf_prog_info_t* prog) {
+  if (prog->type != BPF_PROG_TYPE_XDP)
+    return;
+  log_debug("XDP program present: %s", prog->name);
   for (uint32_t i = 0; i < prog->map_count && i < 16; i++) {
-    log_debug("XDP program uses map ID: %u", prog->map_ids[i]);
+    log_debug("XDP uses map ID: %u", prog->map_ids[i]);
   }
-
-  return 1;  // XDP programs warrant investigation in most environments
 }
 
 /**
- * Check for hidden eBPF programs by comparing different data sources
+ * @brief Light analysis of BPF maps (size and name)
+ * @details Maps overview: https://www.kernel.org/doc/html/v6.0/bpf/maps.html
+ * @param ctx Pointer to the eBPF detection context.
  */
-// NOLINTNEXTLINE
-static int check_hidden_programs(vmi_instance_t vmi,
-                                 ebpf_detection_ctx_t* ctx) {
-  log_debug("Checking for hidden eBPF programs");
-
-  // In a real implementation, we would:
-  // 1. Count programs visible via bpf() syscall interface
-  // 2. Count programs in kernel data structures
-  // 3. Look for discrepancies
-
-  // For now, we just check if we found any programs at all
-  if (ctx->prog_count == 0) {
-    log_debug("No eBPF programs found in kernel structures");
-  }
-
-  return 0;
-}
-
-/**
- * Analyze BPF maps for suspicious patterns
- */
-static void analyze_bpf_maps(ebpf_detection_ctx_t* ctx) {
-  log_debug("Analyzing %u BPF maps for suspicious patterns", ctx->map_count);
-
+static void analyze_bpf_maps(const ebpf_detection_ctx_t* ctx) {
   for (uint32_t i = 0; i < ctx->map_count; i++) {
-    ebpf_map_info_t* map = &ctx->maps[i];
-
-    // Check for suspiciously large maps (data exfiltration)
-    if (map->max_entries > 100000) {
-      log_warn("Large BPF map detected: %s (%u entries)", map->name,
-               map->max_entries);
-      ctx->suspicious_flags |= EBPF_SUSPICIOUS_MAP_OVERFLOW;
-    }
-
-    // Check for maps with obfuscated names
-    if (check_obfuscated_name(map->name)) {
-      log_warn("BPF map with obfuscated name: %s", map->name);
-      ctx->suspicious_flags |= EBPF_SUSPICIOUS_OBFUSCATED_NAME;
-    }
+    const ebpf_map_info_t* map = &ctx->maps[i];
+    log_debug("BPF map: %s (max_entries=%u)", map->name, map->max_entries);
   }
 }
 
 /**
- * Check system call table for BPF trampolines
+ * @brief Read a kernel integer toggle by symbol name. Used for bpf_jit_enable, bpf_jit_harden, bpf_jit_kallsyms.
  */
-static int check_syscall_table_integrity(vmi_instance_t vmi) {
-  addr_t sys_call_table_addr;
+static int read_kernel_toggle(vmi_instance_t vmi, const char* sym,
+                              int* out_value) {
+  addr_t addr = 0;
+  if (vmi_translate_ksym2v(vmi, sym, &addr) != VMI_SUCCESS || !addr)
+    return 0;
 
-  log_debug("Checking syscall table integrity");
-
-  if (vmi_translate_ksym2v(vmi, "sys_call_table", &sys_call_table_addr) !=
-      VMI_SUCCESS) {
-    log_debug("Cannot locate sys_call_table for integrity check");
-    return VMI_FAILURE;
+  uint32_t tmp = 0;
+  if (vmi_read_32_va(vmi, addr, 0, &tmp) != VMI_SUCCESS) {
+    log_warn("eBPF toggle: failed to read %s @0x%" PRIx64, sym, (uint64_t)addr);
+    return 0;
   }
-
-  // TODO: Read syscall table entries and check for BPF trampolines
-  // BPF trampolines have specific signatures we can look for
-
-  return VMI_SUCCESS;
+  *out_value = (int)(int32_t)tmp;
+  log_info("eBPF toggle: %s = %d (addr=0x%" PRIx64 ")", sym, *out_value,
+           > (uint64_t)addr);
+  return 1;
 }
 
 /**
- * Compare current state with previous state
+ * @brief Audit eBPF JIT-related sysctls for visibility/hardening posture.
+ * @note
+ *  * bpf_jit_enable: enable JIT
+ *    https://www.kernel.org/doc/html/v5.9/admin-guide/sysctl/net.html#bpf-jit-enable
+ *  * bpf_jit_harden: harden JIT (0/1/2 semantics)
+ *    https://www.kernel.org/doc/Documentation/sysctl/net.txt
+ *  * bpf_jit_kallsyms: export JITed symbols (visibility)
+ *    https://www.kernel.org/doc/html/v6.1/admin-guide/sysctl/net.html#bpf-jit-kallsyms
  */
-static void compare_with_previous_state(ebpf_detection_ctx_t* current) {
-  if (first_run) {
-    log_info("First eBPF state sampling run - establishing baseline");
-    first_run = 0;
-    return;
-  }
+static void audit_ebpf_runtime_toggles(vmi_instance_t vmi,
+                                       ebpf_detection_ctx_t* ctx) {
+  ebpf_toggle_info_t* t = &ctx->toggles;
 
-  // Check for new programs
-  if (current->prog_count > previous_ctx.prog_count) {
-    log_warn("New eBPF programs detected: %u -> %u", previous_ctx.prog_count,
-             current->prog_count);
-    current->suspicious_flags |= EBPF_SUSPICIOUS_HIDDEN_PROG;
-  }
+  t->present_enable = read_kernel_toggle(vmi, "bpf_jit_enable", &t->val_enable);
+  t->present_harden = read_kernel_toggle(vmi, "bpf_jit_harden", &t->val_harden);
+  t->present_kallsyms =
+      read_kernel_toggle(vmi, "bpf_jit_kallsyms", &t->val_kallsyms);
 
-  // Check for new maps
-  if (current->map_count > previous_ctx.map_count) {
-    log_warn("New eBPF maps detected: %u -> %u", previous_ctx.map_count,
-             current->map_count);
-  }
+  if (t->present_enable && t->val_enable != 0) {
+    if (t->present_harden && t->val_harden == 0)
+      log_warn(
+          "JIT enabled but hardening disabled (review security "
+          "posture).");
+    else if (!t->present_harden)
+      log_warn("eBPF: JIT enabled; hardening status unknown (symbol missing).");
 
-  // Check if suspicious flags increased
-  if (current->suspicious_flags > previous_ctx.suspicious_flags) {
-    log_warn("Suspicious activity level increased: 0x%x -> 0x%x",
-             previous_ctx.suspicious_flags, current->suspicious_flags);
+    if (t->present_kallsyms && t->val_kallsyms == 0)
+      log_warn(
+          "eBPF: bpf_jit_kallsyms is off; JITed programs may be absent from "
+          "/proc/kallsyms.");
+    else if (!t->present_kallsyms)
+      log_warn(
+          "eBPF: JIT enabled; kallsyms exposure unknown (symbol missing).");
+  } else if (t->present_enable && t->val_enable == 0) {
+    log_info("eBPF: JIT disabled (interpreter only).");
+  } else if (!t->present_enable) {
+    log_warn("eBPF: JIT status unknown (bpf_jit_enable symbol missing).");
   }
 }
 
 /**
- * Generate detection report
+ * @brief Log a short aggregated summary of what the sampler observed.
+ * @note: This is considered a top level call for this callback so !log_debug may be used.
  */
-static void generate_detection_report(ebpf_detection_ctx_t* ctx) {
-  log_info("=== eBPF State Detection Report ===");
-  log_info("Programs found: %u", ctx->prog_count);
-  log_info("Maps found: %u", ctx->map_count);
-  log_info("Suspicious flags: 0x%04x", ctx->suspicious_flags);
+static void calculate_program_type_counts(const ebpf_detection_ctx_t* ctx) {
+  log_info("STATE_EBPF_ARTIFACTS: Programs sampled: %u", ctx->prog_count);
+  log_info("STATE_EBPF_ARTIFACTS: Maps sampled:     %u", ctx->map_count);
 
-  if (ctx->suspicious_flags == 0) {
-    log_info("No suspicious eBPF activity detected");
-    return;
-  }
-
-  log_warn("Suspicious eBPF activity detected:");
-
-  if (ctx->suspicious_flags & EBPF_SUSPICIOUS_HIDDEN_PROG)
-    log_warn("  - Hidden or new eBPF programs");
-  if (ctx->suspicious_flags & EBPF_SUSPICIOUS_KPROBE_SYSCALL)
-    log_warn("  - Suspicious syscall kprobes");
-  if (ctx->suspicious_flags & EBPF_SUSPICIOUS_XDP_BACKDOOR)
-    log_warn("  - Potential XDP backdoor");
-  if (ctx->suspicious_flags & EBPF_SUSPICIOUS_TC_HIJACK)
-    log_warn("  - TC filter hijacking");
-  if (ctx->suspicious_flags & EBPF_SUSPICIOUS_TRACEPOINT_HOOK)
-    log_warn("  - Suspicious tracepoint hooks");
-  if (ctx->suspicious_flags & EBPF_SUSPICIOUS_MAP_OVERFLOW)
-    log_warn("  - Abnormally large BPF maps");
-  if (ctx->suspicious_flags & EBPF_SUSPICIOUS_OBFUSCATED_NAME)
-    log_warn("  - Obfuscated program/map names");
-  if (ctx->suspicious_flags & EBPF_SUSPICIOUS_GETDENTS_HOOK)
-    log_warn("  - getdents hook (file hiding)");
-}
-
-/**
- * Save current state for next comparison
- */
-static void save_current_state(ebpf_detection_ctx_t* current) {
-  // Clean up previous state
-  cleanup_detection_context(&previous_ctx);
-
-  // Copy current state to previous
-  previous_ctx.prog_count = current->prog_count;
-  previous_ctx.map_count = current->map_count;
-  previous_ctx.suspicious_flags = current->suspicious_flags;
-
-  // Allocate and copy arrays if needed
-  if (current->prog_count > 0) {
-    previous_ctx.programs =
-        calloc(current->prog_count, sizeof(ebpf_prog_info_t));
-    if (previous_ctx.programs) {
-      memcpy(previous_ctx.programs, current->programs,
-             current->prog_count * sizeof(ebpf_prog_info_t));
+  uint32_t kprobe = 0, xdp = 0, tracep = 0;
+  for (uint32_t i = 0; i < ctx->prog_count; i++) {
+    switch (ctx->programs[i].type) {
+      case BPF_PROG_TYPE_KPROBE:
+        kprobe++;
+        break;
+      case BPF_PROG_TYPE_XDP:
+        xdp++;
+        break;
+      case BPF_PROG_TYPE_TRACEPOINT:
+        tracep++;
+        break;
+      default:
+        log_debug("Other program type: %u", ctx->programs[i].type);
+        break;
     }
   }
+  if (kprobe) {
+    log_info("STATE_EBPF_ARTIFACTS: KPROBE program count: %u", kprobe);
+  }
+  if (xdp) {
 
-  if (current->map_count > 0) {
-    previous_ctx.maps = calloc(current->map_count, sizeof(ebpf_map_info_t));
-    if (previous_ctx.maps) {
-      memcpy(previous_ctx.maps, current->maps,
-             current->map_count * sizeof(ebpf_map_info_t));
-    }
+    log_info("STATE_EBPF_ARTIFACTS: XDP program count: %u", xdp);
+  }
+  if (tracep) {
+
+    log_info("STATE_EBPF_ARTIFACTS: TRACEPOINT program count: %u", tracep);
   }
 }
 
-/**
- * Main state callback for eBPF artifact detection
- * Runs periodically to sample and analyze eBPF subsystem state
- */
 uint32_t state_ebpf_artifacts_callback(vmi_instance_t vmi, void* context) {
-  (void)context;  // Unused parameter
+  (void)context;
 
-  ebpf_detection_ctx_t current_ctx;
+  ebpf_detection_ctx_t ctx;
   uint32_t result = VMI_SUCCESS;
 
-  log_info("Starting eBPF state sampling");
+  log_info("Executing STATE_EBPF_ARTIFACTS callback.");
 
-  // Initialize detection context
-  init_detection_context(&current_ctx);
+  ebpf_detection_ctx_t_initialize(&ctx);
+  audit_ebpf_runtime_toggles(vmi, &ctx);
 
-  // Enumerate all eBPF programs
-  if (enumerate_ebpf_programs(vmi, &current_ctx) != VMI_SUCCESS) {
-    log_error("Failed to enumerate eBPF programs");
-    result = VMI_FAILURE;
+  for (uint32_t i = 0; i < ctx.prog_count; i++) {
+    const ebpf_prog_info_t* program = &ctx.programs[i];
+    check_known_rootkit_signature(program->name);
+    check_ebpf_kprobe_hooks(program);
+    check_ebpf_tracepoint_hooks(program);
+    check_xdp_backdoor(program);
   }
+  analyze_bpf_maps(&ctx);
 
-  // Enumerate all eBPF maps
-  if (enumerate_ebpf_maps(vmi) != VMI_SUCCESS) {
-    log_error("Failed to enumerate eBPF maps");
-    // Don't fail completely, continue with what we have
-  }
+  calculate_program_type_counts(&ctx);
 
-  // Analyze each program for suspicious patterns
-  for (uint32_t i = 0; i < current_ctx.prog_count; i++) {
-    ebpf_prog_info_t* prog = &current_ctx.programs[i];
+  ebpf_detection_ctx_t_cleanup(&ctx);
 
-    // Check for known rootkit signatures
-    if (check_known_rootkit_signature(prog->name)) {
-      current_ctx.suspicious_flags |= EBPF_SUSPICIOUS_HIDDEN_PROG;
-    }
+  log_info("STATE_EBPF_ARTIFACTS callback completed.");
 
-    // Check for obfuscated names
-    if (check_obfuscated_name(prog->name)) {
-      current_ctx.suspicious_flags |= EBPF_SUSPICIOUS_OBFUSCATED_NAME;
-    }
-
-    // Check for suspicious kprobe hooks
-    if (check_kprobe_hooks(prog)) {
-      current_ctx.suspicious_flags |= EBPF_SUSPICIOUS_KPROBE_SYSCALL;
-    }
-
-    // Check for XDP backdoors
-    if (check_xdp_backdoor(prog)) {
-      current_ctx.suspicious_flags |= EBPF_SUSPICIOUS_XDP_BACKDOOR;
-    }
-  }
-
-  // Check for hidden programs.
-  if (check_hidden_programs(vmi, &current_ctx)) {
-    current_ctx.suspicious_flags |= EBPF_SUSPICIOUS_HIDDEN_PROG;
-  }
-
-  // Analyze BPF maps.
-  analyze_bpf_maps(&current_ctx);
-
-  // Check syscall table integrity.
-  check_syscall_table_integrity(vmi);
-
-  // Compare with previous state.
-  compare_with_previous_state(&current_ctx);
-
-  // Generate detection report.
-  generate_detection_report(&current_ctx);
-
-  // Save current state for next comparison.
-  save_current_state(&current_ctx);
-
-  // Set result based on detection
-  if (current_ctx.suspicious_flags != 0) {
-    log_info("eBPF rootkit activity detected! Flags: 0x%04x",
-             current_ctx.suspicious_flags);
-    result = VMI_FAILURE;  // Indicate detection of suspicious activity
-  }
-
-  // Clean up current context
-  cleanup_detection_context(&current_ctx);
-
-  log_info("eBPF state sampling completed");
   return result;
 }

@@ -27,3 +27,11 @@ check-format:
 	find . -type f \( -name '*.c' -o -name '*.h' \) \
 		-not -path './build/*' -not -path '*/.git/*' -print0 | \
 		xargs -0 -n 50 $(CLANG_FORMAT) -n --Werror -style=$(FORMAT_STYLE)
+
+doxygen:
+	@if [ ! -f $(DOXYGEN_CONFIG) ]; then \
+		echo "Doxygen config ($(DOXYGEN_CONFIG)) not found. Generate one with 'doxygen -g'"; \
+		exit 1; \
+	fi
+	$(DOXYGEN) $(DOXYGEN_CONFIG)
+	echo "Documentation generated in docs/html (and docs/latex if enabled)."

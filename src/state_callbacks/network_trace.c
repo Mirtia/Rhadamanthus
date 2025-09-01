@@ -107,8 +107,9 @@ static bool is_suspicious_port(uint16_t port) {
       1234, 2222, 3333,
       31337,  ///< Back Orifice backdoor default port (LEET).
       0,      ///< Port 0 is invalid.
-      65535   ///< Highest port, invalid.
-              // TODO: Add more after checking out the EBPF rootkit samples.
+      65535,  ///< Highest port, invalid.
+      // TODO: Add more after checking out the EBPF rootkit samples.
+      8000,  ///< Default web server (ebpfkit uses).
   };
 
   size_t count = sizeof(suspicious_ports) / sizeof(suspicious_ports[0]);
@@ -479,9 +480,6 @@ static uint32_t walk_tcp_hash_table(vmi_instance_t vmi,
 /**
  * @brief Check netfilter hooks for modifications (Kernel 5.x+ compatible).
  * 
- * @note In kernel 5.x+, netfilter hooks are stored per-netns in struct net
- * instead of the global nf_hooks array that existed in older kernels.
- * 
  * @param vmi The VMI instance.
  * @param ctx The detection context containing state and results.
  * @return uint32_t VMI_SUCCESS on success, VMI_FAILURE on error.
@@ -553,7 +551,6 @@ static uint32_t check_netfilter_hooks(vmi_instance_t vmi,
 
         bool suspicious = false;
 
-        // Correct logic: suspicious if NOT in kernel text
         if (!is_in_kernel_text(vmi, hook_func)) {
           log_debug(
               "SUSPICIOUS: %s HOOK=%d func outside kernel text @ 0x%" PRIx64,
