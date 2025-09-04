@@ -182,8 +182,8 @@ static event_response_t ebpf_probe_singlestep_callback(vmi_instance_t vmi,
   uint32_t vcpu_id = event->vcpu_id;
 
   // Re-plant INT3 breakpoint
-  uint8_t cc = 0xCC;
-  if (vmi_write_8_va(vmi, ctx->kaddr, 0, &cc) != VMI_SUCCESS) {
+  uint8_t x_cc = 0xCC;
+  if (vmi_write_8_va(vmi, ctx->kaddr, 0, &x_cc) != VMI_SUCCESS) {
     log_error("EVENT_EBPF_PROBE: Failed to re-plant INT3 at 0x%" PRIx64,
               ctx->kaddr);
   }
@@ -195,114 +195,4 @@ static event_response_t ebpf_probe_singlestep_callback(vmi_instance_t vmi,
   }
 
   return VMI_EVENT_RESPONSE_NONE;
-}
-
-static vmi_event_t* create_event_ebpf_probe(vmi_instance_t vmi) {
-  // Preconditions
-  if (!vmi) {
-    log_error("EVENT_EBPF_PROBE: Invalid VMI instance at event registration.");
-    return NULL;
-  }
-
-  const char* probe_functions[] = {"register_kprobe",
-                                   "register_kretprobe",
-                                   "register_uprobe",
-                                   "bpf_prog_attach",
-                                   "bpf_raw_tracepoint_open",
-                                   "tracepoint_probe_register",
-                                   NULL};
-
-  for (int i = 0; probe_functions[i] != NULL; i++) {
-    addr_t func_addr = 0;
-    if (vmi_translate_ksym2v(vmi, probe_functions[i], &func_addr) !=
-            VMI_SUCCESS ||
-        !func_addr) {
-      log_debug("EVENT_EBPF_PROBE: Symbol not found: %s", probe_functions[i]);
-      continue;
-    }
-
-    uint8_t orig = 0;
-    if (vmi_read_8_va(vmi, func_addr, 0, &orig) != VMI_SUCCESS) {
-      log_warn("EVENT_EBPF_PROBE: Failed reading byte at %s @0x%" PRIx64,
-               probe_functions[i], func_addr);
-      continue;
-    }
-
-    uint8_t cc = 0xCC;
-    if (vmi_write_8_va(vmi, func_addr, 0, &cc) != VMI_SUCCESS) {
-      log_warn("EVENT_EBPF_PROBE: Failed planting INT3 at %s @0x%" PRIx64,
-               probe_functions[i], func_addr);
-      continue;
-    }
-
-    ebpf_probe_ctx_t* ctx = (ebpf_probe_ctx_t*)g_malloc(sizeof(*ctx));
-    if (!ctx) {
-      log_error("EVENT_EBPF_PROBE: Failed to allocate probe context");
-      vmi_write_8_va(vmi, func_addr, 0, &orig);
-      continue;
-    }
-    ctx->kaddr = func_addr;
-    ctx->orig = orig;
-    ctx->symname = probe_functions[i];
-
-    // Interrupt (INT3) event
-    vmi_event_t* intr_event = (vmi_event_t*)g_malloc(sizeof(*intr_event));
-    if (!intr_event) {
-      log_error("EVENT_EBPF_PROBE: Failed to allocate interrupt vmi_event_t");
-      vmi_write_8_va(vmi, func_addr, 0, &orig);
-      g_free(ctx);
-      continue;
-    }
-
-    memset(intr_event, 0, sizeof(*intr_event));
-    intr_event->version = VMI_EVENTS_VERSION;
-    intr_event->type = VMI_EVENT_INTERRUPT;
-    intr_event->interrupt_event.intr = INT3;  // software breakpoint
-    intr_event->interrupt_event.reinject =
-        -1;  // leave reinjection policy unchanged
-    intr_event->callback = event_ebpf_probe_callback;
-    intr_event->data = ctx;
-
-    if (vmi_register_event(vmi, intr_event) != VMI_SUCCESS) {
-      log_warn("EVENT_EBPF_PROBE: Failed to register INTERRUPT(INT3) for %s",
-               probe_functions[i]);
-      vmi_write_8_va(vmi, func_addr, 0, &orig);
-      g_free(ctx);
-      g_free(intr_event);
-      continue;
-    }
-
-    // Single-step event: re-plant INT3 after one instruction
-    vmi_event_t* ss_event = (vmi_event_t*)g_malloc(sizeof(*ss_event));
-    if (!ss_event) {
-      log_error("EVENT_EBPF_PROBE: Failed to allocate single-step vmi_event_t");
-      vmi_write_8_va(vmi, func_addr, 0, &orig);
-      g_free(ctx);
-      g_free(intr_event);
-      continue;
-    }
-
-    memset(ss_event, 0, sizeof(*ss_event));
-    ss_event->version = VMI_EVENTS_VERSION;
-    ss_event->type = VMI_EVENT_SINGLESTEP;
-    ss_event->callback = ebpf_probe_singlestep_callback;
-    ss_event->data = ctx;
-
-    if (vmi_register_event(vmi, ss_event) != VMI_SUCCESS) {
-      log_warn("EVENT_EBPF_PROBE: Failed to register SINGLESTEP for %s",
-               probe_functions[i]);
-      vmi_write_8_va(vmi, func_addr, 0, &orig);
-      g_free(ctx);
-      g_free(intr_event);
-      g_free(ss_event);
-      continue;
-    }
-
-    log_info("EVENT_EBPF_PROBE: Monitoring enabled on %s @0x%" PRIx64,
-             probe_functions[i], func_addr);
-    return intr_event;
-  }
-
-  log_warn("EVENT_EBPF_PROBE: No probe registration symbols could be hooked");
-  return NULL;
 }

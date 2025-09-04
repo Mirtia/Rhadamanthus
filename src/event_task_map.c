@@ -14,20 +14,22 @@
 #include "event_callbacks/page_table_modification.h"
 #include "event_callbacks/syscall_table_write.h"
 
-#define PAGE_SIZE 4096  ///< X86_64 page size
+#define PAGE_SIZE 4096  ///< x86_64 page size
+#define PAGE_SHIFT 12
+#define PAGE_MASK (~(PAGE_SIZE - 1ULL))
 
 // Event creation functions, early declarations for the map later on.
-static vmi_event_t* create_event_ftrace_hook(vmi_instance_t vmi);
-static vmi_event_t* create_event_syscall_table_write(vmi_instance_t vmi);
-static vmi_event_t* create_event_idt_write(vmi_instance_t vmi);
-static vmi_event_t* create_event_cr0_write(vmi_instance_t vmi);
-static vmi_event_t* create_event_page_table_modification(vmi_instance_t vmi);
-static vmi_event_t* create_event_netfilter_hook_write(vmi_instance_t vmi);
-static vmi_event_t* create_event_msr_write(vmi_instance_t vmi);
-static vmi_event_t* create_event_code_section_modify(vmi_instance_t vmi);
-static vmi_event_t* create_event_io_uring_ring_write(vmi_instance_t vmi);
-static vmi_event_t* create_event_ebpf_probe(vmi_instance_t vmi);
-static vmi_event_t* create_event_kallsyms_table_write(vmi_instance_t vmi);
+static GPtrArray* create_event_ftrace_hook(vmi_instance_t vmi);
+static GPtrArray* create_event_syscall_table_write(vmi_instance_t vmi);
+static GPtrArray* create_event_idt_write(vmi_instance_t vmi);
+static GPtrArray* create_event_cr0_write(vmi_instance_t vmi);
+static GPtrArray* create_event_page_table_modification(vmi_instance_t vmi);
+static GPtrArray* create_event_netfilter_hook_write(vmi_instance_t vmi);
+static GPtrArray* create_event_msr_write(vmi_instance_t vmi);
+static GPtrArray* create_event_code_section_modify(vmi_instance_t vmi);
+static GPtrArray* create_event_io_uring_ring_write(vmi_instance_t vmi);
+static GPtrArray* create_event_ebpf_probe(vmi_instance_t vmi);
+static GPtrArray* create_event_kallsyms_table_write(vmi_instance_t vmi);
 
 static vmi_event_t* setup_memory_event(
     addr_t addr, vmi_mem_access_t access_type,
@@ -41,7 +43,7 @@ static vmi_event_t* setup_register_event(
  */
 typedef struct {
   event_task_id_t task_id;
-  vmi_event_t* (*create_func)(vmi_instance_t vmi);
+  GPtrArray* (*create_func)(vmi_instance_t vmi);
   event_response_t (*callback)(vmi_instance_t, vmi_event_t*);
   const char* description;
 } event_task_map_entry_t;
@@ -75,7 +77,7 @@ static const event_task_map_entry_t event_task_map[] = {
     {.task_id = EVENT_MSR_WRITE,
      .create_func = create_event_msr_write,
      .callback = event_msr_write_callback,
-     .description = "Model Specific Register modification detection"},
+     .description = "MSR modification detection"},
     {.task_id = EVENT_CODE_SECTION_MODIFY,
      .create_func = create_event_code_section_modify,
      .callback = event_code_section_modify_callback,
@@ -83,7 +85,7 @@ static const event_task_map_entry_t event_task_map[] = {
     {.task_id = EVENT_IO_URING_RING_WRITE,
      .create_func = create_event_io_uring_ring_write,
      .callback = event_io_uring_ring_write_callback,
-     .description = "io_uring ring buffer modification detection"},
+     .description = "io_uring behavior detection"},
     {.task_id = EVENT_EBPF_PROBE,
      .create_func = create_event_ebpf_probe,
      .callback = event_ebpf_probe_callback,
@@ -96,11 +98,19 @@ static const event_task_map_entry_t event_task_map[] = {
 static const size_t event_task_map_size =
     sizeof(event_task_map) / sizeof(event_task_map[0]);
 
+/**
+* @brief Set the up memory event object
+* 
+* @param phy_addr The input physical adress.
+* @param access_type The type of access.
+* @param callback 
+* @return vmi_event_t* 
+*/
 static vmi_event_t* setup_memory_event(
-    //NOLINTNEXTLINE
-    addr_t addr, vmi_mem_access_t access_type,
+    // NOLINTNEXTLINE
+    addr_t phy_addr, vmi_mem_access_t access_type,
     event_response_t (*callback)(vmi_instance_t, vmi_event_t*)) {
-
+  // g_new is encouraged for type safety
   vmi_event_t* event = g_new0(vmi_event_t, 1);
   if (event == NULL) {
     log_error("Failed to allocate memory for vmi_event_t");
@@ -109,11 +119,12 @@ static vmi_event_t* setup_memory_event(
 
   event->version = VMI_EVENTS_VERSION;
   event->type = VMI_EVENT_MEMORY;
-  event->mem_event.gfn = addr >> 12;
-  event->mem_event.generic = 0;
+  // This assumes that the address has been translated to physical, responsiblity of the caller.
+  // Shift by 12 to get guest frame number (physical page number).
+  event->mem_event.gfn = phy_addr >> 12;
+  // out_access is ignored.
   event->mem_event.in_access = access_type;
   event->callback = callback;
-
   return event;
 }
 
@@ -121,7 +132,6 @@ static vmi_event_t* setup_register_event(
     // NOLINTNEXTLINE
     reg_t reg, vmi_reg_access_t access_type,
     event_response_t (*callback)(vmi_instance_t, vmi_event_t*)) {
-  // g_new is encouraged for type safety
   vmi_event_t* event = g_new0(vmi_event_t, 1);
   if (event == NULL) {
     log_error("Failed to allocate memory for vmi_event_t");
@@ -137,7 +147,7 @@ static vmi_event_t* setup_register_event(
   return event;
 }
 
-static vmi_event_t* create_event_ftrace_hook(vmi_instance_t vmi) {
+static GPtrArray* create_event_ftrace_hook(vmi_instance_t vmi) {
   // Preconditions
   if (!vmi) {
     log_error("Invalid VMI instance at event registration.");
@@ -152,11 +162,18 @@ static vmi_event_t* create_event_ftrace_hook(vmi_instance_t vmi) {
     return NULL;
   }
 
-  return setup_memory_event(ftrace_ops_addr, VMI_MEMACCESS_W,
-                            event_ftrace_hook_callback);
+  vmi_event_t* event = setup_memory_event(ftrace_ops_addr, VMI_MEMACCESS_W,
+                                          event_ftrace_hook_callback);
+  if (!event) {
+    return NULL;
+  }
+
+  GPtrArray* events = g_ptr_array_new_with_free_func(g_free);
+  g_ptr_array_add(events, event);
+  return events;
 }
 
-static vmi_event_t* create_event_syscall_table_write(vmi_instance_t vmi) {
+static GPtrArray* create_event_syscall_table_write(vmi_instance_t vmi) {
   // Preconditions
   if (!vmi) {
     log_error("Invalid VMI instance at event registration.");
@@ -169,73 +186,173 @@ static vmi_event_t* create_event_syscall_table_write(vmi_instance_t vmi) {
     return NULL;
   }
 
-  size_t syscall_table_size = 512 * sizeof(addr_t);
-  return setup_memory_event(sys_call_table, VMI_MEMACCESS_W,
-                            event_syscall_table_write_callback);
+  vmi_event_t* event = setup_memory_event(sys_call_table, VMI_MEMACCESS_W,
+                                          event_syscall_table_write_callback);
+  if (!event) {
+    return NULL;
+  }
+  GPtrArray* events = g_ptr_array_new_with_free_func(g_free);
+  g_ptr_array_add(events, event);
+  return events;
 }
 
-static vmi_event_t* create_event_idt_write(vmi_instance_t vmi) {
+static GPtrArray* create_event_idt_write(vmi_instance_t vmi) {
   // Preconditions
   if (!vmi) {
     log_error("Invalid VMI instance at event registration.");
     return NULL;
   }
-  uint64_t idtr_base = 0;
-  uint32_t vcpu_count = vmi_get_num_vcpus(vmi);
 
-  if (vcpu_count > 0) {
-    if (vmi_get_vcpureg(vmi, &idtr_base, IDTR_BASE, 0) != VMI_SUCCESS) {
-      log_error("Failed to get IDTR base address");
-      return NULL;
-    }
-  } else {
+  const uint32_t vcpu_count = vmi_get_num_vcpus(vmi);
+  if (vcpu_count == 0) {
     log_error("No VCPUs available");
     return NULL;
   }
 
-  size_t idt_size = (size_t)(256) * 16;
-  return setup_memory_event(idtr_base, VMI_MEMACCESS_W,
-                            event_idt_write_callback);
+  // Where we collect the events.
+  GPtrArray* events = g_ptr_array_new_with_free_func(g_free);
+  GArray* seen_gfns = g_array_new(FALSE, FALSE, sizeof(addr_t));
+
+  for (uint32_t vcpu = 0; vcpu < vcpu_count; ++vcpu) {
+    uint64_t idtr_base = 0;
+    uint64_t idtr_limit = 0;
+
+    if (vmi_get_vcpureg(vmi, &idtr_base, IDTR_BASE, vcpu) != VMI_SUCCESS) {
+      log_warn("IDT: failed to read IDTR_BASE on vCPU %u", vcpu);
+      continue;
+    }
+    if (vmi_get_vcpureg(vmi, &idtr_limit, IDTR_LIMIT, vcpu) != VMI_SUCCESS) {
+      // Fallback: a full 4-KiB IDT (256 * 16 bytes) → limit = 4096-1.
+      idtr_limit = 4096 - 1;
+    }
+
+    const addr_t idt_va = (addr_t)idtr_base;
+    const size_t idt_size = (size_t)idtr_limit + 1;
+
+    // Compute page coverage of the IDT for this vCPU.
+    const addr_t first_page_va = idt_va & ~(addr_t)(PAGE_SIZE - 1);
+    const size_t first_off = (size_t)(idt_va & (PAGE_SIZE - 1));
+    const size_t page_count =
+        (first_off + idt_size + PAGE_SIZE - 1) / PAGE_SIZE;
+
+    for (size_t i = 0; i < page_count; ++i) {
+      const addr_t page_va = first_page_va + i * PAGE_SIZE;
+
+      // VA→PA for the page start.
+      addr_t page_pa = 0;
+      if (vmi_translate_kv2p(vmi, page_va, &page_pa) != VMI_SUCCESS ||
+          !page_pa) {
+        log_warn("IDT: VA->PA failed (vCPU %u, VA=0x%lx)", vcpu,
+                 (unsigned long)page_va);
+        continue;
+      }
+
+      const addr_t gfn = page_pa >> 12;
+
+      // Deduplicate by GFN.
+      bool already = false;
+      for (guint j = 0; j < seen_gfns->len; ++j) {
+        if (g_array_index(seen_gfns, addr_t, j) == gfn) {
+          already = true;
+          break;
+        }
+      }
+      if (already)
+        continue;
+
+      // Remember this GFN.
+      g_array_append_val(seen_gfns, gfn);
+
+      // Create the memory write event on this physical page.
+      vmi_event_t* ev = g_new0(vmi_event_t, 1);
+      if (!ev) {
+        log_error("IDT: failed to allocate vmi_event_t");
+        continue;
+      }
+      ev->version = VMI_EVENTS_VERSION;
+      ev->type = VMI_EVENT_MEMORY;
+      ev->mem_event.gfn = gfn;
+      ev->mem_event.in_access =
+          VMI_MEMACCESS_W;  // we care about writes to the IDT
+      ev->mem_event.out_access = 0;
+      ev->callback = event_idt_write_callback;
+
+      g_ptr_array_add(events, ev);
+
+      log_info(
+          "IDT: monitoring vCPU %u IDT page: VA=0x%lx PA=0x%lx GFN=0x%lx "
+          "(base=0x%llx, limit=0x%llx)",
+          vcpu, (unsigned long)page_va, (unsigned long)page_pa,
+          (unsigned long)gfn, (unsigned long long)idtr_base,
+          (unsigned long long)idtr_limit);
+    }
+  }
+
+  g_array_free(seen_gfns, TRUE);
+
+  if (events->len == 0) {
+    g_ptr_array_free(events, TRUE);
+    log_warn("IDT: no pages were registered (no translations succeeded).");
+    return NULL;
+  }
+
+  return events;
 }
 
-static vmi_event_t* create_event_cr0_write(vmi_instance_t vmi) {
+static GPtrArray* create_event_cr0_write(vmi_instance_t vmi) {
   // Preconditions
   if (!vmi) {
     log_error("Invalid VMI instance at event registration.");
     return NULL;
   }
-  return setup_register_event(CR0, VMI_REGACCESS_W, event_cr0_write_callback);
+  vmi_event_t* event =
+      setup_register_event(CR0, VMI_REGACCESS_W, event_cr0_write_callback);
+  if (!event) {
+    return NULL;
+  }
+
+  GPtrArray* events = g_ptr_array_new_with_free_func(g_free);
+  g_ptr_array_add(events, event);
+  return events;
 }
 
-static vmi_event_t* create_event_page_table_modification(vmi_instance_t vmi) {
+static GPtrArray* create_event_page_table_modification(vmi_instance_t vmi) {
   // Preconditions
   if (!vmi) {
     log_error("Invalid VMI instance at event registration.");
     return NULL;
   }
-  // Hypervisor shit
-  // Get current CR3 (kernel CR3 on vCPU 0 is fine for a single baseline).
+
+  // Get kernel CR3 from vCPU 0 (single-baseline; extend later if needed)
   uint64_t cr3 = 0;
   if (vmi_get_vcpureg(vmi, &cr3, CR3, 0) != VMI_SUCCESS) {
     log_error("PT watch: failed to read CR3");
     return NULL;
   }
-  addr_t pml4_pa = (addr_t)(cr3 & ~0xFFFULL);
 
-  // Create the memory write event on the PML4 page (GFN = PA >> 12).
+  // Extract PML4 base physical address: CR3[63:12]
+  const addr_t pml4_pa = (addr_t)(cr3 & PAGE_MASK);
+
+  // Create the memory event on the PML4 page (writes only)
   vmi_event_t* event = setup_memory_event(
       pml4_pa, VMI_MEMACCESS_W, event_page_table_modification_callback);
-  if (!event)
-    return NULL;
 
-  // Allocate and seed the context with an initial snapshot (if possible).
+  if (!event) {
+    log_error("PT watch: failed to create memory event");
+    return NULL;
+  }
+
+  // Allocate and seed the watcher context with an initial snapshot (best-effort)
   pt_watch_ctx_t* ctx = g_malloc0(sizeof(*ctx));
+
   if (!ctx) {
     log_error("PT watch: failed to allocate context");
     g_free(event);
     return NULL;
   }
+
   ctx->pml4_pa = pml4_pa;
+
   if (vmi_read_pa(vmi, ctx->pml4_pa, sizeof(ctx->shadow), ctx->shadow, NULL) ==
       VMI_SUCCESS) {
     ctx->shadow_valid = 1;
@@ -247,102 +364,81 @@ static vmi_event_t* create_event_page_table_modification(vmi_instance_t vmi) {
         "write",
         (unsigned long)ctx->pml4_pa);
   }
-
   event->data = ctx;
-  return event;
+
+  GPtrArray* events = g_ptr_array_new_with_free_func(NULL);
+  g_ptr_array_add(events, event);
+  return events;
 }
 
-/**
- * @brief Create the breakpoint on nf_register_net_hook / nf_register_net_hooks.
- *
- * Replaces the old memory-write watcher. Returns the first successfully
- * registered BREAKPOINT event; caller registers it with LibVMI and keeps it alive.
- */
-static vmi_event_t* create_event_netfilter_hook_write(vmi_instance_t vmi) {
+static GPtrArray* create_event_netfilter_hook_write(vmi_instance_t vmi) {
   // Preconditions
   if (!vmi) {
     log_error("Invalid VMI instance at event registration.");
     return NULL;
   }
 
-  const char* candidates[] = {"nf_register_net_hook", "nf_register_net_hooks"};
+  const char* hook = "nf_register_net_hook";
 
-  for (size_t i = 0; i < sizeof(candidates) / sizeof(candidates[0]); i++) {
-    addr_t kaddr = 0;
-    if (vmi_translate_ksym2v(vmi, candidates[i], &kaddr) != VMI_SUCCESS ||
-        !kaddr) {
-      log_debug("Symbol not found: %s", candidates[i]);
-      continue;
-    }
-
-    uint8_t orig = 0;
-    if (vmi_read_8_va(vmi, kaddr, 0, &orig) != VMI_SUCCESS) {
-      log_warn("Failed reading first byte at %s @0x%" PRIx64, candidates[i],
-               (uint64_t)kaddr);
-      continue;
-    }
-
-    uint8_t cc = 0xCC;
-    if (vmi_write_8_va(vmi, kaddr, 0, &cc) != VMI_SUCCESS) {
-      log_warn("Failed planting INT3 at %s @0x%" PRIx64, candidates[i],
-               (uint64_t)kaddr);
-      continue;
-    }
-
-    // Allocate context and breakpoint event
-    nf_bp_ctx_t* ctx = (nf_bp_ctx_t*)g_malloc0(sizeof(*ctx));
-    if (!ctx) {
-      log_error("Failed to allocate nf_bp_ctx_t");
-      // Try to restore the byte we just patched (best-effort)
-      {
-        uint8_t val = orig;
-        (void)vmi_write_8_va(vmi, kaddr, 0, &val);
-      }
-      continue;
-    }
-    ctx->kaddr = kaddr;
-    ctx->orig = orig;
-    ctx->symname = candidates[i];
-
-    vmi_event_t* bp_evt = (vmi_event_t*)g_malloc0(sizeof(*bp_evt));
-    if (!bp_evt) {
-      log_error("Failed to allocate vmi_event_t");
-      {
-        uint8_t val = orig;
-        (void)vmi_write_8_va(vmi, kaddr, 0, &val);
-      }
-      g_free(ctx);
-      continue;
-    }
-
-    memset(bp_evt, 0, sizeof(*bp_evt));
-    bp_evt->version = VMI_EVENTS_VERSION;
-    bp_evt->type = VMI_EVENT_SINGLESTEP;
-    bp_evt->callback =
-        event_netfilter_hook_write_callback;  // exported name used in map
-    bp_evt->data = ctx;
-
-    if (vmi_register_event(vmi, bp_evt) != VMI_SUCCESS) {
-      log_warn("Failed to register BREAKPOINT event for %s", candidates[i]);
-      // Restore original byte on failure
-      {
-        uint8_t val = orig;
-        (void)vmi_write_8_va(vmi, kaddr, 0, &val);
-      }
-      g_free(ctx);
-      g_free(bp_evt);
-      continue;
-    }
-
-    log_info("Planted INT3 on %s @0x%" PRIx64, candidates[i], (uint64_t)kaddr);
-    return bp_evt;
+  addr_t kaddr = 0;
+  if (vmi_translate_ksym2v(vmi, hook, &kaddr) != VMI_SUCCESS || !kaddr) {
+    log_debug("Symbol not found: %s", hook);
+    return NULL;
   }
 
-  log_error("No netfilter registration symbols could be hooked.");
-  return NULL;
+  uint8_t orig = 0;
+  if (vmi_read_8_va(vmi, kaddr, 0, &orig) != VMI_SUCCESS) {
+    log_warn("Failed reading first byte at %s @0x%" PRIx64, hook,
+             (uint64_t)kaddr);
+    return NULL;
+  }
+
+  uint8_t x_cc = 0xCC;
+  if (vmi_write_8_va(vmi, kaddr, 0, &x_cc) != VMI_SUCCESS) {
+    log_warn("Failed planting INT3 at %s @0x%" PRIx64, hook, (uint64_t)kaddr);
+    return NULL;
+  }
+
+  // Allocate context and breakpoint event
+  nf_bp_ctx_t* ctx = g_malloc0(sizeof(*ctx));
+  if (!ctx) {
+    log_error("Failed to allocate nf_bp_ctx_t");
+    // Restore byte (CC)
+    {
+      uint8_t val = orig;
+      (void)vmi_write_8_va(vmi, kaddr, 0, &val);
+      return NULL;
+    }
+  }
+  ctx->kaddr = kaddr;
+  ctx->orig = orig;
+  ctx->symname = hook;
+
+  vmi_event_t* event = (vmi_event_t*)g_malloc0(sizeof(*event));
+  if (!event) {
+    log_error("Failed to allocate vmi_event_t");
+    {
+      uint8_t val = orig;
+      (void)vmi_write_8_va(vmi, kaddr, 0, &val);
+    }
+    g_free(ctx);
+    return NULL;
+  }
+
+  memset(event, 0, sizeof(*event));
+  event->version = VMI_EVENTS_VERSION;
+  event->type = VMI_EVENT_INTERRUPT;
+  event->interrupt_event.intr = INT3;
+  event->interrupt_event.reinject = 1;
+  event->callback = event_netfilter_hook_write_callback;
+  event->data = ctx;
+
+  GPtrArray* events = g_ptr_array_new_with_free_func(g_free);
+  g_ptr_array_add(events, event);
+  return events;
 }
 
-static vmi_event_t* create_event_msr_write(vmi_instance_t vmi) {
+static GPtrArray* create_event_msr_write(vmi_instance_t vmi) {
   // Preconditions
   if (!vmi) {
     log_error("Invalid VMI instance at event registration.");
@@ -350,12 +446,21 @@ static vmi_event_t* create_event_msr_write(vmi_instance_t vmi) {
   }
   // Monitor all MSR writes
   (void)vmi;
-  return setup_register_event(MSR_ALL, VMI_REGACCESS_W,
-                              event_msr_write_callback);
+  vmi_event_t* event =
+      setup_register_event(MSR_ALL, VMI_REGACCESS_W, event_msr_write_callback);
+
+  if (!event) {
+    return NULL;
+  }
+
+  GPtrArray* events = g_ptr_array_new_with_free_func(g_free);
+  g_ptr_array_add(events, event);
+  return events;
 }
 
-static vmi_event_t* create_event_code_section_modify(vmi_instance_t vmi) {
+static GPtrArray* create_event_code_section_modify(vmi_instance_t vmi) {
   // Preconditions
+  // TODO:
   if (!vmi) {
     log_error("Invalid VMI instance at event registration.");
     return NULL;
@@ -390,29 +495,18 @@ static vmi_event_t* create_event_code_section_modify(vmi_instance_t vmi) {
   return NULL;
 }
 
-static vmi_event_t* create_event_io_uring_ring_write(vmi_instance_t vmi) {
+static GPtrArray* create_event_io_uring_ring_write(vmi_instance_t vmi) {
   // Preconditions
   if (!vmi) {
     log_error("Invalid VMI instance at event registration.");
     return NULL;
   }
   addr_t kaddr = 0;
-  const char* chosen_sym = NULL;
 
-  /* Try common symbol names: x86_64 first, then generic. */
-  const char* candidates[] = {
-      "__x64_sys_io_uring_enter",
-      "io_uring_enter",
-  };
+  // xTry common symbol names: x86_64 first, then generic. Greedy ;)
+  const char* hook = "__x64_sys_io_uring_enter";
 
-  for (size_t i = 0; i < sizeof(candidates) / sizeof(candidates[0]); i++) {
-    if (vmi_translate_ksym2v(vmi, candidates[i], &kaddr) == VMI_SUCCESS &&
-        kaddr) {
-      chosen_sym = candidates[i];
-      break;
-    }
-  }
-  if (!chosen_sym) {
+  if (vmi_translate_ksym2v(vmi, hook, &kaddr) != VMI_SUCCESS) {
     log_warn(
         "io_uring: could not resolve io_uring_enter symbol on this kernel; "
         "skipping.");
@@ -431,8 +525,9 @@ static vmi_event_t* create_event_io_uring_ring_write(vmi_instance_t vmi) {
     g_free(event);
     return NULL;
   }
+
   ctx->kaddr = kaddr;
-  ctx->symname = chosen_sym;
+  ctx->symname = hook;
 
   // Save original first byte and patch INT3 (0xCC).
   if (vmi_read_8_va(vmi, kaddr, 0, &ctx->orig) != VMI_SUCCESS) {
@@ -442,8 +537,9 @@ static vmi_event_t* create_event_io_uring_ring_write(vmi_instance_t vmi) {
     g_free(event);
     return NULL;
   }
-  uint8_t int3 = 0xCC;
-  if (vmi_write_8_va(vmi, kaddr, 0, &int3) != VMI_SUCCESS) {
+
+  uint8_t x_cc = 0xCC;
+  if (vmi_write_8_va(vmi, kaddr, 0, &x_cc) != VMI_SUCCESS) {
     log_error("io_uring: failed to write INT3 @0x%" PRIx64
               " (text may be write-protected).",
               (uint64_t)kaddr);
@@ -453,174 +549,109 @@ static vmi_event_t* create_event_io_uring_ring_write(vmi_instance_t vmi) {
   }
 
   event->version = VMI_EVENTS_VERSION;
-  event->type = VMI_EVENT_SINGLESTEP;
+  event->type = VMI_EVENT_INTERRUPT;
+  event->interrupt_event.intr = INT3;
+  event->interrupt_event.reinject = 1;
   event->data = ctx;
-
-  return event;
+  GPtrArray* events = g_ptr_array_new_with_free_func(g_free);
+  g_ptr_array_add(events, event);
+  return events;
 }
 
-static vmi_event_t* create_event_ebpf_probe(vmi_instance_t vmi) {
+static GPtrArray* create_event_ebpf_probe(vmi_instance_t vmi) {
   if (!vmi) {
     log_error("Invalid VMI instance at event registration.");
     return NULL;
   }
 
-  // Functions to monitor for eBPF/probe activity
-  const char* probe_functions[] = {
-      "register_kprobe",            // Kernel function hooks
-      "register_kretprobe",         // Return probes
-      "register_uprobe",            // User-space probes
-      "bpf_prog_attach",            // eBPF program attachment
-      "bpf_raw_tracepoint_open",    // Raw tracepoint attachment
+  static const char* probe_functions[] = {
+      "register_kprobe",     // Kernel kprobe hooks
+      "register_kretprobe",  // Return probes
+      "register_uprobe",     // User-space probes (may be absent)
+      "bpf_prog_attach",     // eBPF program attachment (not always exported)
+      "bpf_raw_tracepoint_open",    // Raw tracepoint attach
       "tracepoint_probe_register",  // Tracepoint probes
       NULL};
 
-  // Try each function until we find one that works
+  GPtrArray* events = g_ptr_array_new_with_free_func(g_free);
+  unsigned monitored = 0;
+
   for (int i = 0; probe_functions[i] != NULL; i++) {
-    addr_t func_addr = 0;
-    if (vmi_translate_ksym2v(vmi, probe_functions[i], &func_addr) !=
-            VMI_SUCCESS ||
-        !func_addr) {
-      log_debug("Symbol not found: %s", probe_functions[i]);
+    const char* sym = probe_functions[i];
+    addr_t func_va = 0;
+    if (vmi_translate_ksym2v(vmi, sym, &func_va) != VMI_SUCCESS || !func_va) {
+      log_debug("Symbol not found: %s", sym);
       continue;
     }
 
-    // Read original byte
+    // Read original first byte (needed for INT3 patching).
     uint8_t orig = 0;
-    if (vmi_read_8_va(vmi, func_addr, 0, &orig) != VMI_SUCCESS) {
-      log_warn("Failed reading byte at %s @0x%" PRIx64, probe_functions[i],
-               func_addr);
+    if (vmi_read_8_va(vmi, func_va, 0, &orig) != VMI_SUCCESS) {
+      log_warn("Failed reading first byte at %s @0x%" PRIx64, sym,
+               (uint64_t)func_va);
       continue;
     }
 
-    // Plant INT3 breakpoint
+    // Plant INT3 (0xCC) — debugger-style breakpoint.
     uint8_t cc = 0xCC;
-    if (vmi_write_8_va(vmi, func_addr, 0, &cc) != VMI_SUCCESS) {
-      log_warn("Failed planting INT3 at %s @0x%" PRIx64, probe_functions[i],
-               func_addr);
+    if (vmi_write_8_va(vmi, func_va, 0, &cc) != VMI_SUCCESS) {
+      log_warn("Failed planting INT3 at %s @0x%" PRIx64, sym,
+               (uint64_t)func_va);
       continue;
     }
 
-    // Allocate context
     ebpf_probe_ctx_t* ctx = g_malloc0(sizeof(*ctx));
     if (!ctx) {
-      log_error("Failed to allocate probe context");
-      vmi_write_8_va(vmi, func_addr, 0, &orig);
+      log_error("Failed to allocate ebpf_probe_ctx_t");
+      (void)vmi_write_8_va(vmi, func_va, 0, &orig);
       continue;
     }
-    ctx->kaddr = func_addr;
+    ctx->kaddr = func_va;
     ctx->orig = orig;
-    ctx->symname = probe_functions[i];
+    ctx->symname = sym;
 
-    // Allocate event
+    // Allocate & populate event.
     vmi_event_t* event = g_malloc0(sizeof(*event));
     if (!event) {
       log_error("Failed to allocate vmi_event_t");
-      vmi_write_8_va(vmi, func_addr, 0, &orig);
+      (void)vmi_write_8_va(vmi, func_va, 0, &orig);
       g_free(ctx);
       continue;
     }
 
-    // Setup breakpoint event
     event->version = VMI_EVENTS_VERSION;
-    event->type = VMI_EVENT_SINGLESTEP;
+    event->type = VMI_EVENT_INTERRUPT;
+    event->interrupt_event.intr = INT3;
+    event->interrupt_event.reinject = 1;
     event->callback = event_ebpf_probe_callback;
     event->data = ctx;
 
-    // Register the event
     if (vmi_register_event(vmi, event) != VMI_SUCCESS) {
-      log_warn("Failed to register event for %s", probe_functions[i]);
-      vmi_write_8_va(vmi, func_addr, 0, &orig);  // Restore
+      log_warn("Failed to register INT3 event for %s. Restoring byte...", sym);
+      (void)vmi_write_8_va(vmi, func_va, 0, &orig);
       g_free(ctx);
       g_free(event);
       continue;
     }
 
-    log_info("eBPF probe monitoring enabled on %s @0x%" PRIx64,
-             probe_functions[i], func_addr);
-    return event;
+    log_info("eBPF probe monitoring enabled on %s @0x%" PRIx64, sym,
+             (uint64_t)func_va);
+    g_ptr_array_add(events, event);
+    monitored++;
   }
 
-  log_warn(
-      "No eBPF probe registration symbols could be hooked - monitoring "
-      "disabled");
-  return NULL;
+  if (monitored == 0) {
+    g_ptr_array_free(events, TRUE);
+    log_warn(
+        "No eBPF/trace probe symbols could be monitored (nothing registered).");
+    return NULL;
+  }
+  return events;
 }
 
-int register_all_event_tasks(event_handler_t* event_handler) {
-  // Preconditions
-  if (!event_handler) {
-    log_error("Event handler is NULL");
-    return -1;
-  }
-
-  int registered_count = 0;
-
-  for (size_t i = 0; i < event_task_map_size; ++i) {
-    const event_task_map_entry_t* entry = &event_task_map[i];
-
-    log_info("Registering event task: %s", entry->description);
-
-    vmi_event_t* event = entry->create_func(event_handler->vmi);
-    if (event) {
-      event_handler_register_event_task(event_handler, entry->task_id, event,
-                                        entry->callback);
-      registered_count++;
-      log_info("Successfully registered: %s", entry->description);
-    } else {
-      log_warn("Failed to create event for: %s", entry->description);
-    }
-  }
-
-  log_info("Registered %d out of %zu event tasks", registered_count,
-           event_task_map_size);
-  return registered_count;
-}
-
-int register_event_task_by_id(event_handler_t* event_handler,
-                              event_task_id_t task_id) {
-  if (!event_handler) {
-    log_error("Event handler is NULL");
-    return -1;
-  }
-
-  for (size_t i = 0; i < event_task_map_size; ++i) {
-    const event_task_map_entry_t* entry = &event_task_map[i];
-
-    if (entry->task_id == task_id) {
-      log_info("Registering specific event task: %s", entry->description);
-
-      vmi_event_t* event = entry->create_func(event_handler->vmi);
-      if (event) {
-        event_handler_register_event_task(event_handler, entry->task_id, event,
-                                          entry->callback);
-        log_info("Successfully registered: %s", entry->description);
-        return 1;
-      }
-
-      log_error("Failed to create event for: %s", entry->description);
-      return -1;
-    }
-  }
-
-  log_error("Event task ID %d not found in mapping table", task_id);
-  return -1;
-}
-
-void list_available_event_tasks(void) {
-  log_info("Available event tasks:");
-
-  for (size_t i = 0; i < event_task_map_size; i++) {
-    const event_task_map_entry_t* entry = &event_task_map[i];
-    log_info("  %d: %s - %s", entry->task_id,
-             event_task_id_to_str(entry->task_id), entry->description);
-  }
-}
-
-static vmi_event_t* create_event_kallsyms_table_write(vmi_instance_t vmi) {
-  vmi_event_t* event = g_malloc0(sizeof(vmi_event_t));
-  if (event == NULL) {
-    log_error("Failed to allocate memory for vmi_event_t");
+static GPtrArray* create_event_kallsyms_table_write(vmi_instance_t vmi) {
+  if (!vmi) {
+    log_error("Invalid VMI instance at event registration.");
     return NULL;
   }
 
@@ -628,12 +659,10 @@ static vmi_event_t* create_event_kallsyms_table_write(vmi_instance_t vmi) {
   if (vmi_translate_ksym2v(vmi, "kallsyms_addresses", &kallsyms_addresses) !=
       VMI_SUCCESS) {
     log_error("Failed to resolve kallsyms_addresses symbol");
-    g_free(event);
     return NULL;
   }
 
   size_t kallsyms_size = 0;
-
   addr_t kallsyms_num_syms = 0;
   if (vmi_translate_ksym2v(vmi, "kallsyms_num_syms", &kallsyms_num_syms) ==
       VMI_SUCCESS) {
@@ -658,9 +687,88 @@ static vmi_event_t* create_event_kallsyms_table_write(vmi_instance_t vmi) {
     kallsyms_size = 0x100000;
     log_info("Using default kallsyms_addresses size: %zu bytes", kallsyms_size);
   }
+  vmi_event_t* event = setup_memory_event(kallsyms_addresses, VMI_MEMACCESS_W,
+                                          event_kallsyms_write_callback);
+  if (!event) {
+    return NULL;
+  }
 
-  SETUP_MEM_EVENT(event, kallsyms_addresses, VMI_MEMACCESS_W,
-                  event_kallsyms_write_callback, kallsyms_size);
+  GPtrArray* events = g_ptr_array_new_with_free_func(g_free);
+  g_ptr_array_add(events, event);
+  return events;
+}
 
-  return event;
+int register_all_event_tasks(event_handler_t* event_handler) {
+  // Preconditions
+  if (!event_handler) {
+    log_error("Event handler is NULL");
+    return -1;
+  }
+
+  int registered_count = 0;
+
+  for (size_t i = 0; i < event_task_map_size; ++i) {
+    const event_task_map_entry_t* entry = &event_task_map[i];
+
+    log_info("Registering event task: %s", entry->description);
+
+    GPtrArray* events = entry->create_func(event_handler->vmi);
+    if (!events || events->len == 0) {
+      if (events)
+        g_ptr_array_free(events, TRUE);
+      log_warn("Failed to create events for: %s", entry->description);
+      continue;
+    }
+
+    event_handler_register_event_task(event_handler, entry->task_id, events);
+
+    registered_count++;
+    log_info("Successfully registered: %s (%u sub-events)", entry->description,
+             events->len);
+  }
+
+  log_info("Registered %d out of %zu event tasks", registered_count,
+           event_task_map_size);
+  return registered_count;
+}
+
+int register_event_task_by_id(event_handler_t* event_handler,
+                              event_task_id_t task_id) {
+  if (!event_handler) {
+    log_error("Event handler is NULL");
+    return -1;
+  }
+
+  if (task_id >=EVENT_TASK_ID_MAX || task_id < 0) {
+    log_error("Invalid event task ID: %d", task_id);
+    return -1;
+  }
+  const event_task_map_entry_t* entry = &event_task_map[task_id];
+
+  if (entry->task_id == task_id) {
+    log_info("Registering specific event task: %s", entry->description);
+
+    GPtrArray* events = entry->create_func(event_handler->vmi);
+    if (events) {
+      event_handler_register_event_task(event_handler, entry->task_id, events);
+      log_info("Successfully registered: %s", entry->description);
+      return 1;
+    }
+
+    log_error("Failed to create event for: %s", entry->description);
+    return -1;
+  }
+
+  log_error("Event task ID %d not found in mapping table", task_id);
+  return -1;
+}
+
+void list_available_event_tasks(void) {
+  log_info("Available event tasks:");
+
+  for (size_t i = 0; i < event_task_map_size; i++) {
+    const event_task_map_entry_t* entry = &event_task_map[i];
+    log_info("  %d: %s - %s", entry->task_id,
+             event_task_id_to_str(entry->task_id), entry->description);
+  }
 }

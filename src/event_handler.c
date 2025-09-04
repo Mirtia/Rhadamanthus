@@ -137,24 +137,36 @@ void event_handler_free(event_handler_t* event_handler) {
     state_task_t* task = event_handler->state_tasks[i];
     g_free(task);
   }
-
   for (int i = 0; i < EVENT_TASK_ID_MAX; ++i) {
     event_task_t* task = event_handler->event_tasks[i];
-    if (task) {
-      vmi_clear_event(event_handler->vmi, task->event, NULL);
-      // Note: The event is removed from hashtables internal to LibVMI,
-      // but the memory related to the vmi_event_t is not freed.
-      // Memory management remains the responsibility of the caller.
-      g_free(task->event);
-      g_free(task);
+    if (task->events) {
+      // Unregister each event on the list
+      for (guint j = 0; j < task->events->len; ++j) {
+        vmi_event_t* event = (vmi_event_t*)g_ptr_array_index(task->events, j);
+        if (!event)
+          continue;
+        if (vmi_clear_event(event_handler->vmi, event, NULL) == VMI_FAILURE) {
+          log_error("Failed to unregister event (task ID: %d, idx: %u)",
+                    task->id, j);
+        }
+        // Note: The event is removed from hashtables internal to LibVMI,
+        // but the memory related to the vmi_event_t is not freed.
+        // Memory management remains the responsibility of the caller.
+        // TODO: free_routine
+        g_free(event);
+      }
+      /* Prevent g_ptr_array_free from freeing elements again. */
+      g_ptr_array_set_free_func(task->events, NULL);
+      g_ptr_array_free(task->events, TRUE);
     }
-  }
+    g_free(task);
 
-  if (event_handler->vmi) {
-    vmi_destroy(event_handler->vmi);
-  }
+    if (event_handler->vmi) {
+      vmi_destroy(event_handler->vmi);
+    }
 
-  g_free(event_handler);
+    g_free(event_handler);
+  }
 }
 
 void event_handler_register_state_task(event_handler_t* event_handler,
@@ -180,9 +192,9 @@ void event_handler_register_state_task(event_handler_t* event_handler,
   event_handler->state_tasks[task_id] = task;
 }
 
-void event_handler_register_event_task(
-    event_handler_t* event_handler, event_task_id_t task_id, vmi_event_t* event,
-    event_response_t (*callback)(vmi_instance_t, vmi_event_t*)) {
+void event_handler_register_event_task(event_handler_t* event_handler,
+                                       event_task_id_t task_id,
+                                       GPtrArray* events) {
   // Note: Each event will have its own create_event_EVENT_TASK_ID function
   // that will set the event type, flags, and other parameters.
 
@@ -191,29 +203,40 @@ void event_handler_register_event_task(
     return;
   }
 
-  if (task_id >= EVENT_TASK_ID_MAX) {
+  if (task_id >= EVENT_TASK_ID_MAX || task_id < 0) {
     log_error("Invalid event task ID: %d", task_id);
     return;
   }
 
-  if (!event) {
-    log_error("The provided event is NULL.");
+  if (!events || events->len == 0) {
+    log_error("The provided event list is NULL or empty.");
     return;
   }
 
   event_task_t* task = g_new0(event_task_t, 1);
+  if (!task) {
+    log_error("Task allocation failed for event registration.");
+    return;
+  }
 
   task->id = task_id;
-  task->event = event;
+  task->events = events;
   task->event_count = 0;
 
   // Set the callback and data in the LibVMI event struct.
-  task->event->callback = callback;
-  task->event->data = task;
+  task->events = task->events;
 
   event_handler->event_tasks[task_id] = task;
 
-  vmi_register_event(event_handler->vmi, task->event);
+  // Register each event with LibVMI.
+  for (size_t i = 0; i < events->len; ++i) {
+    vmi_event_t* event = g_ptr_array_index(events, i);
+    if (event) {
+      if (vmi_register_event(event_handler->vmi, event) == VMI_FAILURE) {
+        log_error("Failed to register event for task ID: %d", task_id);
+      }
+    }
+  }
 }
 
 void event_handler_start_event_loop(event_handler_t* event_handler) {

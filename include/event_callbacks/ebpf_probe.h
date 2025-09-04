@@ -13,14 +13,13 @@
 
 #include <libvmi/events.h>
 
-
 /**
  * @brief Context structure for eBPF probe events.
  */
 typedef struct {
-    addr_t kaddr;           ///< Address where INT3 is planted
-    uint8_t orig;           ///< Original byte replaced by 0xCC
-    const char* symname;    ///< Symbol name for logging
+  addr_t kaddr;         ///< Address where INT3 is planted
+  uint8_t orig;         ///< Original byte replaced by 0xCC
+  const char* symname;  ///< Symbol name for logging
 } ebpf_probe_ctx_t;
 
 /**
@@ -32,5 +31,5 @@ typedef struct {
  */
 
 event_response_t event_ebpf_probe_callback(vmi_instance_t vmi,
-                                                vmi_event_t* event);
+                                           vmi_event_t* event);
 #endif  // EBPF_PROBE_H

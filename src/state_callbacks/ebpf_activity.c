@@ -63,8 +63,8 @@ uint32_t state_ebpf_activity_callback(vmi_instance_t vmi, void* context) {
     if (vmi_translate_ksym2v(vmi, sym_nr_cpu, &nr_cpu_ids_va) == VMI_SUCCESS &&
         nr_cpu_ids_va) {
       uint32_t num = 0;
-      if (vmi_read_32_va(vmi, nr_cpu_ids_va, 0, &num) == VMI_SUCCESS && num > 0 &&
-          num <= 4096) {
+      if (vmi_read_32_va(vmi, nr_cpu_ids_va, 0, &num) == VMI_SUCCESS &&
+          num > 0 && num <= 4096) {
         cpu_count = num;
       }
     }

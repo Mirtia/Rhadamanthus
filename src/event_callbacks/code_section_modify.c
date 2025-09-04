@@ -6,7 +6,7 @@
 #include <stdint.h>
 
 /**
- * @brief Resolve the first-match kernel symbol for a given virtual address.
+ * @brief Resolve the kernel symbol for a given virtual address.
  * 
  * @param vmi The LibVMI instance.
  * @param virtual_addr Virtual address to resolve.

@@ -15,10 +15,10 @@
  * @brief  Task IDs for state tasks.
  */
 enum state_task_id {
-  STATE_KERNEL_MODULE_LIST,   ///< List of kernel modules.
-  STATE_FTRACE_HOOKS,         ///< List of ftrace hooks.
-  STATE_NETWORK_TRACE,        ///< Network state information.
-  STATE_SYSCALL_TABLE,        ///< Syscall table information.
+  STATE_KERNEL_MODULE_LIST = 0,  ///< List of kernel modules.
+  STATE_FTRACE_HOOKS,            ///< List of ftrace hooks.
+  STATE_NETWORK_TRACE,           ///< Network state information.
+  STATE_SYSCALL_TABLE,           ///< Syscall table information.
   STATE_IDT_TABLE,            ///< IDT table state check (are there any hooks?).
   STATE_DIR_STRING_MATCHING,  ///< Check directories and files of interest.
   STATE_PROCESS_LIST,         ///< List of processes.
@@ -34,7 +34,7 @@ enum state_task_id {
  * @brief Task IDs for event tasks.
  */
 enum event_task_id {
-  EVENT_FTRACE_HOOK,              ///< ftrace hook detection
+  EVENT_FTRACE_HOOK = 0,          ///< ftrace hook detection
   EVENT_SYSCALL_TABLE_WRITE,      ///< syscall table write detection
   EVENT_IDT_WRITE,                ///< IDT hook detection
   EVENT_CR0_WRITE,                ///< write access to control register
@@ -43,9 +43,9 @@ enum event_task_id {
   EVENT_MSR_WRITE,                ///< MSR register access detection
   EVENT_CODE_SECTION_MODIFY,      ///< kernel code integrity
   EVENT_IO_URING_RING_WRITE,      ///< io_uring structure tampering
-  EVENT_EBPF_PROBE,          ///< eBPF map or program overwrite
+  EVENT_EBPF_PROBE,               ///< eBPF map or program overwrite
   EVENT_KALLSYMS_TABLE_WRITE,     ///< kallsyms or symbol hijacking
-  EVENT_TASK_ID_MAX  ///< Maximum number of event tasks.
+  EVENT_TASK_ID_MAX               ///< Maximum number of event tasks.
 };
 
 // Type definitions for the event_handler and task structures
@@ -87,7 +87,7 @@ struct event_handler {
 struct event_task {
   event_task_id_t
       id;  ///< The ID of the event task (1-1 mapping with Event IDs).
-  vmi_event_t* event;   ///< The LibVMI event.
+  GPtrArray* events;    ///< The LibVMI event array.
   int64_t event_count;  ///< The number of times the event has been triggered.
 };
 
@@ -158,12 +158,12 @@ void event_handler_free(event_handler_t* event_handler);
  *
  * @param event_handler The event_handler instance.
  * @param id The ID of the event task to register.
- * @param event The LibVMI event filter that triggers the task.
+ * @param events The LibVMI events to monitor.
  * @param callback The callback function to execute when the event is triggered.
  */
-void event_handler_register_event_task(
-    event_handler_t* event_handler, event_task_id_t task_id, vmi_event_t* event,
-    unsigned int (*callback)(vmi_instance_t, vmi_event_t*));
+void event_handler_register_event_task(event_handler_t* event_handler,
+                                       event_task_id_t task_id,
+                                       GPtrArray* events);
 
 /**
  * @brief Register a state task with the event_handler.
