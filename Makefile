@@ -9,7 +9,7 @@ clean:
 
 build:
 	conan install . --build=missing
-	conan build . 
+	conan build .
 
 test: build
 	cd build && sudo -E ctest --output-on-failure --verbose
@@ -28,6 +28,8 @@ check-format:
 	echo "Checking format..."
 	find . -type f \( -name '*.c' -o -name '*.h' \) \
 		-not -path './build/*' -not -path '*/.git/*' -print0 | \
+		# Issue with reordering of imports and mocka tests.
+		-not -path './tests/*' \
 		xargs -0 -n 50 $(CLANG_FORMAT) -n --Werror -style=$(FORMAT_STYLE)
 
 doxygen:

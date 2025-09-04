@@ -67,7 +67,7 @@ event_handler_t* event_handler_initialize_from_config(const char* config_path) {
   for (GList* it = config.event_tasks; it != NULL; it = it->next) {
     event_task_id_t task_id = GPOINTER_TO_INT(it->data);
     if (register_event_task_by_id(event_handler, task_id) < 0) {
-      log_error("Failed to register event task id=%d", task_id);
+      log_error("Parser failed to register event task ID: %d", task_id);
     }
   }
 
@@ -210,12 +210,10 @@ int parse_yaml_config(const char* path, config_t* config) {
             }
           }
         } else if (features_context == STATE_LIST && in_sequence) {
-          // We're in a state sequence item
           if (strcmp(val, "id") == 0) {
             context = STATE_TASK;
           }
         } else if (features_context == EVENT_LIST && in_sequence) {
-          // We're in an event sequence item
           if (strcmp(val, "id") == 0) {
             context = EVENT_TASK;
           }

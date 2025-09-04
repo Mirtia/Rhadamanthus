@@ -154,6 +154,7 @@ static GPtrArray* create_event_ftrace_hook(vmi_instance_t vmi) {
     return NULL;
   }
   addr_t ftrace_ops_addr = 0;
+  addr_t ftrace_ops_phy_addr = 0;
   // Just monitor writes to ftrace_ops_list.
   if (vmi_translate_ksym2v(vmi, "ftrace_ops_list", &ftrace_ops_addr) !=
       VMI_SUCCESS) {
@@ -162,7 +163,15 @@ static GPtrArray* create_event_ftrace_hook(vmi_instance_t vmi) {
     return NULL;
   }
 
-  vmi_event_t* event = setup_memory_event(ftrace_ops_addr, VMI_MEMACCESS_W,
+  if (vmi_translate_kv2p(vmi, ftrace_ops_addr, &ftrace_ops_phy_addr) !=
+      VMI_SUCCESS) {
+    log_warn(
+        "Failed to translate ftrace_ops_list VA->PA for ftrace hook "
+        "monitoring");
+    return NULL;
+  }
+
+  vmi_event_t* event = setup_memory_event(ftrace_ops_phy_addr, VMI_MEMACCESS_W,
                                           event_ftrace_hook_callback);
   if (!event) {
     return NULL;
@@ -179,15 +188,23 @@ static GPtrArray* create_event_syscall_table_write(vmi_instance_t vmi) {
     log_error("Invalid VMI instance at event registration.");
     return NULL;
   }
-  addr_t sys_call_table = 0;
-  if (vmi_translate_ksym2v(vmi, "sys_call_table", &sys_call_table) !=
+  addr_t syscall_table_addr = 0;
+  addr_t syscall_table_phy_addr = 0;
+  if (vmi_translate_ksym2v(vmi, "sys_call_table", &syscall_table_addr) !=
       VMI_SUCCESS) {
-    log_error("Failed to resolve sys_call_table symbol");
+    log_error("Failed to resolve syscall_table_addr symbol");
     return NULL;
   }
 
-  vmi_event_t* event = setup_memory_event(sys_call_table, VMI_MEMACCESS_W,
-                                          event_syscall_table_write_callback);
+  if (vmi_translate_kv2p(vmi, syscall_table_addr, &syscall_table_phy_addr) !=
+      VMI_SUCCESS) {
+    log_error("Failed to translate syscall_table_addr VA->PA");
+    return NULL;
+  }
+
+  vmi_event_t* event =
+      setup_memory_event(syscall_table_phy_addr, VMI_MEMACCESS_W,
+                         event_syscall_table_write_callback);
   if (!event) {
     return NULL;
   }
@@ -477,7 +494,15 @@ static GPtrArray* create_event_code_section_modify(vmi_instance_t vmi) {
 
   for (size_t i = 0; i < page_count; ++i) {
     addr_t page_addr = text_start + i * PAGE_SIZE;
-    vmi_event_t* event = setup_memory_event(page_addr, VMI_MEMACCESS_W,
+    // Translate to physical address
+    addr_t page_phy_addr = 0;
+    if (vmi_translate_kv2p(vmi, page_addr, &page_phy_addr) != VMI_SUCCESS ||
+        !page_phy_addr) {
+      log_warn("Failed to translate text section page VA->PA @0x%" PRIx64,
+               page_addr);
+      continue;
+    }
+    vmi_event_t* event = setup_memory_event(page_phy_addr, VMI_MEMACCESS_W,
                                             event_code_section_modify_callback);
 
     if (!event || vmi_register_event(vmi, event) != VMI_SUCCESS) {
@@ -579,7 +604,7 @@ static GPtrArray* create_event_ebpf_probe(vmi_instance_t vmi) {
   for (int i = 0; probe_functions[i] != NULL; i++) {
     const char* sym = probe_functions[i];
     addr_t func_va = 0;
-    if (vmi_translate_ksym2v(vmi, sym, &func_va) != VMI_SUCCESS || !func_va) {
+    if (vmi_translate_ksym2v(vmi, sym, &func_va) != VMI_SUCCESS) {
       log_debug("Symbol not found: %s", sym);
       continue;
     }
@@ -654,12 +679,10 @@ static GPtrArray* create_event_kallsyms_table_write(vmi_instance_t vmi) {
     log_error("Invalid VMI instance at event registration.");
     return NULL;
   }
-
-  addr_t kallsyms_addresses = 0;
-  if (vmi_translate_ksym2v(vmi, "kallsyms_addresses", &kallsyms_addresses) !=
-      VMI_SUCCESS) {
-    log_error("Failed to resolve kallsyms_addresses symbol");
-    return NULL;
+  addr_t kallsyms_offset_addr = 0;
+  if ((vmi_translate_ksym2v(vmi, "kallsyms_offsets", &kallsyms_offset_addr) !=
+       VMI_SUCCESS)) {
+    log_warn("Could not resolve kallsyms_offsets symbol.");
   }
 
   size_t kallsyms_size = 0;
@@ -671,24 +694,27 @@ static GPtrArray* create_event_kallsyms_table_write(vmi_instance_t vmi) {
                     NULL) == VMI_SUCCESS &&
         num_syms > 0) {
       kallsyms_size = num_syms * sizeof(addr_t);
-      log_info("Resolved %u kallsyms entries (total size: %zu bytes)", num_syms,
-               kallsyms_size);
+      log_debug("Resolved %u kallsyms entries (total size: %zu bytes)",
+                num_syms, kallsyms_size);
     } else {
-      log_warn(
+      log_debug(
           "Failed to read kallsyms_num_syms, falling back to default size.");
     }
   } else {
-    log_warn(
+    log_debug(
         "Could not resolve kallsyms_num_syms, falling back to default size.");
   }
-
-  if (kallsyms_size == 0) {
-    // Note: This is a constant out of ass.
-    kallsyms_size = 0x100000;
-    log_info("Using default kallsyms_addresses size: %zu bytes", kallsyms_size);
+  addr_t kallsyms_offset_phy_addr = 0;
+  // Convert to physical address
+  if (kallsyms_offset_addr == 0 ||
+      vmi_translate_kv2p(vmi, kallsyms_offset_addr,
+                         &kallsyms_offset_phy_addr) != VMI_SUCCESS ||
+      !kallsyms_offset_phy_addr) {
+    log_warn("Failed to translate kallsyms_offsets VA->PA");
+    return NULL;
   }
-  vmi_event_t* event = setup_memory_event(kallsyms_addresses, VMI_MEMACCESS_W,
-                                          event_kallsyms_write_callback);
+  vmi_event_t* event = setup_memory_event(
+      kallsyms_offset_phy_addr, VMI_MEMACCESS_W, event_kallsyms_write_callback);
   if (!event) {
     return NULL;
   }
@@ -739,7 +765,7 @@ int register_event_task_by_id(event_handler_t* event_handler,
     return -1;
   }
 
-  if (task_id >=EVENT_TASK_ID_MAX || task_id < 0) {
+  if (task_id >= EVENT_TASK_ID_MAX || task_id < 0) {
     log_error("Invalid event task ID: %d", task_id);
     return -1;
   }
