@@ -19,7 +19,7 @@
 typedef struct {
   addr_t kaddr;         ///< Address where INT3 is planted
   uint8_t orig;         ///< Original byte replaced by 0xCC
-  const char* symname;  ///< Symbol name for logging
+  const char* symname;  ///< Symbol name.
 } ebpf_probe_ctx_t;
 
 /**

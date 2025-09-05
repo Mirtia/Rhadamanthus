@@ -4,6 +4,7 @@
 #include <glib-2.0/glib.h>
 #include <libvmi/events.h>
 #include <libvmi/libvmi.h>
+#include "interrupt_context.h"
 
 /**
  * @brief Constants
@@ -39,13 +40,20 @@ enum event_task_id {
   EVENT_IDT_WRITE,                ///< IDT hook detection
   EVENT_CR0_WRITE,                ///< write access to control register
   EVENT_PAGE_TABLE_MODIFICATION,  ///< page table or memory mapping change
-  EVENT_NETFILTER_HOOK_WRITE,     ///< function pointer hook detection
   EVENT_MSR_WRITE,                ///< MSR register access detection
   EVENT_CODE_SECTION_MODIFY,      ///< kernel code integrity
-  EVENT_IO_URING_RING_WRITE,      ///< io_uring structure tampering
-  EVENT_EBPF_PROBE,               ///< eBPF map or program overwrite
   EVENT_KALLSYMS_TABLE_WRITE,     ///< kallsyms or symbol hijacking
   EVENT_TASK_ID_MAX               ///< Maximum number of event tasks.
+};
+
+/**
+ * @brief Task IDs for interrupt tasks.
+ */
+enum interrupt_task_id {
+  INTERRUPT_EBPF_PROBE = 0,        ///< eBPF/kprobe function monitoring.
+  INTERRUPT_IO_URING_RING_WRITE,   ///< io_uring ring buffer write monitoring.
+  INTERRUPT_NETFILTER_HOOK_WRITE,  ///< Netfilter hook registration monitoring.
+  INTERRUPT_TASK_ID_MAX            ///< Maximum number of interrupt tasks.
 };
 
 // Type definitions for the event_handler and task structures
@@ -54,6 +62,7 @@ typedef struct event_task event_task_t;
 typedef struct state_task state_task_t;
 typedef enum state_task_id state_task_id_t;
 typedef enum event_task_id event_task_id_t;
+typedef enum interrupt_task_id interrupt_task_id_t;
 typedef struct callback_event_item_t callback_event_item_t;
 
 struct event_handler {
@@ -61,8 +70,11 @@ struct event_handler {
   state_task_t* state_tasks[STATE_TASK_ID_MAX];  ///< Array of state tasks
                                                  ///< indexed by their IDs.
   event_task_t* event_tasks[EVENT_TASK_ID_MAX];  ///< Array of event tasks
-                                                 ///< indexed by their IDs.
-
+  ///< indexed by their IDs.
+  bool interrupt_tasks
+      [INTERRUPT_TASK_ID_MAX];  ///< Array of interrupt tasks (if they are enabled or not) indexed by their IDs.
+  interrupt_context_t* interrupt_context;  // The shared interrupt context.
+  vmi_event_t* global_interrupt_event;     ///< The LibVMI event for interrupts.
   uint32_t window_ms;  ///< The time window in milliseconds for monitoring.
   uint32_t
       state_sampling_ms;  ///< The frequency in milliseconds for state tasks sampling.
@@ -120,6 +132,14 @@ const char* state_task_id_to_str(state_task_id_t task_id);
 const char* event_task_id_to_str(event_task_id_t task_id);
 
 /**
+ * @brief Convert an interrupt task ID to a string representation.
+ *
+ * @param task_id The interrupt task ID to convert.
+ * @return const char* The string representation of the task ID else NULL.
+ */
+const char* interrupt_task_id_to_str(interrupt_task_id_t task_id);
+
+/**
  * @brief Parse a string into a state_task_id_t.
  * @param str The input string.
  * @return Corresponding enum value, or -1 on failure.
@@ -132,6 +152,13 @@ int state_task_id_from_str(const char* str);
  * @return Corresponding enum value, or -1 on failure.
  */
 int event_task_id_from_str(const char* str);
+
+/**
+ * @brief Parse a string into an interrupt_task_id_t.
+ * @param str The input string.
+ * @return Corresponding enum value, or -1 on failure.
+ */
+int interrupt_task_id_from_str(const char* str);
 
 /**
  * @brief Creating and initializing the event_handler is responsible for managing
@@ -178,6 +205,16 @@ void event_handler_register_state_task(event_handler_t* event_handler,
                                                            void*));
 
 /**
+ * @brief Register an interrupt-driven task with the event_handler.
+ * 
+ * @param event_handler The event_handler instance.
+ * @param task_id The ID of the interrupt task to register.
+ * @return int 0 on success, -1 on failure.
+ */
+int event_handler_register_interrupt_task(event_handler_t* event_handler,
+                                          interrupt_task_id_t task_id);
+
+/**
  * @brief The event_handler starts a thread that runs the LibVMI event loop which waits for events.
  * 
  * @param event_handler The event_handler instance.
@@ -214,5 +251,27 @@ static gpointer event_window(gpointer data);
  * @param event_handler The event_handler instance.
  */
 void sample_state_tasks(event_handler_t* event_handler);
+
+/**
+ * @brief Register a global interrupt event to handle all interrupt-driven tasks.
+ * 
+ * @details Store the event to the handler for book-keeping and later cleanup. 
+ *
+ * @param event_handler The event_handler instance.
+ * @return int 0 on success, -1 on failure.
+ */
+int event_handler_register_global_interrupt(event_handler_t* event_handler);
+
+/**
+ * @brief Convert interrupt task ID to breakpoint type.
+ * 
+ * This function should be declared elsewhere (event_handler.h) but is used
+ * in the implementation files, so including the declaration here for reference.
+ * 
+ * @param task_id Interrupt task ID.
+ * @return breakpoint_type_t Corresponding breakpoint type.
+ */
+breakpoint_type_t interrupt_task_to_breakpoint_type(
+    interrupt_task_id_t task_id);
 
 #endif  // EVENT_HANDLER_H

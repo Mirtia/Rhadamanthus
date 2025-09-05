@@ -6,9 +6,9 @@
 /**
  * @brief No-op free routine with the correct signature for vmi_event_free_t.
  */
-static void vmi_event_free_noop(vmi_event_t* evt, status_t rc) {
-  (void)evt;
-  (void)rc;
+static void vmi_event_free_noop(vmi_event_t* event, status_t status) {
+  (void)event;
+  (void)status;
   log_debug("(҂ `з´) ︻╦̵̵̿╤──");
 }
 
@@ -16,16 +16,19 @@ static event_response_t event_io_uring_ring_write_ss_callback(
     vmi_instance_t vmi, vmi_event_t* event) {
   // One-step handler: re-arm INT3 and turn off single-step on this vCPU.
   io_uring_bp_ctx_t* ctx = (io_uring_bp_ctx_t*)event->data;
-  if (!ctx)
+  if (!ctx) {
+    log_debug("io_uring_enter: NULL context in SINGLESTEP handler.");
     return VMI_EVENT_INVALID;
+  }
 
-  // Re-arm INT3 at function entry.
+  // Re-arm INT3 at function entry. Restore 0xCC at the function start.
   uint8_t val = 0xCC;
   (void)vmi_write_8_va(vmi, ctx->kaddr, 0, &val);
 
-  // Disable MTF-based single-step for this vCPU via LibVMI.
+  // Disable single-step.
   (void)vmi_toggle_single_step_vcpu(vmi, event, event->vcpu_id, false);
-
+  // We don't want to clear the context.
+  // I could have put NULL on the free_routine here but the ASCII logging is funny. Will disable when performing performance checks.
   vmi_clear_event(vmi, event, vmi_event_free_noop);
 
   return VMI_EVENT_RESPONSE_NONE;
@@ -46,8 +49,10 @@ event_response_t event_io_uring_ring_write_callback(vmi_instance_t vmi,
    *  - Enable single-step via vmi_toggle_single_step_vcpu (no direct TF twiddling).
    */
   io_uring_bp_ctx_t* ctx = (io_uring_bp_ctx_t*)event->data;
-  if (!ctx)
+  if (!ctx) {
+    log_error("EVENT_IO_URING_RING_WRITE: NULL context in INT3 handler.");
     return VMI_EVENT_INVALID;
+  }
 
   // Grab syscall-style args for logging:
   reg_t rdi = 0, rsi = 0, rdx = 0, r10 = 0, r8 = 0, r9 = 0;
@@ -88,18 +93,19 @@ event_response_t event_io_uring_ring_write_callback(vmi_instance_t vmi,
 
     if (vmi_register_event(vmi, &ctx->ss_evt) != VMI_SUCCESS) {
       log_warn(
-          "io_uring_enter: failed to register SINGLESTEP; INT3 may not be "
+          "EVENT_IO_URING_RING_WRITE: failed to register SINGLESTEP; INT3 may "
+          "not be "
           "re-armed.");
       // We cannot single-step without a registered handler; bail out.
       return VMI_EVENT_RESPONSE_NONE;
     }
   }
 
-  // Turn on single-step for this vCPU using the LibVMI API (no direct TF writes).
   if (vmi_toggle_single_step_vcpu(vmi, &ctx->ss_evt, event->vcpu_id, true) !=
       VMI_SUCCESS) {
     log_warn(
-        "io_uring_enter: failed to enable SINGLESTEP on vCPU %u; INT3 may not "
+        "EVENT_IO_URING_RING_WRITE: failed to enable SINGLESTEP on vCPU %u; "
+        "INT3 may not "
         "be re-armed.",
         event->vcpu_id);
   }

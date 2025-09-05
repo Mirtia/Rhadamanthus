@@ -25,6 +25,7 @@ add_library(vmi_event_handler STATIC
     src/state_task_map.c
     src/event_task_map.c
     src/utils.c
+    src/interrupt_context.c
     ${STATE_CALLBACKS}
     ${EVENT_CALLBACKS}
 )

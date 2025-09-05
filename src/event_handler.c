@@ -1,6 +1,9 @@
 #include "event_handler.h"
 #include <inttypes.h>
 #include <log.h>
+#include "event_callbacks/ebpf_probe.h"
+#include "event_callbacks/io_uring_ring_write.h"
+#include "event_callbacks/netfilter_hook_write.h"
 
 const char* state_task_id_to_str(state_task_id_t task_id) {
   switch (task_id) {
@@ -46,20 +49,28 @@ const char* event_task_id_to_str(event_task_id_t task_id) {
       return "EVENT_CR0_WRITE";
     case EVENT_PAGE_TABLE_MODIFICATION:
       return "EVENT_PAGE_TABLE_MODIFICATION";
-    case EVENT_NETFILTER_HOOK_WRITE:
-      return "EVENT_NETFILTER_HOOK_WRITE";
     case EVENT_MSR_WRITE:
       return "EVENT_MSR_WRITE";
     case EVENT_CODE_SECTION_MODIFY:
       return "EVENT_CODE_SECTION_MODIFY";
-    case EVENT_IO_URING_RING_WRITE:
-      return "EVENT_IO_URING_RING_WRITE";
-    case EVENT_EBPF_PROBE:
-      return "EVENT_EBPF_PROBE";
     case EVENT_KALLSYMS_TABLE_WRITE:
       return "EVENT_KALLSYMS_TABLE_WRITE";
     default:
       log_error("Unknown event task with code: %d", task_id);
+      return NULL;
+  }
+}
+
+const char* interrupt_task_id_to_str(interrupt_task_id_t task_id) {
+  switch (task_id) {
+    case INTERRUPT_EBPF_PROBE:
+      return "INTERRUPT_EBPF_PROBE";
+    case INTERRUPT_IO_URING_RING_WRITE:
+      return "INTERRUPT_IO_URING_RING_WRITE";
+    case INTERRUPT_NETFILTER_HOOK_WRITE:
+      return "INTERRUPT_NETFILTER_HOOK_WRITE";
+    default:
+      log_error("Unknown interrupt task with code: %d", task_id);
       return NULL;
   }
 }
@@ -89,6 +100,20 @@ int event_task_id_from_str(const char* str) {
       return i;
   }
   log_error("Unknown event task ID string: %s", str);
+  return -1;
+}
+
+int interrupt_task_id_from_str(const char* str) {
+  if (!str) {
+    log_error("The provided string to convert to interrupt task ID is NULL.");
+    return -1;
+  }
+
+  for (int i = 0; i < INTERRUPT_TASK_ID_MAX; ++i) {
+    if (strcmp(str, interrupt_task_id_to_str(i)) == 0)
+      return i;
+  }
+  log_error("Unknown interrupt task ID string: %s", str);
   return -1;
 }
 
@@ -124,6 +149,15 @@ event_handler_t* event_handler_initialize(vmi_instance_t vmi,
   for (int i = 0; i < EVENT_TASK_ID_MAX; ++i)
     event_handler->event_tasks[i] = NULL;
 
+  event_handler->interrupt_context = interrupt_context_init(INITIAL_CAPACITY);
+  if (!event_handler->interrupt_context) {
+    log_error("Failed to initialize interrupt context");
+    g_free(event_handler);
+    return NULL;
+  }
+  for (int i = 0; i < INTERRUPT_TASK_ID_MAX; ++i)
+    event_handler->interrupt_tasks[i] = false;
+
   return event_handler;
 }
 
@@ -135,38 +169,60 @@ void event_handler_free(event_handler_t* event_handler) {
 
   for (int i = 0; i < STATE_TASK_ID_MAX; ++i) {
     state_task_t* task = event_handler->state_tasks[i];
-    g_free(task);
+    if (task) {
+      g_free(task);
+      event_handler->state_tasks[i] = NULL;
+    }
   }
+
   for (int i = 0; i < EVENT_TASK_ID_MAX; ++i) {
     event_task_t* task = event_handler->event_tasks[i];
+    if (!task)
+      continue;
+
     if (task->events) {
-      // Unregister each event on the list
       for (guint j = 0; j < task->events->len; ++j) {
         vmi_event_t* event = (vmi_event_t*)g_ptr_array_index(task->events, j);
         if (!event)
           continue;
-        if (vmi_clear_event(event_handler->vmi, event, NULL) == VMI_FAILURE) {
+
+        if (event_handler->vmi &&
+            vmi_clear_event(event_handler->vmi, event, NULL) == VMI_FAILURE) {
           log_error("Failed to unregister event (task ID: %d, idx: %u)",
                     task->id, j);
         }
-        // Note: The event is removed from hashtables internal to LibVMI,
-        // but the memory related to the vmi_event_t is not freed.
-        // Memory management remains the responsibility of the caller.
-        // TODO: free_routine
         g_free(event);
       }
-      /* Prevent g_ptr_array_free from freeing elements again. */
       g_ptr_array_set_free_func(task->events, NULL);
       g_ptr_array_free(task->events, TRUE);
+      task->events = NULL;
+      // Note: The event is removed from hashtables internal to LibVMI,
+      // but the memory related to the vmi_event_t is not freed.
+      // Memory management remains the responsibility of the caller.
     }
+
     g_free(task);
-
-    if (event_handler->vmi) {
-      vmi_destroy(event_handler->vmi);
-    }
-
-    g_free(event_handler);
+    event_handler->event_tasks[i] = NULL;
   }
+
+  if (event_handler->interrupt_context) {
+    interrupt_context_cleanup(event_handler->interrupt_context,
+                              event_handler->vmi);
+    event_handler->interrupt_context = NULL;
+    if (event_handler->global_interrupt_event) {
+      vmi_clear_event(event_handler->vmi, event_handler->global_interrupt_event,
+                      NULL);
+      g_free(event_handler->global_interrupt_event);
+      event_handler->global_interrupt_event = NULL;
+    }
+  }
+
+  if (event_handler->vmi) {
+    vmi_destroy(event_handler->vmi);
+    event_handler->vmi = NULL;
+  }
+
+  g_free(event_handler);
 }
 
 void event_handler_register_state_task(event_handler_t* event_handler,
@@ -222,9 +278,6 @@ void event_handler_register_event_task(event_handler_t* event_handler,
   task->id = task_id;
   task->events = events;
   task->event_count = 0;
-
-  // Set the callback and data in the LibVMI event struct.
-  task->events = task->events;
 
   event_handler->event_tasks[task_id] = task;
 
@@ -372,4 +425,288 @@ void sample_state_tasks(event_handler_t* event_handler) {
   }
 
   event_handler->latest_state_sampling_ms = current_time_ms;
+}
+
+/**
+ * @brief Create a interrupt task context object for the given task ID
+ *
+ * @param task_id The interrupt task ID.
+ * @param symbol_name The symbol name associated with the task.
+ * @return void*  The allocated context object, or NULL on error.
+ */
+static void* create_interrupt_task_context(interrupt_task_id_t task_id,
+                                           const char* symbol_name) {
+  switch (task_id) {
+    case INTERRUPT_EBPF_PROBE: {
+      ebpf_probe_ctx_t* ctx = g_malloc0(sizeof(ebpf_probe_ctx_t));
+      if (ctx) {
+        ctx->symname = symbol_name;
+      }
+      return ctx;
+    }
+    case INTERRUPT_IO_URING_RING_WRITE: {
+      io_uring_bp_ctx_t* ctx = g_malloc0(sizeof(io_uring_bp_ctx_t));
+      if (ctx) {
+        ctx->symname = symbol_name;
+      }
+      return ctx;
+    }
+    case INTERRUPT_NETFILTER_HOOK_WRITE: {
+      nf_bp_ctx_t* ctx = g_malloc0(sizeof(nf_bp_ctx_t));
+      if (ctx) {
+        ctx->symname = symbol_name;
+      }
+      return ctx;
+    }
+    default:
+      log_error("Unknown interrupt task type: %d", task_id);
+      return NULL;
+  }
+}
+
+/**
+ * @brief Map interrupt task ID to breakpoint type for dispatch
+ *
+ * @param task_id The interrupt task ID from configuration
+ * @return breakpoint_type_t The corresponding breakpoint type, or BP_TYPE_MAX on error
+ */
+breakpoint_type_t interrupt_task_to_breakpoint_type(
+    interrupt_task_id_t task_id) {
+  switch (task_id) {
+    case INTERRUPT_EBPF_PROBE:
+      return BP_TYPE_EBPF_PROBE;
+    case INTERRUPT_IO_URING_RING_WRITE:
+      return BP_TYPE_IO_URING;
+    case INTERRUPT_NETFILTER_HOOK_WRITE:
+      return BP_TYPE_NETFILTER_HOOK;
+    default:
+      log_error("Invalid interrupt task ID: %d", task_id);
+      return BP_TYPE_MAX;
+  }
+}
+
+/**
+ * @brief Register breakpoints for common eBPF-related kernel functions.
+ *
+ * @param event_handler The event handler instance.
+ * @return int The number of successfully registered breakpoints.
+ */
+static int register_ebpf_breakpoints(event_handler_t* event_handler) {
+  static const char* ebpf_symbols[] = {"register_kprobe",
+                                       "register_kretprobe",
+                                       "register_uprobe",
+                                       "bpf_prog_attach",
+                                       "bpf_raw_tracepoint_open",
+                                       "tracepoint_probe_register",
+                                       NULL};
+
+  int registered = 0;
+  breakpoint_type_t bp_type =
+      interrupt_task_to_breakpoint_type(INTERRUPT_EBPF_PROBE);
+
+  for (int i = 0; ebpf_symbols[i] != NULL; i++) {
+    void* ctx =
+        create_interrupt_task_context(INTERRUPT_EBPF_PROBE, ebpf_symbols[i]);
+    if (!ctx) {
+      log_warn("Failed to create context for eBPF symbol: %s", ebpf_symbols[i]);
+      continue;
+    }
+
+    if (interrupt_context_add_breakpoint(event_handler->interrupt_context,
+                                         event_handler->vmi, ebpf_symbols[i],
+                                         bp_type, ctx) == 0) {
+      registered++;
+      log_info("Registered eBPF breakpoint: %s", ebpf_symbols[i]);
+    } else {
+      log_debug("eBPF symbol not found: %s", ebpf_symbols[i]);
+      g_free(ctx);
+    }
+  }
+
+  return registered;
+}
+
+/**
+ * @brief Register a single breakpoint for the given interrupt task ID and symbol name.
+ *
+ * @param event_handler The event handler instance.
+ * @param task_id The interrupt task ID.
+ * @param symbol_name The symbol name to set the breakpoint on.
+ * @return int 0 on success else -1 on failure.
+ */
+static int register_single_breakpoint(event_handler_t* event_handler,
+                                      interrupt_task_id_t task_id,
+                                      const char* symbol_name) {
+  breakpoint_type_t bp_type = interrupt_task_to_breakpoint_type(task_id);
+  if (bp_type == BP_TYPE_MAX) {
+    return -1;
+  }
+
+  void* ctx = create_interrupt_task_context(task_id, symbol_name);
+  if (!ctx) {
+    log_error("Failed to create context for interrupt task: %d", task_id);
+    return -1;
+  }
+
+  if (interrupt_context_add_breakpoint(event_handler->interrupt_context,
+                                       event_handler->vmi, symbol_name, bp_type,
+                                       ctx) != 0) {
+    log_warn("Failed to register breakpoint for %s", symbol_name);
+    g_free(ctx);
+    return -1;
+  }
+
+  log_info("Registered breakpoint: %s", symbol_name);
+  return 0;
+}
+
+int event_handler_register_interrupt_task(event_handler_t* event_handler,
+                                          interrupt_task_id_t task_id) {
+  // Validation
+  if (!event_handler) {
+    log_error("Invalid event handler");
+    return -1;
+  }
+
+  if (!event_handler->interrupt_context) {
+    log_error("Interrupt context not initialized");
+    return -1;
+  }
+
+  if (task_id < 0 || task_id >= INTERRUPT_TASK_ID_MAX) {
+    log_error("Invalid interrupt task ID: %d", task_id);
+    return -1;
+  }
+
+  if (event_handler->interrupt_tasks[task_id]) {
+    log_warn("Interrupt task %s already registered",
+             interrupt_task_id_to_str(task_id));
+    return 0;
+  }
+
+  int result = -1;
+  switch (task_id) {
+    case INTERRUPT_EBPF_PROBE:
+      result = register_ebpf_breakpoints(event_handler);
+      if (result > 0) {
+        log_info("Registered %d eBPF breakpoints", result);
+        result = 0;  // Convert count to success/failure
+      }
+      break;
+    case INTERRUPT_IO_URING_RING_WRITE:
+      result = register_single_breakpoint(event_handler, task_id,
+                                          "__x64_sys_io_uring_enter");
+      break;
+    case INTERRUPT_NETFILTER_HOOK_WRITE:
+      result = register_single_breakpoint(event_handler, task_id,
+                                          "nf_register_net_hook");
+      break;
+    default:
+      log_error("Unknown interrupt task ID: %d", task_id);
+      return -1;
+  }
+
+  // Update task registration status
+  if (result == 0) {
+    event_handler->interrupt_tasks[task_id] = true;
+    log_info("Successfully registered interrupt task: %s",
+             interrupt_task_id_to_str(task_id));
+    return 0;
+  }
+  log_warn("Failed to register interrupt task: %s",
+           interrupt_task_id_to_str(task_id));
+  return -1;
+}
+
+int event_handler_register_global_interrupt(event_handler_t* event_handler) {
+  if (!event_handler || !event_handler->interrupt_context) {
+    return -1;
+  }
+
+  if (event_handler->interrupt_context->count == 0) {
+    log_info("No interrupt breakpoints registered");
+    return 0;
+  }
+
+  // Create and register the global INT3 event directly with VMI
+  vmi_event_t* global_int3_event = g_malloc0(sizeof(vmi_event_t));
+  if (!global_int3_event) {
+    log_error("Failed to allocate global INT3 event");
+    return -1;
+  }
+
+  global_int3_event->version = VMI_EVENTS_VERSION;
+  global_int3_event->type = VMI_EVENT_INTERRUPT;
+  global_int3_event->interrupt_event.intr = INT3;
+  global_int3_event->interrupt_event.reinject = 1;
+  global_int3_event->interrupt_event.insn_length = 1;
+  global_int3_event->callback = interrupt_context_global_callback;
+  global_int3_event->data = event_handler->interrupt_context;
+
+  // Just register it with VMI - don't store it as an "event task"
+  if (vmi_register_event(event_handler->vmi, global_int3_event) !=
+      VMI_SUCCESS) {
+    log_error("Failed to register global INT3 event");
+    g_free(global_int3_event);
+    return -1;
+  }
+
+  log_info("Registered global INT3 handler for %zu breakpoints",
+           event_handler->interrupt_context->count);
+
+  // Just for store keeping purposes
+  event_handler->global_interrupt_event = global_int3_event;
+  return 0;
+}
+
+bool event_handler_is_interrupt_task_registered(event_handler_t* event_handler,
+                                                interrupt_task_id_t task_id) {
+  if (!event_handler || task_id < 0 || task_id >= INTERRUPT_TASK_ID_MAX) {
+    log_error("Invalid event handler or interrupt task ID");
+    return false;
+  }
+
+  return event_handler->interrupt_tasks[task_id];
+}
+
+int event_handler_unregister_interrupt_task(event_handler_t* event_handler,
+                                            interrupt_task_id_t task_id) {
+  if (!event_handler || !event_handler->interrupt_context) {
+    log_error("Invalid event handler or interrupt context");
+    return -1;
+  }
+
+  if (task_id < 0 || task_id >= INTERRUPT_TASK_ID_MAX) {
+    log_error("Invalid interrupt task ID: %d", task_id);
+    return -1;
+  }
+
+  if (!event_handler->interrupt_tasks[task_id]) {
+    log_debug("Interrupt task %s not registered",
+              interrupt_task_id_to_str(task_id));
+    return 0;
+  }
+
+  // Remove breakpoints associated with this task
+  breakpoint_type_t bp_type = interrupt_task_to_breakpoint_type(task_id);
+  if (bp_type == BP_TYPE_MAX) {
+    return -1;
+  }
+
+  // Iterate through breakpoints and remove those matching the type
+  for (size_t i = 0; i < event_handler->interrupt_context->count; i++) {
+    breakpoint_entry_t* breakpoint =
+        &event_handler->interrupt_context->breakpoints[i];
+    if (breakpoint->active && breakpoint->type == bp_type) {
+      interrupt_context_remove_breakpoint(event_handler->interrupt_context,
+                                          event_handler->vmi,
+                                          breakpoint->kaddr);
+    }
+  }
+
+  event_handler->interrupt_tasks[task_id] = false;
+  log_info("Unregistered interrupt task: %s",
+           interrupt_task_id_to_str(task_id));
+
+  return 0;
 }

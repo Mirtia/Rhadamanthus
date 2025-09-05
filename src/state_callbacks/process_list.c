@@ -176,7 +176,7 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
 
   do {
     memset(&proc_info, 0, sizeof(proc_info));
-    current_process = cur_list_entry - tasks_offset;
+    current_process = cur_list_entry - linux_tasks_offset;
     proc_info.task_struct_addr = current_process;
     bool process_valid = true;
 

@@ -15,7 +15,8 @@ class VMIExamplesConan(ConanFile):
         "log.c/cci.20200620",
         "libyaml/0.2.5",
         "cmocka/1.1.8",
-        "openssl/3.2.1",
+        # Note: This is not needed, it was used for integrity check.
+        # "openssl/3.2.1",
     )
 
     def layout(self):

@@ -9,9 +9,9 @@
 /**
  * @brief No-op free callback to pair with vmi_clear_event.
  */
-static void vmi_event_free_noop(vmi_event_t* evt, status_t rc) {
-  (void)evt;
-  (void)rc;
+static void vmi_event_free_noop(vmi_event_t* event, status_t status) {
+  (void)event;
+  (void)status;
   log_debug("(҂ `з´) ︻╦̵̵̿╤──");
 }
 
@@ -23,19 +23,15 @@ static event_response_t event_netfilter_hook_write_ss_callback(
 
   // Re-arm INT3 at function entry.
   uint8_t val = 0xCC;
-  (void)vmi_write_8_va(vmi, ctx->kaddr, 0, &val);
+  vmi_write_8_va(vmi, ctx->kaddr, 0, &val);
 
-  // Disable single-step for this vCPU via LibVMI.
-  (void)vmi_toggle_single_step_vcpu(vmi, event, event->vcpu_id, false);
+  vmi_toggle_single_step_vcpu(vmi, event, event->vcpu_id, false);
 
   vmi_clear_event(vmi, event, vmi_event_free_noop);
 
   return VMI_EVENT_RESPONSE_NONE;
 }
 
-/**
- * @brief INT3 entry callback: logs args, restores first byte, rewinds RIP, enables SINGLESTEP.
- */
 event_response_t event_netfilter_hook_write_callback(vmi_instance_t vmi,
                                                      vmi_event_t* event) {
   // Preconditions
@@ -67,13 +63,12 @@ event_response_t event_netfilter_hook_write_callback(vmi_instance_t vmi,
     (void)vmi_write_8_va(vmi, ctx->kaddr, 0, &val);
   }
 
-  // Rewind RIP by 1 (INT3 advanced it by 1 byte on x86).
   (void)vmi_get_vcpureg(vmi, &rip, RIP, event->vcpu_id);
   if (rip) {
+    // Rewind RIP by 1 (INT3 advanced RIP on x86 by one byte).
     (void)vmi_set_vcpureg(vmi, rip - 1, RIP, event->vcpu_id);
   }
 
-  // Ensure the SINGLESTEP event exists and is registered once.
   if (ctx->ss_evt.callback == NULL) {
     memset(&ctx->ss_evt, 0, sizeof(ctx->ss_evt));
     ctx->ss_evt.version = VMI_EVENTS_VERSION;
@@ -88,7 +83,6 @@ event_response_t event_netfilter_hook_write_callback(vmi_instance_t vmi,
     }
   }
 
-  // Turn on single-step for this vCPU using the LibVMI API (no direct TF writes).
   if (vmi_toggle_single_step_vcpu(vmi, &ctx->ss_evt, event->vcpu_id, true) !=
       VMI_SUCCESS) {
     log_warn(

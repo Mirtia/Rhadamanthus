@@ -2,6 +2,7 @@
 #include <glib-2.0/glib.h>
 #include <inttypes.h>
 #include <log.h>
+#include "offsets.h"
 
 static void extract_kprobe_info(vmi_instance_t vmi, uint32_t vcpu_id) {
   registers_t regs;
@@ -18,6 +19,7 @@ static void extract_kprobe_info(vmi_instance_t vmi, uint32_t vcpu_id) {
 
   // Read target symbol name
   addr_t symbol_ptr = 0;
+  // TODO: Replace 0x8 with proper offset from offsets.h  (pahole)
   if (vmi_read_addr_va(vmi, kprobe_ptr + 0x8, 0, &symbol_ptr) == VMI_SUCCESS &&
       symbol_ptr) {
     char* symbol_name = vmi_read_str_va(vmi, symbol_ptr, 0);
@@ -29,19 +31,19 @@ static void extract_kprobe_info(vmi_instance_t vmi, uint32_t vcpu_id) {
           strstr(symbol_name, "sys_openat") ||
           strstr(symbol_name, "do_sys_open") ||
           strstr(symbol_name, "vfs_open")) {
-        log_warn("EVENT_EBPF_PROBE: File operation hook detected");
+        log_warn("EVENT_EBPF_PROBE: File operation hook detected (sys_open).");
       } else if (strstr(symbol_name, "sys_getdents") ||
                  strstr(symbol_name, "filldir")) {
-        log_warn("EVENT_EBPF_PROBE: Directory listing hook detected");
+        log_warn("EVENT_EBPF_PROBE: Directory listing hook detected (sys_getdents).");
       } else if (strstr(symbol_name, "sys_kill") ||
                  strstr(symbol_name, "sys_tkill")) {
-        log_warn("EVENT_EBPF_PROBE: Process killing hook detected");
+        log_warn("EVENT_EBPF_PROBE: Process killing hook detected (sys_kill).");
       } else if (strstr(symbol_name, "tcp") || strstr(symbol_name, "inet") ||
                  strstr(symbol_name, "sock")) {
-        log_warn("EVENT_EBPF_PROBE: Network operation hook detected");
+        log_warn("EVENT_EBPF_PROBE: Network operation hook detected (tcp/inet/sock).");
       } else if (strstr(symbol_name, "sys_delete_module") ||
                  strstr(symbol_name, "sys_init_module")) {
-        log_warn("EVENT_EBPF_PROBE: Module operation hook detected");
+        log_warn("EVENT_EBPF_PROBE: Module operation hook detected (sys_delete_module/sys_init_module).");
       }
 
       g_free(symbol_name);

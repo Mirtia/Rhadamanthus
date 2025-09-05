@@ -19,6 +19,7 @@ void config_free(config_t* config) {
   g_free(config->domain_name);
   g_list_free(config->state_tasks);
   g_list_free(config->event_tasks);
+  g_list_free(config->interrupt_tasks);
   memset(config, 0, sizeof(config_t));
 }
 
@@ -71,11 +72,18 @@ event_handler_t* event_handler_initialize_from_config(const char* config_path) {
     }
   }
 
-  // Free config resources.
-  g_list_free(config.state_tasks);
-  g_list_free(config.event_tasks);
-  g_free(config.domain_name);
+  for (GList* it = config.interrupt_tasks; it != NULL; it = it->next) {
+    interrupt_task_id_t task_id = GPOINTER_TO_INT(it->data);
+    if (event_handler_register_interrupt_task(event_handler, task_id) < 0) {
+      log_error("Parser failed to register interrupt task ID: %d", task_id);
+    }
+  }
 
+  if (event_handler_register_global_interrupt(event_handler) != 0) {
+    log_error("Failed to register global interrupt handler");
+  }
+
+  config_free(&config);
   return event_handler;
 }
 
@@ -84,7 +92,6 @@ static char* dup_scalar(yaml_event_t* event) {
     return NULL;
   return g_strdup((const char*)event->data.scalar.value);
 }
-
 int parse_yaml_config(const char* path, config_t* config) {
   if (!path || !config) {
     log_error("Invalid input to parser.");
@@ -116,13 +123,15 @@ int parse_yaml_config(const char* path, config_t* config) {
     MONITOR_KEY,
     FEATURES,
     STATE_TASK,
-    EVENT_TASK
+    EVENT_TASK,
+    INTERRUPT_TASK
   } context = NONE;
 
   enum {
     FEATURES_NONE,
     STATE_LIST,
-    EVENT_LIST
+    EVENT_LIST,
+    INTERRUPT_LIST
   } features_context = FEATURES_NONE;
 
   char* last_key = NULL;
@@ -179,14 +188,27 @@ int parse_yaml_config(const char* path, config_t* config) {
             features_context = STATE_LIST;
           } else if (strcmp(val, "event") == 0) {
             features_context = EVENT_LIST;
+          } else if (strcmp(val, "interrupt") == 0) {
+            features_context = INTERRUPT_LIST;
+          } else if (features_context == STATE_LIST && in_sequence) {
+            if (strcmp(val, "id") == 0) {
+              context = STATE_TASK;
+            }
+          } else if (features_context == EVENT_LIST && in_sequence) {
+            if (strcmp(val, "id") == 0) {
+              context = EVENT_TASK;
+            }
+          } else if (features_context == INTERRUPT_LIST && in_sequence) {
+            if (strcmp(val, "id") == 0) {
+              context = INTERRUPT_TASK;
+            }
           }
-        } else if (context == STATE_TASK || context == EVENT_TASK) {
-          // Handle task parsing
+        } else if (context == STATE_TASK || context == EVENT_TASK ||
+                   context == INTERRUPT_TASK) {
           if (strcmp(val, "id") == 0) {
             // Next scalar will be the task ID
             // Context remains the same
           } else {
-            // This should be a task ID value
             if (context == STATE_TASK) {
               int task_id = state_task_id_from_str(val);
               log_debug("Parsed state task ID: %s", val);
@@ -200,25 +222,26 @@ int parse_yaml_config(const char* path, config_t* config) {
             } else if (context == EVENT_TASK) {
               int task_id = event_task_id_from_str(val);
               log_debug("Parsed event task ID: %s", val);
-              if (task_id >= 0) {
+              if (task_id >= 0 && task_id < EVENT_TASK_ID_MAX) {
                 config->event_tasks = g_list_append(config->event_tasks,
                                                     (GINT_TO_POINTER(task_id)));
                 log_debug("Added event task ID: %d", task_id);
               } else {
                 log_warn("Unknown event task ID string: %s", val);
               }
+            } else if (context == INTERRUPT_TASK) {
+              int task_id = interrupt_task_id_from_str(val);
+              log_debug("Parsed interrupt task ID: %s", val);
+              if (task_id >= 0 && task_id < INTERRUPT_TASK_ID_MAX) {
+                config->interrupt_tasks = g_list_append(
+                    config->interrupt_tasks, (GINT_TO_POINTER(task_id)));
+                log_warn("Interrupt tasks are not supported in config_t yet.");
+              } else {
+                log_warn("Unknown interrupt task ID string: %s", val);
+              }
             }
           }
-        } else if (features_context == STATE_LIST && in_sequence) {
-          if (strcmp(val, "id") == 0) {
-            context = STATE_TASK;
-          }
-        } else if (features_context == EVENT_LIST && in_sequence) {
-          if (strcmp(val, "id") == 0) {
-            context = EVENT_TASK;
-          }
         }
-
         break;
       }
 
@@ -228,6 +251,8 @@ int parse_yaml_config(const char* path, config_t* config) {
           context = STATE_TASK;
         } else if (features_context == EVENT_LIST && in_sequence) {
           context = EVENT_TASK;
+        } else if (features_context == INTERRUPT_LIST && in_sequence) {
+          context = INTERRUPT_TASK;
         }
         break;
 
@@ -238,7 +263,8 @@ int parse_yaml_config(const char* path, config_t* config) {
         } else if (context == FEATURES) {
           features_context = FEATURES_NONE;
           context = NONE;
-        } else if (context == STATE_TASK || context == EVENT_TASK) {
+        } else if (context == STATE_TASK || context == EVENT_TASK ||
+                   context == INTERRUPT_TASK) {
           // Stay in features context, but reset task context
           context = FEATURES;
         }

@@ -35,3 +35,8 @@
 
 - [ ] Kernel code integrity is a stupid approach. It will only make sense when you compare at same alive boot. Compare along time window. Hold a history of the hashes.
 - [ ] Double-check implementations so far and rationalize.
+
+
+## TODO
+
+- [ ] Response schema. It should be identical to the schema or at least same schema as 

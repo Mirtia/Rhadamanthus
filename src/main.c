@@ -58,6 +58,9 @@ int main(int argc, char** argv) {
   if (event_handler->event_thread) {
     g_thread_join(event_handler->event_thread);
   }
+  if (event_handler->signal_event_thread) {
+    g_thread_join(event_handler->signal_event_thread);
+  }
   event_handler_free(event_handler);
 
   return EXIT_SUCCESS;

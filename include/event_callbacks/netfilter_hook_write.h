@@ -19,7 +19,7 @@
 struct nf_bp_ctx_t {
   addr_t kaddr;         ///< Kernel VA of the function entry.
   uint8_t orig;         ///< Original first byte at entry.
-  const char* symname;  ///< Symbol name for logging.
+  const char* symname;  ///< Symbol name.
   vmi_event_t ss_evt;   ///< One-shot SINGLESTEP event to re-arm INT3.
 };
 

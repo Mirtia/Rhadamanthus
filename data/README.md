@@ -8,5 +8,6 @@ This list contains files and directories observed in rootkit samples, whose exis
 by inspecting inodes to detect if they are being hidden by malicious actors.
 
 ## syscall_index.linux
+>
 
 
