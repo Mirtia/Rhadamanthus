@@ -17,6 +17,7 @@ find_package(OpenSSL REQUIRED)
 
 file(GLOB STATE_CALLBACKS "src/state_callbacks/*.c")
 file(GLOB EVENT_CALLBACKS "src/event_callbacks/*.c")
+file(GLOB RESPONSES "src/responses/*.c")
 
 add_library(vmi_event_handler STATIC
     src/event_handler.c
@@ -26,6 +27,7 @@ add_library(vmi_event_handler STATIC
     src/event_task_map.c
     src/utils.c
     src/interrupt_context.c
+    ${RESPONSES}
     ${STATE_CALLBACKS}
     ${EVENT_CALLBACKS}
 )

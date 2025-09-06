@@ -39,4 +39,10 @@
 
 ## TODO
 
-- [ ] Response schema. It should be identical to the schema or at least same schema as 
+- [ ] ARCHITECTURE: Response schema. It should be identical to the schema or at least same schema as Clueless Admin.
+- [ ] Try to inject process with DRKAVUF for Clueless Admin! 
+- [ ] ARCHITECTURE: Time sync, comparison?
+  - [ ] Internal comparison
+  - [ ] External comparison
+- [ ] Scenarios
+- [ ] Name: something related to Crete or Greek Mythology (Radamanthus)
