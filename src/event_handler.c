@@ -4,6 +4,7 @@
 #include "event_callbacks/ebpf_probe.h"
 #include "event_callbacks/io_uring_ring_write.h"
 #include "event_callbacks/netfilter_hook_write.h"
+#include "serializer.h"
 
 const char* state_task_id_to_str(state_task_id_t task_id) {
   switch (task_id) {
@@ -23,8 +24,6 @@ const char* state_task_id_to_str(state_task_id_t task_id) {
       return "STATE_PROCESS_LIST";
     case STATE_MSR_REGISTERS:
       return "STATE_MSR_REGISTERS";
-    // case STATE_KERNEL_CODE_INTEGRITY_CHECK:
-    // return "STATE_KERNEL_CODE_INTEGRITY_CHECK";
     case STATE_EBPF_ARTIFACTS:
       return "STATE_EBPF_ARTIFACTS";
     case STATE_IO_URING_ARTIFACTS:
@@ -391,6 +390,38 @@ void event_handler_start_event_window(event_handler_t* event_handler) {
   } else {
     log_info("Started event window thread to run for %u ms.",
              event_handler->window_ms);
+  }
+}
+
+static gpointer json_serialization(gpointer data) {
+  if (!data) {
+    log_error("json_serialization: received NULL data pointer.");
+    return NULL;
+  }
+
+  event_handler_t* event_handler = (event_handler_t*)data;
+
+  while (!g_atomic_int_get(&event_handler->stop_signal)) {
+    // TODO: Add listening event behavior here.
+  }
+
+  return NULL;
+}
+
+void event_handler_start_json_serilaziation(event_handler_t* event_handler) {
+  if (!event_handler) {
+    log_error("event_handler_start_json_serilaziation: NULL handler.");
+    return;
+  }
+
+  // Launch the timer thread
+  event_handler->json_serialization_thread =
+      g_thread_new("json_serilaziation", json_serialization, event_handler);
+  if (!event_handler->json_serialization_thread) {
+    log_error(
+        "event_handler_start_json_serilaziation: Failed to create thread.");
+  } else {
+    log_info("Started json serialization thread.");
   }
 }
 

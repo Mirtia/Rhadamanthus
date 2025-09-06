@@ -10,7 +10,7 @@
  */
 #include <cjson/cJSON.h>
 
-enum status { SUCCESS = 0, FAILURE };
+enum callback_status { SUCCESS = 0, FAILURE };
 
 enum task_type { STATE = 0, EVENT, INTERRUPT };
 
@@ -25,7 +25,7 @@ struct metadata {
 };
 
 typedef struct metadata metadata;
-typedef enum status status;
+typedef enum callback_status callback_status;
 
 /**
  * @brief The data of the response.
@@ -40,6 +40,13 @@ typedef struct data data;
 
 #define MESSAGE_LENGTH 512
 
+enum error_code {
+  MEMORY_ALLOCATION_FAILURE = 0,
+  ERROR_CODE_MAX,
+// TODO: TO BE FILLED
+};
+
+
 struct error {
   int code;  ///< The error code.
   const char
@@ -50,12 +57,21 @@ struct error {
 typedef struct error error;
 
 /**
+ * @brief Create a error object.
+ * 
+ * @param code The input error code.
+ * @param message The input error message.
+ * @return error* The pointer to the created error object else `NULL` if creation fails.
+ */
+error* create_error(int code, const char* message);
+
+/**
  * @brief 
  * 
  */
 struct response {
-  const char* timestamp;  ///< The timestamp generated for the response.
-  status status;          ///< The status of the response (SUCCESS, FAILURE).
+  const char* timestamp;   ///< The timestamp generated for the response.
+  callback_status status;  ///< The status of the response (SUCCESS, FAILURE).
   metadata
       metadata;  ///< The metadata associated with the response (task type, system details etc).
   error error;  ///< The error associated with the response.

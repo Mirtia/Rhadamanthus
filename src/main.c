@@ -54,6 +54,7 @@ int main(int argc, char** argv) {
   // Start the timer and event loop
   event_handler_start_event_window(event_handler);
   event_handler_start_event_loop(event_handler);
+  event_handler_start_json_serilaziation(event_handler);
 
   if (event_handler->event_thread) {
     g_thread_join(event_handler->event_thread);
@@ -61,6 +62,10 @@ int main(int argc, char** argv) {
   if (event_handler->signal_event_thread) {
     g_thread_join(event_handler->signal_event_thread);
   }
+  if (event_handler->signal_event_thread) {
+    g_thread_join(event_handler->json_serialization_thread);
+  }
+
   event_handler_free(event_handler);
 
   return EXIT_SUCCESS;

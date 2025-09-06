@@ -23,9 +23,8 @@ enum state_task_id {
   STATE_IDT_TABLE,            ///< IDT table state check (are there any hooks?).
   STATE_DIR_STRING_MATCHING,  ///< Check directories and files of interest.
   STATE_PROCESS_LIST,         ///< List of processes.
-  STATE_MSR_REGISTERS,  ///< MSR register state check (are there any hooks?).
-  // STATE_KERNEL_CODE_INTEGRITY_CHECK,  ///< Check kernel code integrity.
-  STATE_EBPF_ARTIFACTS,      ///< eBPF programs and maps state check.
+  STATE_MSR_REGISTERS,   ///< MSR register state check (are there any hooks?).
+  STATE_EBPF_ARTIFACTS,  ///< eBPF programs and maps state check.
   STATE_IO_URING_ARTIFACTS,  ///< io_uring structures state check.,
   STATE_KALLSYMS_SYMBOLS,    ///< kallsyms symbols state check.
   STATE_TASK_ID_MAX          ///< Maximum number of state tasks.
@@ -83,6 +82,8 @@ struct event_handler {
   GThread* event_thread;         ///< The thread running the LibVMI event loop.
   GThread*
       signal_event_thread;  ///< The thread that signals the event loop to stop processing events after window ms.
+  GThread*
+      json_serialization_thread;  ///< The thread that handles JSON serialization of events. We do not want blocking I/O operations in the event callbacks.
   volatile sig_atomic_t
       stop_signal;  ///< Signal to stop the event loop after the time window.
   // TODO: Add thread that does post-processing / serialization / storage of the events.
@@ -244,6 +245,13 @@ void event_handler_start_event_window(event_handler_t* event_handler);
  * @return gpointer The result of the thread execution, typically NULL.
  */
 static gpointer event_window(gpointer data);
+
+/**
+ * @brief The event_handler starts a thread that handles JSON serialization of events.
+ * 
+ * @param event_handler The event_handler instance.
+ */
+void event_handler_start_json_serilaziation(event_handler_t* event_handler);
 
 /**
  * @brief The function that calls all state functors.
