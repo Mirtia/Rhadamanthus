@@ -2,7 +2,6 @@
 #include <glib.h>
 #include <inttypes.h>
 #include <log.h>
-#include "responses/response.h"
 /*
  * CR0 control register semantics and attacker relevance. These definitions were taken from "Intel® 64 and IA-32 Architectures
  * Software Developer’s Manual" (https://cdrdv2.intel.com/v1/dl/getContent/671200).

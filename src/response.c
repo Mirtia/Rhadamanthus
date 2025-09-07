@@ -1,4 +1,4 @@
-#include "responses/response.h"
+#include "response.h"
 #include <glib-2.0/glib.h>
 #include <log.h>
 #include <sys/time.h>
