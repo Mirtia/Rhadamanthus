@@ -21,7 +21,7 @@
  * and goes to the LSTAR MSR register address, which is the system call entry point. In other words, the 
  * target is to modify the system call entry point.
  *
- * @todo Fix PoC. Adjust the way to retrieve OLD_RSP and KERNEL_STACK addresses.
+ * @todo Fix PoC. Adjust the way to retrieve OLD_RSP and KERNEL_STACK addresses. Or just test on the older kernel :(.
  *
  * @param vmi The VMI instance.
  * @param event The event that triggered the callback.
