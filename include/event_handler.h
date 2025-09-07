@@ -195,7 +195,7 @@ void event_handler_register_event_task(event_handler_t* event_handler,
 
 /**
  * @brief Register a state task with the event_handler.
- * 
+ *
  * @param event_handler The event_handler instance.
  * @param task_id The ID of the state task to register.
  * @param functor The function to execute when the state task is triggered.
@@ -207,7 +207,7 @@ void event_handler_register_state_task(event_handler_t* event_handler,
 
 /**
  * @brief Register an interrupt-driven task with the event_handler.
- * 
+ *
  * @param event_handler The event_handler instance.
  * @param task_id The ID of the interrupt task to register.
  * @return int 0 on success, -1 on failure.
@@ -217,30 +217,30 @@ int event_handler_register_interrupt_task(event_handler_t* event_handler,
 
 /**
  * @brief The event_handler starts a thread that runs the LibVMI event loop which waits for events.
- * 
+ *
  * @param event_handler The event_handler instance.
  */
 void event_handler_start_event_loop(event_handler_t* event_handler);
 
 /**
  * @brief The gthread function that runs the event loop and processes events.
- * 
+ *
  * @param data The data passed to the ghtread function, in this context, the event_handler instance.
  * @return gpointer The result of the thread execution, typically NULL.
  */
 static gpointer event_loop_thread(gpointer data);
 
 /**
- * @brief The event_handler starts a thread that has a thread sleeping 
+ * @brief The event_handler starts a thread that has a thread sleeping
  * for window_ms till it sends a singal to the event processing loop.
- * 
+ *
  * @param event_handler The event_handler instance.
  */
 void event_handler_start_event_window(event_handler_t* event_handler);
 
 /**
  * @brief The gthread function that runs the event window timer and sends a signal.
- * 
+ *
  * @param data The data passed to the ghtread function, in this context, the event_handler instance.
  * @return gpointer The result of the thread execution, typically NULL.
  */
@@ -248,22 +248,22 @@ static gpointer event_window(gpointer data);
 
 /**
  * @brief The event_handler starts a thread that handles JSON serialization of events.
- * 
+ *
  * @param event_handler The event_handler instance.
  */
 void event_handler_start_json_serilaziation(event_handler_t* event_handler);
 
 /**
  * @brief The function that calls all state functors.
- * 
+ *
  * @param event_handler The event_handler instance.
  */
 void sample_state_tasks(event_handler_t* event_handler);
 
 /**
  * @brief Register a global interrupt event to handle all interrupt-driven tasks.
- * 
- * @details Store the event to the handler for book-keeping and later cleanup. 
+ *
+ * @details Store the event to the handler for book-keeping and later cleanup.
  *
  * @param event_handler The event_handler instance.
  * @return int 0 on success, -1 on failure.
@@ -272,14 +272,21 @@ int event_handler_register_global_interrupt(event_handler_t* event_handler);
 
 /**
  * @brief Convert interrupt task ID to breakpoint type.
- * 
+ *
  * This function should be declared elsewhere (event_handler.h) but is used
  * in the implementation files, so including the declaration here for reference.
- * 
+ *
  * @param task_id Interrupt task ID.
  * @return breakpoint_type_t Corresponding breakpoint type.
  */
 breakpoint_type_t interrupt_task_to_breakpoint_type(
     interrupt_task_id_t task_id);
+
+/**
+ * @brief Pause the VM and run all the state tasks. Unpause when finished taking the sample "state".
+ *
+ * @param event_handler The event_handler instance.
+ */
+void sample_state_tasks_all(event_handler_t* event_handler);
 
 #endif  // EVENT_HANDLER_H

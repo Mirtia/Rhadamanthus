@@ -75,6 +75,7 @@ static inline bool is_power_of_two_u32(uint32_t value) {
 }
 
 /**
+
  * @brief  Inspect io_uring state of a single task_struct.
  *
  * @details
@@ -106,6 +107,9 @@ static void inspect_io_uring_for_task(vmi_instance_t vmi,
               procname ? procname : "?");
     return;
   }
+
+  log_debug("PID %u (%s): found io_uring_task=0x%" PRIx64, pid,
+            procname ? procname : "?", (uint64_t)io_uring_task);
 
   addr_t ctx = 0;
   if (vmi_read_addr_va_retry(vmi,

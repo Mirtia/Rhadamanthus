@@ -2,35 +2,34 @@
 #include <glib-2.0/glib.h>
 #include <inttypes.h>
 #include <log.h>
-
-/**
- * @brief No-op free routine with the correct signature for vmi_event_free_t.
- */
-static void vmi_event_free_noop(vmi_event_t* event, status_t status) {
-  (void)event;
-  (void)status;
-  log_debug("(҂ `з´) ︻╦̵̵̿╤──");
-}
+#include "offsets.h"
+#include "utils.h"
 
 static event_response_t event_io_uring_ring_write_ss_callback(
     vmi_instance_t vmi, vmi_event_t* event) {
-  // One-step handler: re-arm INT3 and turn off single-step on this vCPU.
+
   io_uring_bp_ctx_t* ctx = (io_uring_bp_ctx_t*)event->data;
   if (!ctx) {
-    log_debug("io_uring_enter: NULL context in SINGLESTEP handler.");
+    log_error("EVENT_IO_URING_RING_WRITE: NULL context in SS handler.");
     return VMI_EVENT_INVALID;
   }
 
-  // Re-arm INT3 at function entry. Restore 0xCC at the function start.
-  uint8_t val = 0xCC;
-  (void)vmi_write_8_va(vmi, ctx->kaddr, 0, &val);
+  // Re-arm the breakpoint by writing INT3 back
+  uint8_t int3 = 0xCC;
+  if (vmi_write_8_va(vmi, ctx->kaddr, 0, &int3) != VMI_SUCCESS) {
+    log_warn("Failed to re-arm breakpoint");
+  }
 
-  // Disable single-step.
-  (void)vmi_toggle_single_step_vcpu(vmi, event, event->vcpu_id, false);
-  // We don't want to clear the context.
-  // I could have put NULL on the free_routine here but the ASCII logging is funny. Will disable when performing performance checks.
-  vmi_clear_event(vmi, event, vmi_event_free_noop);
+  // Disable single-step on this VCPU
+  if (vmi_toggle_single_step_vcpu(vmi, event, event->vcpu_id, false) !=
+      VMI_SUCCESS) {
+    log_warn("Failed to disable single-step");
+  }
 
+  log_info("EVENT_IO_URING_RING_WRITE: Breakpoint re-armed on vCPU %u",
+           event->vcpu_id);
+
+  log_vcpu_state(vmi, event->vcpu_id, ctx->kaddr, "SS exit");
   return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -42,73 +41,94 @@ event_response_t event_io_uring_ring_write_callback(vmi_instance_t vmi,
     return VMI_EVENT_INVALID;
   }
 
-  /* Entry breakpoint handler (INT3/0xCC delivered via VMI_EVENT_INTERRUPT:INT3):
-   *  - Restore original byte (so the real first instruction can run),
-   *  - Rewind RIP by 1 (INT3 advanced it),
-   *  - Ensure a SINGLESTEP event is registered,
-   *  - Enable single-step via vmi_toggle_single_step_vcpu (no direct TF twiddling).
-   */
   io_uring_bp_ctx_t* ctx = (io_uring_bp_ctx_t*)event->data;
   if (!ctx) {
     log_error("EVENT_IO_URING_RING_WRITE: NULL context in INT3 handler.");
     return VMI_EVENT_INVALID;
   }
 
-  // Grab syscall-style args for logging:
-  reg_t rdi = 0, rsi = 0, rdx = 0, r10 = 0, r8 = 0, r9 = 0;
-  (void)vmi_get_vcpureg(vmi, &rdi, RDI, event->vcpu_id);
-  (void)vmi_get_vcpureg(vmi, &rsi, RSI, event->vcpu_id);
-  (void)vmi_get_vcpureg(vmi, &rdx, RDX, event->vcpu_id);
-  (void)vmi_get_vcpureg(vmi, &r10, R10, event->vcpu_id);
-  (void)vmi_get_vcpureg(vmi, &r8, R8, event->vcpu_id);
-  (void)vmi_get_vcpureg(vmi, &r9, R9, event->vcpu_id);
-
-  // io_uring_enter(fd=rdi, to_submit=rsi, min_complete=rdx, flags=r10, sig=r8, sigsz=r9)
-  log_info("%s ENTER @0x%" PRIx64
-           ": fd=%llu submit=%llu min_cq=%llu flags=0x%llx sig=%llu sigsz=%llu",
-           ctx->symname ? ctx->symname : "io_uring_enter", (uint64_t)ctx->kaddr,
-           (unsigned long long)rdi, (unsigned long long)rsi,
-           (unsigned long long)rdx, (unsigned long long)r10,
-           (unsigned long long)r8, (unsigned long long)r9);
-
-  // Restore original first byte so the real first instruction can execute.
-  {
-    uint8_t val = ctx->orig;
-    (void)vmi_write_8_va(vmi, ctx->kaddr, 0, &val);
+  if (ctx->kaddr == 0) {
+    log_error("EVENT_IO_URING_RING_WRITE: Invalid kaddr in context.");
+    return VMI_EVENT_INVALID;
   }
 
-  // Rewind RIP by 1 (INT3 advanced RIP on x86 by one byte).
-  reg_t rip = 0;
-  (void)vmi_get_vcpureg(vmi, &rip, RIP, event->vcpu_id);
-  if (rip)
-    (void)vmi_set_vcpureg(vmi, rip - 1, RIP, event->vcpu_id);
+  event->interrupt_event.reinject = 0;
+  event->interrupt_event.insn_length = 0;
 
-  // Ensure the SINGLESTEP event exists and is registered once.
-  if (ctx->ss_evt.callback == NULL) {
-    memset(&ctx->ss_evt, 0, sizeof(ctx->ss_evt));
-    ctx->ss_evt.version = VMI_EVENTS_VERSION;
-    ctx->ss_evt.type = VMI_EVENT_SINGLESTEP;
-    ctx->ss_evt.callback = event_io_uring_ring_write_ss_callback;
-    ctx->ss_evt.data = ctx;
+  addr_t regs_addr = 0;
+  if (vmi_get_vcpureg(vmi, &regs_addr, RDI, event->vcpu_id) != VMI_SUCCESS) {
+    log_error("EVENT_IO_URING_RING_WRITE: Failed to get RDI for vCPU %u",
+              event->vcpu_id);
+    return VMI_EVENT_INVALID;
+  }
+  
+  if (regs_addr == 0) {
+    log_error(
+        "EVENT_IO_URING_RING_WRITE: Invalid pt_regs address (RDI=0) for vCPU "
+        "%u",
+        event->vcpu_id);
+    return VMI_EVENT_INVALID;
+  }
 
-    if (vmi_register_event(vmi, &ctx->ss_evt) != VMI_SUCCESS) {
-      log_warn(
-          "EVENT_IO_URING_RING_WRITE: failed to register SINGLESTEP; INT3 may "
-          "not be "
-          "re-armed.");
-      // We cannot single-step without a registered handler; bail out.
-      return VMI_EVENT_RESPONSE_NONE;
-    }
+  // Read fields (guest kernel VA space → dtb=0 for kernel)
+  uint64_t di = 0, si = 0, dx = 0, r10 = 0, r8 = 0, r9 = 0, orig_ax = 0, ip = 0;
+  vmi_read_64_va(vmi, regs_addr + LINUX_PTREGS_OFF_DI, 0, &di);
+  vmi_read_64_va(vmi, regs_addr + LINUX_PTREGS_OFF_SI, 0, &si);
+  vmi_read_64_va(vmi, regs_addr + LINUX_PTREGS_OFF_DX, 0, &dx);
+  vmi_read_64_va(vmi, regs_addr + LINUX_PTREGS_OFF_R10, 0, &r10);
+  vmi_read_64_va(vmi, regs_addr + LINUX_PTREGS_OFF_R8, 0, &r8);
+  vmi_read_64_va(vmi, regs_addr + LINUX_PTREGS_OFF_R9, 0, &r9);
+  vmi_read_64_va(vmi, regs_addr + LINUX_PTREGS_OFF_ORIG_AX, 0, &orig_ax);
+  vmi_read_64_va(vmi, regs_addr + LINUX_PTREGS_OFF_IP, 0, &ip);
+
+  unsigned int file_descriptor = (unsigned int)di;
+  unsigned int to_submit = (unsigned int)si;
+  unsigned int min_cq = (unsigned int)dx;
+  unsigned int flags = (unsigned int)r10;
+  uint64_t sig_ptr = r8;
+  size_t sigsz = (size_t)r9;
+  unsigned long user_ip = ip;
+  unsigned long scno = (unsigned long)orig_ax;
+
+  log_info(
+      "__x64_sys_io_uring_enter: scno=%lu fd=%u submit=%u min_cq=%u flags=0x%x "
+      "sig=%#" PRIx64 " sigsz=%zu RIP=%#" PRIx64,
+      scno, file_descriptor, to_submit, min_cq, flags, sig_ptr, sigsz, user_ip);
+
+  if (vmi_write_8_va(vmi, ctx->kaddr, 0, &ctx->orig) != VMI_SUCCESS) {
+    log_error(
+        "EVENT_IO_URING_RING_WRITE: Failed to restore original byte at "
+        "0x%" PRIx64,
+        (uint64_t)ctx->kaddr);
+    return VMI_EVENT_INVALID;
+  }
+
+  memset(&ctx->ss_evt, 0, sizeof(ctx->ss_evt));
+  ctx->ss_evt.version = VMI_EVENTS_VERSION;
+  ctx->ss_evt.type = VMI_EVENT_SINGLESTEP;
+  ctx->ss_evt.callback = event_io_uring_ring_write_ss_callback;
+  ctx->ss_evt.data = ctx;
+  ctx->ss_evt.ss_event.enable = 1;
+
+  if (vmi_register_event(vmi, &ctx->ss_evt) != VMI_SUCCESS) {
+    log_warn(
+        "EVENT_IO_URING_RING_WRITE: Failed to register SINGLESTEP event; "
+        "breakpoint will not be re-armed");
+    return VMI_EVENT_RESPONSE_NONE;
   }
 
   if (vmi_toggle_single_step_vcpu(vmi, &ctx->ss_evt, event->vcpu_id, true) !=
       VMI_SUCCESS) {
     log_warn(
-        "EVENT_IO_URING_RING_WRITE: failed to enable SINGLESTEP on vCPU %u; "
-        "INT3 may not "
-        "be re-armed.",
+        "EVENT_IO_URING_RING_WRITE: Failed to enable single-step on vCPU %u; "
+        "breakpoint will not be re-armed",
         event->vcpu_id);
   }
+
+  log_info("EVENT_IO_URING_RING_WRITE: Single-step enabled on vCPU %u",
+           event->vcpu_id);
+
+  log_vcpu_state(vmi, event->vcpu_id, ctx->kaddr, "CB exit");
 
   return VMI_EVENT_RESPONSE_NONE;
 }

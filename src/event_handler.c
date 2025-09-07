@@ -229,6 +229,7 @@ void event_handler_register_state_task(event_handler_t* event_handler,
                                        uint32_t (*functor)(vmi_instance_t,
                                                            void*)) {
 
+  // Preconditions
   if (!event_handler) {
     log_error("The provided event_handler is NULL.");
     return;
@@ -250,9 +251,7 @@ void event_handler_register_state_task(event_handler_t* event_handler,
 void event_handler_register_event_task(event_handler_t* event_handler,
                                        event_task_id_t task_id,
                                        GPtrArray* events) {
-  // Note: Each event will have its own create_event_EVENT_TASK_ID function
-  // that will set the event type, flags, and other parameters.
-
+  // Preconditions
   if (!event_handler) {
     log_error("The provided event_handler is NULL.");
     return;
@@ -280,7 +279,6 @@ void event_handler_register_event_task(event_handler_t* event_handler,
 
   event_handler->event_tasks[task_id] = task;
 
-  // Register each event with LibVMI.
   for (size_t i = 0; i < events->len; ++i) {
     vmi_event_t* event = g_ptr_array_index(events, i);
     if (event) {
@@ -301,6 +299,26 @@ void event_handler_start_event_loop(event_handler_t* event_handler) {
       g_thread_new("event_loop", (GThreadFunc)event_loop_thread, event_handler);
 }
 
+void sample_state_tasks_all(event_handler_t* event_handler) {
+  if (!event_handler) {
+    log_error("The provided event_handler is NULL.");
+    return;
+  }
+  // Pause the vm for state sampling to have consistent view of the state.
+  if (vmi_pause_vm(event_handler->vmi) == VMI_FAILURE) {
+    log_error("Failed to pause the VM before sampling all state tasks.");
+    return;
+  }
+  event_handler->is_paused = true;
+  sample_state_tasks(event_handler);
+  // Resume the vm after state sampling.
+  if (vmi_resume_vm(event_handler->vmi) == VMI_FAILURE) {
+    log_error("Failed to resume the VM after sampling all state tasks.");
+    return;
+  }
+  event_handler->is_paused = false;
+}
+
 static gpointer event_loop_thread(gpointer data) {
   if (!data) {
     log_error("The provided data to the event loop thread is NULL.");
@@ -309,24 +327,11 @@ static gpointer event_loop_thread(gpointer data) {
 
   event_handler_t* event_handler = (event_handler_t*)data;
   log_info("Pre-sampling state tasks before starting the event loop thread...");
-  // TODO: Wrap this.
-  // Pause the vm for state sampling.
-  if (vmi_pause_vm(event_handler->vmi) == VMI_FAILURE) {
-    log_error("Failed to pause the VM before starting the event loop.");
-    return NULL;
-  }
-  event_handler->is_paused = true;
-  sample_state_tasks(event_handler);
-  // Resume the vm after state sampling.
-  if (vmi_resume_vm(event_handler->vmi) == VMI_FAILURE) {
-    log_error("Failed to resume the VM before starting the event loop.");
-    return NULL;
-  }
-  event_handler->is_paused = false;
+  sample_state_tasks_all(event_handler);
 
   log_info("Starting event loop thread with window size: %u ms",
            event_handler->window_ms);
-  // NOTE: LibVMI processes one event at a time, listen to total of time window_ms.
+  // LibVMI processes one event at a time, listen to total of time window_ms.
   // The callback will be triggered, which will enqueue the item.
   while (!g_atomic_int_get(&event_handler->stop_signal)) {
     if (vmi_events_listen(event_handler->vmi, event_handler->window_ms) ==
@@ -335,22 +340,6 @@ static gpointer event_loop_thread(gpointer data) {
     }
   }
   log_info("Event loop thread has finished processing events, exiting...");
-  // TODO: Uncommment and use wrap function.
-  // log_info(
-  //     "Post-sampling state tasks after the event loop thread has started...");
-
-  // if (vmi_pause_vm(event_handler->vmi) == VMI_FAILURE) {
-  //   log_error("Failed to pause the VM before starting the event loop.");
-  //   return NULL;
-  // }
-  // event_handler->is_paused = true;
-  // sample_state_tasks(event_handler);
-  // // Resume the vm after state sampling.
-  // if (vmi_resume_vm(event_handler->vmi) == VMI_FAILURE) {
-  //   log_error("Failed to resume the VM before starting the event loop.");
-  //   return NULL;
-  // }
-  // event_handler->is_paused = false;
   return NULL;
 }
 
@@ -414,7 +403,7 @@ void event_handler_start_json_serilaziation(event_handler_t* event_handler) {
     return;
   }
 
-  // Launch the timer thread
+  // Launch the timer thread, it will singal both event loop and json serialization(?).
   event_handler->json_serialization_thread =
       g_thread_new("json_serilaziation", json_serialization, event_handler);
   if (!event_handler->json_serialization_thread) {
@@ -443,16 +432,14 @@ void sample_state_tasks(event_handler_t* event_handler) {
     return;
   }
 
-  // TODO: Investigate. This would definitely be a performance issue.
+  // Observation: The state sampling does not seem to hinder performance.
+  // TODO: Profile/time to check.
   for (int i = 0; i < STATE_TASK_ID_MAX; ++i) {
     state_task_t* task = event_handler->state_tasks[i];
     if (task && task->functor) {
       log_info("Sampling state task: %s", state_task_id_to_str(task->id));
       task->functor(event_handler->vmi, event_handler);
     }
-    // else {
-    //   debug_info("No registered state task for ID: %d", i);
-    // }
   }
 
   event_handler->latest_state_sampling_ms = current_time_ms;
@@ -472,6 +459,8 @@ static void* create_interrupt_task_context(interrupt_task_id_t task_id,
       ebpf_probe_ctx_t* ctx = g_malloc0(sizeof(ebpf_probe_ctx_t));
       if (ctx) {
         ctx->symname = symbol_name;
+        ctx->kaddr = 0;
+        ctx->orig = 0;
       }
       return ctx;
     }
@@ -479,6 +468,8 @@ static void* create_interrupt_task_context(interrupt_task_id_t task_id,
       io_uring_bp_ctx_t* ctx = g_malloc0(sizeof(io_uring_bp_ctx_t));
       if (ctx) {
         ctx->symname = symbol_name;
+        ctx->kaddr = 0;
+        ctx->orig = 0;
       }
       return ctx;
     }
@@ -486,6 +477,8 @@ static void* create_interrupt_task_context(interrupt_task_id_t task_id,
       nf_bp_ctx_t* ctx = g_malloc0(sizeof(nf_bp_ctx_t));
       if (ctx) {
         ctx->symname = symbol_name;
+        ctx->kaddr = 0;
+        ctx->orig = 0;
       }
       return ctx;
     }
@@ -569,7 +562,8 @@ static int register_single_breakpoint(event_handler_t* event_handler,
                                       interrupt_task_id_t task_id,
                                       const char* symbol_name) {
   breakpoint_type_t bp_type = interrupt_task_to_breakpoint_type(task_id);
-  if (bp_type == BP_TYPE_MAX) {
+  if (bp_type < 0 || bp_type >= BP_TYPE_MAX) {
+    log_error("Invalid breakpoint type for task ID: %d", task_id);
     return -1;
   }
 
@@ -593,7 +587,7 @@ static int register_single_breakpoint(event_handler_t* event_handler,
 
 int event_handler_register_interrupt_task(event_handler_t* event_handler,
                                           interrupt_task_id_t task_id) {
-  // Validation
+  // Preconditions
   if (!event_handler) {
     log_error("Invalid event handler");
     return -1;
@@ -637,7 +631,6 @@ int event_handler_register_interrupt_task(event_handler_t* event_handler,
       return -1;
   }
 
-  // Update task registration status
   if (result == 0) {
     event_handler->interrupt_tasks[task_id] = true;
     log_info("Successfully registered interrupt task: %s",
@@ -659,22 +652,22 @@ int event_handler_register_global_interrupt(event_handler_t* event_handler) {
     return 0;
   }
 
-  // Create and register the global INT3 event directly with VMI
+  // Create and register the global INT3 event directly with VMI. In Xen, you can
+  // only have one interrupt (INT3) event registered at a time.
   vmi_event_t* global_int3_event = g_malloc0(sizeof(vmi_event_t));
   if (!global_int3_event) {
     log_error("Failed to allocate global INT3 event");
     return -1;
   }
 
+  // TODO: Replace with SETUP from LibVMI.
   global_int3_event->version = VMI_EVENTS_VERSION;
   global_int3_event->type = VMI_EVENT_INTERRUPT;
   global_int3_event->interrupt_event.intr = INT3;
-  global_int3_event->interrupt_event.reinject = 1;
-  global_int3_event->interrupt_event.insn_length = 1;
+  global_int3_event->interrupt_event.reinject = -1;
   global_int3_event->callback = interrupt_context_global_callback;
   global_int3_event->data = event_handler->interrupt_context;
 
-  // Just register it with VMI - don't store it as an "event task"
   if (vmi_register_event(event_handler->vmi, global_int3_event) !=
       VMI_SUCCESS) {
     log_error("Failed to register global INT3 event");
@@ -685,7 +678,7 @@ int event_handler_register_global_interrupt(event_handler_t* event_handler) {
   log_info("Registered global INT3 handler for %zu breakpoints",
            event_handler->interrupt_context->count);
 
-  // Just for store keeping purposes
+  // Save its reference for book-keeping purposes.
   event_handler->global_interrupt_event = global_int3_event;
   return 0;
 }
@@ -702,6 +695,7 @@ bool event_handler_is_interrupt_task_registered(event_handler_t* event_handler,
 
 int event_handler_unregister_interrupt_task(event_handler_t* event_handler,
                                             interrupt_task_id_t task_id) {
+  // Preconditions
   if (!event_handler || !event_handler->interrupt_context) {
     log_error("Invalid event handler or interrupt context");
     return -1;
@@ -718,13 +712,12 @@ int event_handler_unregister_interrupt_task(event_handler_t* event_handler,
     return 0;
   }
 
-  // Remove breakpoints associated with this task
   breakpoint_type_t bp_type = interrupt_task_to_breakpoint_type(task_id);
   if (bp_type == BP_TYPE_MAX) {
     return -1;
   }
 
-  // Iterate through breakpoints and remove those matching the type
+  // Iterate through breakpoints and remove those matching the type.
   for (size_t i = 0; i < event_handler->interrupt_context->count; i++) {
     breakpoint_entry_t* breakpoint =
         &event_handler->interrupt_context->breakpoints[i];

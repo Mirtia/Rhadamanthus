@@ -5,30 +5,32 @@
 #include <string.h>
 #include "event_handler.h"
 #include "offsets.h"
-
-/**
- * @brief No-op free callback to pair with vmi_clear_event.
- */
-static void vmi_event_free_noop(vmi_event_t* event, status_t status) {
-  (void)event;
-  (void)status;
-  log_debug("(҂ `з´) ︻╦̵̵̿╤──");
-}
+#include "utils.h"
 
 static event_response_t event_netfilter_hook_write_ss_callback(
     vmi_instance_t vmi, vmi_event_t* event) {
   nf_bp_ctx_t* ctx = (nf_bp_ctx_t*)event->data;
-  if (!ctx)
+  if (!ctx) {
+    log_error("EVENT_NETFILTER_HOOK_WRITE: NULL context in SS handler.");
     return VMI_EVENT_INVALID;
+  }
 
-  // Re-arm INT3 at function entry.
-  uint8_t val = 0xCC;
-  vmi_write_8_va(vmi, ctx->kaddr, 0, &val);
+  /// Re-arm the breakpoint by writing INT3 back
+  uint8_t int3 = 0xCC;
+  if (vmi_write_8_va(vmi, ctx->kaddr, 0, &int3) != VMI_SUCCESS) {
+    log_warn("Failed to re-arm breakpoint");
+  }
 
-  vmi_toggle_single_step_vcpu(vmi, event, event->vcpu_id, false);
+  // Disable single-step on this VCPU
+  if (vmi_toggle_single_step_vcpu(vmi, event, event->vcpu_id, false) !=
+      VMI_SUCCESS) {
+    log_warn("Failed to disable single-step");
+  }
 
-  vmi_clear_event(vmi, event, vmi_event_free_noop);
+  log_info("EVENT_IO_URING_RING_WRITE: Breakpoint re-armed on vCPU %u",
+           event->vcpu_id);
 
+  log_vcpu_state(vmi, event->vcpu_id, ctx->kaddr, "SS exit");
   return VMI_EVENT_RESPONSE_NONE;
 }
 
@@ -41,7 +43,10 @@ event_response_t event_netfilter_hook_write_callback(vmi_instance_t vmi,
   }
   nf_bp_ctx_t* ctx = (nf_bp_ctx_t*)event->data;
   if (!ctx)
+  {
+    log_error("EVENT_NETFILTER_HOOK_WRITE: NULL context in INT3 handler.");
     return VMI_EVENT_INVALID;
+  }
 
   // Expected calling convention (x86_64 SysV):
   //   RDI = struct net *net

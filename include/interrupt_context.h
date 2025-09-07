@@ -43,7 +43,6 @@ typedef struct {
   breakpoint_entry_t* breakpoints;  ///< Dynamic array of breakpoint entries.
   size_t count;                     ///< Number of active breakpoints.
   size_t capacity;            ///< Allocated capacity of breakpoints array.
-  GHashTable* addr_to_index;  ///< Hash table for lookup (kaddr as key).
 
   uint64_t total_hits;      ///< Total breakpoint hits.
   uint64_t unhandled_hits;  ///< INT3s that were not covered by breakpoints.

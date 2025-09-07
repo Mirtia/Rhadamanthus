@@ -49,7 +49,7 @@ event_response_t event_cr0_write_callback(vmi_instance_t vmi,
   if (!response) {
     log_error("Failed to allocate memory for CR0 write response.");
     // ADDED: The response should return an error to the event handler.
-    error* error = create_error(VMI_EVENT_INVALID, "Failed to allocate memory for CR0 write response.");
+    // error* error = create_error(VMI_EVENT_INVALID, "Failed to allocate memory for CR0 write response.");
     return VMI_EVENT_INVALID;
   }
 

@@ -22,4 +22,15 @@ uint32_t get_kernel_text_section_range(vmi_instance_t vmi, addr_t* start_addr,
  */
 bool is_in_kernel_text(vmi_instance_t vmi, addr_t addr);
 
+/**
+ * @brief Log the state of a vCPU.
+ * 
+ * @param vmi The VMI instance. 
+ * @param vcpu_id The vCPU ID.
+ * @param kaddr The kernel address of the vCPU structure.
+ * @param context The context associated with the event.
+ */
+void log_vcpu_state(vmi_instance_t vmi, uint32_t vcpu_id, addr_t kaddr,
+                    const char* context);
+
 #endif

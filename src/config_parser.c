@@ -60,7 +60,6 @@ event_handler_t* event_handler_initialize_from_config(const char* config_path) {
   for (GList* list_iter = config.state_tasks; list_iter != NULL;
        list_iter = list_iter->next) {
     state_task_id_t task_id = (state_task_id_t)GPOINTER_TO_INT(list_iter->data);
-    // Mapping from task_id to a callback function should be done here.
     void* functor = get_state_task_functor(task_id);
     event_handler_register_state_task(event_handler, task_id, functor);
   }
@@ -135,7 +134,7 @@ int parse_yaml_config(const char* path, config_t* config) {
   } features_context = FEATURES_NONE;
 
   char* last_key = NULL;
-  int in_sequence = 0;  // Track if we're inside a YAML sequence
+  int in_sequence = 0;
 
   while (yaml_parser_parse(&parser, &event)) {
     switch (event.type) {
@@ -168,7 +167,6 @@ int parse_yaml_config(const char* path, config_t* config) {
         } else if (context == MONITOR) {
           if (strcmp(val, "window_ms") == 0 ||
               strcmp(val, "state_sampling_ms") == 0) {
-            // Free previous key if any
             if (last_key) {
               g_free(last_key);
             }
@@ -235,7 +233,6 @@ int parse_yaml_config(const char* path, config_t* config) {
               if (task_id >= 0 && task_id < INTERRUPT_TASK_ID_MAX) {
                 config->interrupt_tasks = g_list_append(
                     config->interrupt_tasks, (GINT_TO_POINTER(task_id)));
-                log_warn("Interrupt tasks are not supported in config_t yet.");
               } else {
                 log_warn("Unknown interrupt task ID string: %s", val);
               }
@@ -246,7 +243,6 @@ int parse_yaml_config(const char* path, config_t* config) {
       }
 
       case YAML_MAPPING_START_EVENT:
-        // Handle mapping start - could be entering a task definition
         if (features_context == STATE_LIST && in_sequence) {
           context = STATE_TASK;
         } else if (features_context == EVENT_LIST && in_sequence) {

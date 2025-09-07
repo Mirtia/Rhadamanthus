@@ -148,7 +148,7 @@ static GPtrArray* create_event_ftrace_hook(vmi_instance_t vmi) {
   }
   addr_t ftrace_ops_addr = 0;
   addr_t ftrace_ops_phy_addr = 0;
-  // Just monitor writes to ftrace_ops_list.
+  // For now, we monitor writes to ftrace_ops_list.
   if (vmi_translate_ksym2v(vmi, "ftrace_ops_list", &ftrace_ops_addr) !=
       VMI_SUCCESS) {
     log_warn(
@@ -322,7 +322,7 @@ static GPtrArray* create_event_page_table_modification(vmi_instance_t vmi) {
     return NULL;
   }
 
-  // Get kernel CR3 from vCPU 0 (single-baseline; extend later if needed)
+  // Get kernel CR3 from vCPU 0 (single-baseline... extend later if needed)
   uint64_t cr3 = 0;
   if (vmi_get_vcpureg(vmi, &cr3, CR3, 0) != VMI_SUCCESS) {
     log_error("PT watch: failed to read CR3");
@@ -376,7 +376,7 @@ static GPtrArray* create_event_msr_write(vmi_instance_t vmi) {
     log_error("Invalid VMI instance at event registration.");
     return NULL;
   }
-  // Monitor all MSR writes
+  // Monitor all MSR writes (MSR_ALL).
   (void)vmi;
   vmi_event_t* event =
       setup_register_event(MSR_ALL, VMI_REGACCESS_W, event_msr_write_callback);
@@ -409,7 +409,6 @@ static GPtrArray* create_event_code_section_modify(vmi_instance_t vmi) {
 
   for (size_t i = 0; i < page_count; ++i) {
     addr_t page_addr = text_start + i * PAGE_SIZE;
-    // Translate to physical address
     addr_t page_phy_addr = 0;
     if (vmi_translate_kv2p(vmi, page_addr, &page_phy_addr) != VMI_SUCCESS ||
         !page_phy_addr) {
@@ -433,7 +432,6 @@ static GPtrArray* create_event_code_section_modify(vmi_instance_t vmi) {
   log_info("Registered write monitoring on %zu pages of kernel .text section",
            page_count);
 
-  // You can return NULL here if nothing else needs to hold the event object
   return NULL;
 }
 
@@ -468,7 +466,6 @@ static GPtrArray* create_event_kallsyms_table_write(vmi_instance_t vmi) {
         "Could not resolve kallsyms_num_syms, falling back to default size.");
   }
   addr_t kallsyms_offset_phy_addr = 0;
-  // Convert to physical address
   if (kallsyms_offset_addr == 0 ||
       vmi_translate_kv2p(vmi, kallsyms_offset_addr,
                          &kallsyms_offset_phy_addr) != VMI_SUCCESS ||
@@ -523,6 +520,7 @@ int register_all_event_tasks(event_handler_t* event_handler) {
 
 int register_event_task_by_id(event_handler_t* event_handler,
                               event_task_id_t task_id) {
+  // Preconditions
   if (!event_handler) {
     log_error("Event handler is NULL");
     return -1;

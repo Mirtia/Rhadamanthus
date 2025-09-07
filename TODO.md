@@ -40,9 +40,11 @@
 ## TODO
 
 - [ ] ARCHITECTURE: Response schema. It should be identical to the schema or at least same schema as Clueless Admin.
+  - [ ] Google response schema, let's go with that.
 - [ ] Try to inject process with DRKAVUF for Clueless Admin! 
 - [ ] ARCHITECTURE: Time sync, comparison?
   - [ ] Internal comparison
   - [ ] External comparison
 - [ ] Scenarios
 - [ ] Name: something related to Crete or Greek Mythology (Radamanthus)
+- [ ] Secure VMs ???
