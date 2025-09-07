@@ -61,17 +61,18 @@ void log_vcpu_state(vmi_instance_t vmi, uint32_t vcpu_id, addr_t kaddr,
       log_warn("log_vcpu_state: Failed to read byte at 0x%" PRIx64, kaddr);
       // Sentinel value.
       byte_at_kaddr = 0xFF;
-  }
+    }
 
-  unsigned int tf_flag = (unsigned int)((rflags >> 8) & 1);
+    unsigned int tf_flag = (unsigned int)((rflags >> 8) & 1);
 
-  if (kaddr != 0) {
-    log_info("%s state: RIP=0x%" PRIx64 " TF=%u byte@0x%" PRIx64
-             "=0x%02x vCPU=%u",
-             context ? context : "VCPU", (uint64_t)rip, tf_flag, kaddr,
-             byte_at_kaddr, vcpu_id);
-  } else {
-    log_info("%s state: RIP=0x%" PRIx64 " TF=%u vCPU=%u",
-             context ? context : "VCPU", (uint64_t)rip, tf_flag, vcpu_id);
+    if (kaddr != 0) {
+      log_info("%s state: RIP=0x%" PRIx64 " TF=%u byte@0x%" PRIx64
+               "=0x%02x vCPU=%u",
+               context ? context : "VCPU", (uint64_t)rip, tf_flag, kaddr,
+               byte_at_kaddr, vcpu_id);
+    } else {
+      log_info("%s state: RIP=0x%" PRIx64 " TF=%u vCPU=%u",
+               context ? context : "VCPU", (uint64_t)rip, tf_flag, vcpu_id);
+    }
   }
 }

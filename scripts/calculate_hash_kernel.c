@@ -3,7 +3,6 @@
 // gcc -O2 -Wall -Wextra calculate_hash_kernel.c -o calculate_hash_kernel -lvmi -lcrypto
 // ./calculate_hash_kernel -d myguest -o kernel_text.hash
 
-#define return_valueE
 #include <getopt.h>
 #include <inttypes.h>
 #include <stdio.h>

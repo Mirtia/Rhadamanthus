@@ -57,7 +57,7 @@ static inline bool geometry_sane(uint32_t sqe, uint32_t cqe) {
   if (sqe == 0 || cqe == 0)
     return false;
   /* CQ entries are >= SQ entries; man page: cq_entries must be > entries and may be rounded to next power-of-two.
-   *   - man7: https://man7.org/linux/man-pages/man2/io_uring_setup.2.html  (IORING_SETUP_CQSIZE)
+   * man7: https://man7.org/linux/man-pages/man2/io_uring_setup.2.html  (IORING_SETUP_CQSIZE)
    */
   if (cqe < sqe)
     return false;
@@ -83,11 +83,11 @@ static inline bool is_power_of_two_u32(uint32_t value) {
  *   task_struct -> io_uring (struct io_uring_task *) -> last (struct io_ring_ctx *)
  *   -> rings (struct io_rings *)
  * References:
- *   - Types/fields: io_uring_types.h (io_uring_task, io_ring_ctx, io_rings)
+ *  * Types/fields: io_uring_types.h (io_uring_task, io_ring_ctx, io_rings)
  *       https://chromium.googlesource.com/chromiumos/third_party/kernel-next/+/refs/heads/main/include/linux/io_uring_types.h
- *   - Context/rings linkage in fs/io_uring.c:
+ *  * Context/rings linkage in fs/io_uring.c:
  *       https://lxr.missinglinkelectronics.com/linux/fs/io_uring.c
- *   - Background on SQ/CQ rings:
+ *  * Background on SQ/CQ rings:
  *       https://man7.org/linux/man-pages/man7/io_uring.7.html
  * 
  * @param vmi The VMI instance.
@@ -149,7 +149,7 @@ static void inspect_io_uring_for_task(vmi_instance_t vmi,
   // Separate obviously suspicious geometry (race/offset issue) from normal.
   if (!geometry_sane(sq_entries, cq_entries)) {
     /* Strong signal (likely wrong offsets or torn-down rings):
-     *   - man7 IORING_SETUP_CQSIZE: CQ must be > entries (SQ requested depth).
+     *  * man7 IORING_SETUP_CQSIZE: CQ must be > entries (SQ requested depth).
      *     https://man7.org/linux/man-pages/man2/io_uring_setup.2.html
      */
     log_debug(
@@ -197,13 +197,13 @@ uint32_t state_io_uring_artifacts_callback(vmi_instance_t vmi, void* context) {
 
   /* Weak corroboration only; do not classify based on these counters.
    * Thread naming references:
-   *   - SQPOLL worker naming (iou-sqp*): https://man7.org/linux/man-pages/man2/io_uring_setup.2.html (IORING_SETUP_SQPOLL)
-   *   - Worker pool: https://blog.cloudflare.com/missing-manuals-io_uring-worker-pool/
+   *  * SQPOLL worker naming (iou-sqp*): https://man7.org/linux/man-pages/man2/io_uring_setup.2.html (IORING_SETUP_SQPOLL)
+   *  * Worker pool: https://blog.cloudflare.com/missing-manuals-io_uring-worker-pool/
    */
 
   // Using IORING_SETUP_SQPOLL will, by default, create two threads in your process, one named iou-sqp-TID, and the other named iou-wrk-TID.
-  uint64_t iou_worker_count = 0; /* threads named "iou-wrk*" */
-  uint64_t iou_sqp_count = 0;    /* threads named "iou-sqp*" */
+  uint64_t iou_worker_count = 0; // threads named "iou-wrk*"
+  uint64_t iou_sqp_count = 0;    // threads named "iou-sqp*"
 
   log_info("Executing STATE_IO_URING_ARTIFACTS callback.");
 
@@ -289,8 +289,8 @@ uint32_t state_io_uring_artifacts_callback(vmi_instance_t vmi, void* context) {
   /* Expected geometry:
    * CQ often >= SQ, historically sometimes 2x; apps may request larger CQ via CQSIZE.
    * See: 
-   * - https://man7.org/linux/man-pages/man2/io_uring_setup.2.html
-   * - https://lxr.missinglinkelectronics.com/linux/fs/io_uring.c
+   *  * https://man7.org/linux/man-pages/man2/io_uring_setup.2.html
+   *  * https://lxr.missinglinkelectronics.com/linux/fs/io_uring.c
    */
   log_info(
       "STATE_IO_URING_ARTIFACTS: Finished scanning io_uring artifacts across "

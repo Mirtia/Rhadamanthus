@@ -1,3 +1,0 @@
-[submodule "tests/poc/curing"]
-	path = tests/poc/curing
-	url = https://github.com/armosec/curing.git
