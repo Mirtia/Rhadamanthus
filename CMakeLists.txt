@@ -126,5 +126,6 @@ add_compile_definitions(TEST_DATA_DIR="${CMAKE_CURRENT_SOURCE_DIR}/tests/data")
 add_compile_definitions(SYSCALL_INDEX_FILE="${CMAKE_CURRENT_SOURCE_DIR}/data/syscall_index.linux")
 add_compile_definitions(INTERRUPT_INDEX_FILE="${CMAKE_CURRENT_SOURCE_DIR}/data/interrupt_index.linux")
 add_compile_definitions(BASELINE_HASH_FILE="${CMAKE_CURRENT_SOURCE_DIR}/data/ubuntu-20-04-new-kernel-clean.bin")
+add_compile_definitions(JSON_LOG_OUTPUT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/output/")
 
 install(TARGETS introspector DESTINATION bin)

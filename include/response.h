@@ -10,6 +10,37 @@
  */
 #include <cjson/cJSON.h>
 
+/**
+ * Note: The json schema follows closely the Google json response guide.
+ * https://google.github.io/styleguide/jsoncstyleguide.xml 
+ * Error:
+ *
+ * ─────────────────────────────────────────────
+ * JSON Response Structure
+ * ─────────────────────────────────────────────
+ * {
+ *   "timestamp": "",
+ *   "status": "",
+ *   "metadata": {
+ *     "task_type": "",
+ *     "subtype": "",
+ *     "iteration": 0,
+ *     "system": { }
+ *   },
+ *   "data": { },
+ *   "error": {
+ *     "code": 0,
+ *     "message": ""
+ *   }
+ * }
+ *
+ * Rules:
+ * • "status" is either "SUCCESS" or "FAILURE".
+ * • "error" is present only if status == "FAILURE".
+ * • "data" is present only if status == "SUCCESS".
+ */
+
+
 enum callback_status { SUCCESS = 0, FAILURE };
 
 enum task_type { STATE = 0, EVENT, INTERRUPT };
@@ -40,6 +71,9 @@ typedef struct data data;
 
 #define MESSAGE_LENGTH 512
 
+/**
+ * @brief The error codes.
+ */
 enum error_code {
   MEMORY_ALLOCATION_FAILURE = 0,
   ERROR_CODE_MAX,

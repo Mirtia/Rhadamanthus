@@ -1,7 +1,10 @@
 #include "event_callbacks/cr0_write.h"
+#include "event_callbacks/responses/cr0_write_response.h"
 #include <glib.h>
 #include <inttypes.h>
 #include <log.h>
+
+
 /*
  * CR0 control register semantics and attacker relevance. These definitions were taken from "Intel® 64 and IA-32 Architectures
  * Software Developer’s Manual" (https://cdrdv2.intel.com/v1/dl/getContent/671200).
@@ -18,22 +21,6 @@
  * * CR0.CD (bit 30): Disables CPU caching.
  * * CR0.PG (bit 31): Enables paging. Both PE and PG flags must be set to enable paging.
  */
-#define CR0_PE (1UL << 0)
-#define CR0_WP (1UL << 16)
-#define CR0_AM (1UL << 18)
-#define CR0_CD (1UL << 30)
-#define CR0_PG (1UL << 31)
-
-// ADDED: Structure for response data.
-struct cr0_write_data {
-  uint64_t cr0_value;
-  uint32_t vcpu_id;
-  uint64_t rip;
-  uint64_t cr3;
-  uint64_t rsp;
-};
-
-typedef struct cr0_write_data cr0_write_data_t;
 
 event_response_t event_cr0_write_callback(vmi_instance_t vmi,
                                           vmi_event_t* event) {
