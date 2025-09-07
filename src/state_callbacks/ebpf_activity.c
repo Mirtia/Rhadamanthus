@@ -36,7 +36,7 @@ uint32_t state_ebpf_activity_callback(vmi_instance_t vmi, void* context) {
   }
 
   if (stats_enabled == 1) {
-    log_info("STATE_EBPF_ARTIFACTS: bpf_stats_enabled=1 (BPF statistics ON).");
+    log_debug("STATE_EBPF_ARTIFACTS: bpf_stats_enabled=1 (BPF statistics ON).");
   } else if (stats_enabled == 0) {
     log_debug("STATE_EBPF_ARTIFACTS: bpf_stats_enabled=0.");
   } else {

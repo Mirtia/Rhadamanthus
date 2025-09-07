@@ -202,8 +202,8 @@ uint32_t state_io_uring_artifacts_callback(vmi_instance_t vmi, void* context) {
    */
 
   // Using IORING_SETUP_SQPOLL will, by default, create two threads in your process, one named iou-sqp-TID, and the other named iou-wrk-TID.
-  uint64_t iou_worker_count = 0; // threads named "iou-wrk*"
-  uint64_t iou_sqp_count = 0;    // threads named "iou-sqp*"
+  uint64_t iou_worker_count = 0;  // threads named "iou-wrk*"
+  uint64_t iou_sqp_count = 0;     // threads named "iou-sqp*"
 
   log_info("Executing STATE_IO_URING_ARTIFACTS callback.");
 
@@ -245,14 +245,26 @@ uint32_t state_io_uring_artifacts_callback(vmi_instance_t vmi, void* context) {
       return VMI_FAILURE;
     }
 
+    /* Read the next pointer up-front to make advancement unconditional and remove goto. */
+    addr_t next_after = 0;
+    if (vmi_read_addr_va_retry(vmi, cur_list_entry, &next_after) !=
+        VMI_SUCCESS) {
+      log_error(
+          "STATE_IO_URING_ARTIFACTS: Failed to read next task pointer at "
+          "0x%" PRIx64,
+          (uint64_t)cur_list_entry);
+      return VMI_FAILURE;
+    }
+
     current_task = cur_list_entry - tasks_offset;
 
     if (vmi_read_32_va(vmi, current_task + pid_offset, 0, (uint32_t*)&pid) !=
         VMI_SUCCESS) {
-      log_warn("STATE_IO_URING_ARTIFACTS: Failed to read PID at 0x%" PRIx64
-               " — skipping task",
-               (uint64_t)current_task);
-      goto advance;
+      log_debug("STATE_IO_URING_ARTIFACTS: Failed to read PID at 0x%" PRIx64
+                ". Skipping task...",
+                (uint64_t)current_task);
+      cur_list_entry = next_after;
+      continue;
     }
 
     procname = vmi_read_str_va(vmi, current_task + name_offset, 0);
@@ -272,17 +284,8 @@ uint32_t state_io_uring_artifacts_callback(vmi_instance_t vmi, void* context) {
       procname = NULL;
     }
 
-  advance:
-    if (vmi_read_addr_va_retry(vmi, cur_list_entry, &next_list_entry) !=
-        VMI_SUCCESS) {
-      log_error(
-          "STATE_IO_URING_ARTIFACTS: Failed to read next task pointer at "
-          "0x%" PRIx64,
-          (uint64_t)cur_list_entry);
-      return VMI_FAILURE;
-    }
-
-    cur_list_entry = next_list_entry;
+    /* Advance using the already-read pointer. */
+    cur_list_entry = next_after;
 
   } while (cur_list_entry != list_head);
 
@@ -292,7 +295,7 @@ uint32_t state_io_uring_artifacts_callback(vmi_instance_t vmi, void* context) {
    *  * https://man7.org/linux/man-pages/man2/io_uring_setup.2.html
    *  * https://lxr.missinglinkelectronics.com/linux/fs/io_uring.c
    */
-  log_info(
+  log_warn(
       "STATE_IO_URING_ARTIFACTS: Finished scanning io_uring artifacts across "
       "all tasks. Weak signals: iou-wrk=%" PRIu64 ", iou-sqp=%" PRIu64,
       iou_worker_count, iou_sqp_count);

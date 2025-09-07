@@ -22,9 +22,10 @@ event_response_t event_syscall_table_write_callback(vmi_instance_t vmi,
 
   if (vmi_get_vcpureg(vmi, &rip, RIP, vcpu_id) != VMI_SUCCESS) {
     log_error("SYSCALL_TABLE_WRITE: Failed to get RIP for VCPU %u", vcpu_id);
+    return VMI_FAILURE;
   }
 
-  log_info("SYSCALL_TABLE_WRITE Event: VCPU: %u RIP: 0x%" PRIx64
+  log_warn("SYSCALL_TABLE_WRITE Event: VCPU: %u RIP: 0x%" PRIx64
            " GLA: 0x%" PRIx64 " GPA: 0x%" PRIx64,
            vcpu_id, rip, write_gla, write_gpa);
 

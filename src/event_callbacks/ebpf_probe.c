@@ -35,7 +35,7 @@ static void extract_kprobe_info(vmi_instance_t vmi, uint32_t vcpu_id) {
       symbol_ptr) {
     char* symbol_name = vmi_read_str_va(vmi, symbol_ptr, 0);
     if (symbol_name) {
-      log_info("EVENT_EBPF_PROBE: Target Symbol: %s", symbol_name);
+      log_debug("EVENT_EBPF_PROBE: Target Symbol: %s", symbol_name);
 
       // Check for commonly targeted functions by rootkits
       if (strstr(symbol_name, "sys_open") ||
@@ -70,7 +70,7 @@ static void extract_kprobe_info(vmi_instance_t vmi, uint32_t vcpu_id) {
   addr_t target_addr = 0;
   if (vmi_read_addr_va(vmi, kprobe_ptr + 0x0, 0, &target_addr) == VMI_SUCCESS &&
       target_addr) {
-    log_info("EVENT_EBPF_PROBE: Target Address: 0x%" PRIx64, target_addr);
+    log_debug("EVENT_EBPF_PROBE: Target Address: 0x%" PRIx64, target_addr);
   }
 }
 
@@ -89,7 +89,7 @@ static void extract_bpf_attach_info(vmi_instance_t vmi, uint32_t vcpu_id,
                                     const char* func_name) {
   registers_t regs;
   if (vmi_get_vcpuregs(vmi, &regs, vcpu_id) != VMI_SUCCESS) {
-    log_warn("EVENT_EBPF_PROBE: Failed to get CPU registers for VCPU %u",
+    log_debug("EVENT_EBPF_PROBE: Failed to get CPU registers for VCPU %u",
              vcpu_id);
     return;
   }
@@ -98,7 +98,7 @@ static void extract_bpf_attach_info(vmi_instance_t vmi, uint32_t vcpu_id,
     uint32_t prog_fd = (uint32_t)regs.x86.rdi;
     uint32_t attach_type = (uint32_t)regs.x86.rdx;
 
-    log_info("EVENT_EBPF_PROBE: Program FD: %u, Attach Type: %u", prog_fd,
+    log_debug("EVENT_EBPF_PROBE: Program FD: %u, Attach Type: %u", prog_fd,
              attach_type);
 
     if (attach_type == 1 || attach_type == 2) {
@@ -115,7 +115,7 @@ static void extract_bpf_attach_info(vmi_instance_t vmi, uint32_t vcpu_id,
     if (name_ptr) {
       char* tp_name = vmi_read_str_va(vmi, name_ptr, 0);
       if (tp_name) {
-        log_info("EVENT_EBPF_PROBE: Tracepoint: %s", tp_name);
+        log_debug("EVENT_EBPF_PROBE: Tracepoint: %s", tp_name);
 
         if (strstr(tp_name, "sys_enter") || strstr(tp_name, "sys_exit")) {
           log_warn("EVENT_EBPF_PROBE: System call tracing capability detected");
@@ -164,7 +164,7 @@ static event_response_t event_ebpf_probe_ss_callback(vmi_instance_t vmi,
              event->vcpu_id);
   }
 
-  log_info("EVENT_EBPF_PROBE: Breakpoint re-armed on vCPU %u", event->vcpu_id);
+  log_debug("EVENT_EBPF_PROBE: Breakpoint re-armed on vCPU %u", event->vcpu_id);
 
   log_vcpu_state(vmi, event->vcpu_id, ctx->kaddr, "SS exit");
   return VMI_EVENT_RESPONSE_NONE;
@@ -216,20 +216,20 @@ event_response_t event_ebpf_probe_callback(vmi_instance_t vmi,
   // Extract function-specific details
   if (ctx->symname && (strstr(ctx->symname, "register_kprobe") ||
                        strstr(ctx->symname, "register_kretprobe"))) {
-    log_info("EVENT_EBPF_PROBE: Type - Kernel probe registration");
+    log_debug("EVENT_EBPF_PROBE: Type - Kernel probe registration");
     extract_kprobe_info(vmi, vcpu_id);
   } else if (ctx->symname && strstr(ctx->symname, "register_uprobe")) {
-    log_info("EVENT_EBPF_PROBE: Type - User-space probe registration");
+    log_debug("EVENT_EBPF_PROBE: Type - User-space probe registration");
     registers_t regs;
     if (vmi_get_vcpuregs(vmi, &regs, vcpu_id) == VMI_SUCCESS) {
       uint64_t file_offset = regs.x86.rsi;
-      log_info("EVENT_EBPF_PROBE: File Offset: 0x%" PRIx64, file_offset);
+      log_debug("EVENT_EBPF_PROBE: File Offset: 0x%" PRIx64, file_offset);
     }
   } else if (ctx->symname && strstr(ctx->symname, "bpf_")) {
-    log_info("EVENT_EBPF_PROBE: Type - eBPF program attachment");
+    log_debug("EVENT_EBPF_PROBE: Type - eBPF program attachment");
     extract_bpf_attach_info(vmi, vcpu_id, ctx->symname);
   } else if (ctx->symname && strstr(ctx->symname, "tracepoint")) {
-    log_info("EVENT_EBPF_PROBE: Type - Tracepoint probe registration");
+    log_debug("EVENT_EBPF_PROBE: Type - Tracepoint probe registration");
   }
 
   // Restore original byte
@@ -248,20 +248,20 @@ event_response_t event_ebpf_probe_callback(vmi_instance_t vmi,
 
   if (vmi_register_event(vmi, &ctx->ss_evt) != VMI_SUCCESS) {
     log_warn(
-        "EVENT_EBPF_PROBE: Failed to register SINGLESTEP event; "
-        "breakpoint will not be re-armed");
+        "EVENT_EBPF_PROBE: Failed to register SINGLESTEP event. "
+        "Breakpoint will not be re-armed.");
     return VMI_EVENT_RESPONSE_NONE;
   }
 
   if (vmi_toggle_single_step_vcpu(vmi, &ctx->ss_evt, vcpu_id, true) !=
       VMI_SUCCESS) {
     log_warn(
-        "EVENT_EBPF_PROBE: Failed to enable single-step on vCPU %u; "
-        "breakpoint will not be re-armed",
+        "EVENT_EBPF_PROBE: Failed to enable single-step on vCPU %u. "
+        "Breakpoint will not be re-armed.",
         vcpu_id);
   }
 
-  log_info("EVENT_EBPF_PROBE: Single-step enabled on vCPU %u", vcpu_id);
+  log_debug("EVENT_EBPF_PROBE: Single-step enabled on vCPU %u.", vcpu_id);
 
   log_vcpu_state(vmi, vcpu_id, ctx->kaddr, "CB exit");
 

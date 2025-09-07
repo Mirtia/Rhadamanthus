@@ -17,7 +17,10 @@ event_response_t event_idt_write_callback(vmi_instance_t vmi,
   addr_t write_gla = event->mem_event.gla;
   addr_t write_gpa = (event->mem_event.gfn << 12) | event->mem_event.offset;
 
-  vmi_get_vcpureg(vmi, &rip, RIP, vcpu_id);
+  if (vmi_get_vcpureg(vmi, &rip, RIP, vcpu_id))  {
+    log_error("EVENT_IDT_WRITE: Failed to get RIP for VCPU %u", vcpu_id);
+    return VMI_EVENT_INVALID;
+  }
 
   log_warn("EVENT_IDT_WRITE: VCPU: %u RIP: 0x%" PRIx64 " GLA: 0x%" PRIx64
            " GPA: 0x%" PRIx64,

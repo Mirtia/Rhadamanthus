@@ -55,7 +55,7 @@ uint32_t state_kernel_module_list_callback(vmi_instance_t vmi, void* context) {
 
     if (vmi_read_32_va(vmi, module_base + LINUX_MODULE_STATE_OFFSET, 0,
                        &state) != VMI_SUCCESS) {
-      log_error(
+      log_debug(
           "STATE_KERNEL_MODULE_LIST: Failed to read module state at "
           "0x%" PRIx64,
           module_base + LINUX_MODULE_STATE_OFFSET);
@@ -63,12 +63,12 @@ uint32_t state_kernel_module_list_callback(vmi_instance_t vmi, void* context) {
     }
 
     if (!modname) {
-      log_warn(
+      log_debug(
           "STATE_KERNEL_MODULE_LIST: Failed to read module name at "
           "0x%" PRIx64,
           name_addr);
     } else {
-      log_info(
+      log_debug(
           "STATE_KERNEL_MODULE_LIST: Module %d: %s "
           "[module_base=0x%" PRIx64 "]",
           ++count, modname, module_base);

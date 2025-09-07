@@ -27,7 +27,7 @@ static void cleanup_sys_index(char** sys_index, size_t size) {
 static char** parse_syscall_index_file(size_t* count_dst) {
   FILE* file = fopen(SYSCALL_INDEX_FILE, "r");
   if (!file) {
-    log_debug("Failed to open syscall index file: %s", SYSCALL_INDEX_FILE);
+    log_error("Failed to open syscall index file: %s", SYSCALL_INDEX_FILE);
     return NULL;
   }
 
@@ -57,7 +57,7 @@ static char** parse_syscall_index_file(size_t* count_dst) {
 
     char* name = g_strdup(endptr);
     if (!name) {
-      log_debug("Endptr was NULL. Strdup failed for line: %s", line);
+      log_error("Endptr was NULL. Strdup failed for line: %s", line);
       (void)fclose(file);
       cleanup_sys_index(sys_index, count);
       return NULL;
@@ -66,7 +66,7 @@ static char** parse_syscall_index_file(size_t* count_dst) {
     name[strcspn(name, "\r\n")] = '\0';
     char** temp = g_realloc(sys_index, sizeof(char*) * (count + 1));
     if (!temp) {
-      log_debug("Realloc failed while expanding syscall index array.");
+      log_error("Realloc failed while expanding syscall index array.");
       g_free(name);
       (void)fclose(file);
       cleanup_sys_index(sys_index, count);
@@ -133,7 +133,7 @@ uint32_t state_syscall_table_callback(vmi_instance_t vmi, void* context) {
   for (size_t i = 0; i < syscall_number; ++i) {
     if (vmi_read_addr_va(vmi, sys_call_table_addr + i * sizeof(addr_t), 0,
                          &sys_call_addr) == VMI_FAILURE) {
-      log_warn(
+      log_debug(
           "STATE_SYSCALL_TABLE: Failed to read syscall address at index %zu.",
           i);
       continue;
@@ -141,8 +141,8 @@ uint32_t state_syscall_table_callback(vmi_instance_t vmi, void* context) {
 
     // It is suspicious that the hook is outside the kernel text section.
     if (sys_call_addr < kernel_start || sys_call_addr > kernel_end) {
-      log_warn("STATE_SYSCALL_TABLE: Hook detected: syscall %s at 0x%" PRIx64,
-               sys_index[i], sys_call_addr);
+      log_debug("STATE_SYSCALL_TABLE: Hook detected: syscall %s at 0x%" PRIx64,
+                sys_index[i], sys_call_addr);
       syscall_hit_count++;
     }
   }

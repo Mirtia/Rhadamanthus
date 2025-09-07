@@ -49,7 +49,7 @@ typedef struct {
  */
 typedef struct {
   GArray* kernel_connections;  ///< Direct kernel connections.
-  uint32_t suspicious_count;   ///< Count of suspicious connections.
+  uint32_t to_be_reviewed;   ///< Count of suspicious connections.
 } detection_context_t;         ///< Context for network detection.
 
 /**
@@ -283,7 +283,7 @@ static uint32_t walk_tcp_hash_table(vmi_instance_t vmi,
   // Get tcp_hashinfo global symbol
   if (vmi_translate_ksym2v(vmi, "tcp_hashinfo", &tcp_hashinfo_addr) !=
       VMI_SUCCESS) {
-    log_debug("Failed to resolve tcp_hashinfo global symbol");
+    log_error("Failed to resolve tcp_hashinfo global symbol");
     return VMI_FAILURE;
   }
 
@@ -294,7 +294,7 @@ static uint32_t walk_tcp_hash_table(vmi_instance_t vmi,
       vmi_read_32_va(vmi,
                      tcp_hashinfo_addr + LINUX_INET_HASHINFO_EHASH_MASK_OFFSET,
                      0, &ehash_mask) != VMI_SUCCESS) {
-    log_debug("Failed to read TCP established hash table info");
+    log_error("Failed to read TCP established hash table info");
     return VMI_FAILURE;
   }
 
@@ -437,7 +437,7 @@ static uint32_t walk_tcp_hash_table(vmi_instance_t vmi,
         // Note: We already filtered state==0 and state > TCP_NEW_SYN_RECV above
 
         if (suspicious)
-          ctx->suspicious_count++;
+          ctx->to_be_reviewed++;
 
         g_array_append_val(ctx->kernel_connections, conn);
       }
@@ -467,7 +467,7 @@ static uint32_t walk_tcp_hash_table(vmi_instance_t vmi,
     if (chain_count >= 100) {
       log_debug("Excessive socket chain in bucket %u: %d connections", i,
                 chain_count);
-      ctx->suspicious_count++;
+      ctx->to_be_reviewed++;
     }
   }
 
@@ -489,7 +489,7 @@ static uint32_t check_netfilter_hooks(vmi_instance_t vmi,
   addr_t init_net_addr = 0;
 
   if (vmi_translate_ksym2v(vmi, "init_net", &init_net_addr) != VMI_SUCCESS) {
-    log_debug("Failed to resolve init_net symbol");
+    log_error("Failed to resolve init_net symbol");
     return VMI_FAILURE;
   }
 
@@ -559,7 +559,7 @@ static uint32_t check_netfilter_hooks(vmi_instance_t vmi,
         }
 
         if (suspicious)
-          ctx->suspicious_count++;
+          ctx->to_be_reviewed++;
       }
     }
   }
@@ -598,7 +598,7 @@ uint32_t state_network_trace_callback(vmi_instance_t vmi, void* context) {
 
   detection_context.kernel_connections =
       g_array_new(FALSE, TRUE, sizeof(network_connection_t));
-  detection_context.suspicious_count = 0;
+  detection_context.to_be_reviewed = 0;
 
   if (check_netfilter_hooks(vmi, &detection_context) != VMI_SUCCESS) {
     log_error("STATE_NETWORK_TRACE: Failed to check netfilter hooks");
@@ -610,11 +610,11 @@ uint32_t state_network_trace_callback(vmi_instance_t vmi, void* context) {
     return VMI_FAILURE;
   }
 
-  if (detection_context.suspicious_count > 0) {
+  if (detection_context.to_be_reviewed > 0) {
     log_warn(
-        "STATE_NETWORK_TRACE: Found %u suspicious network "
-        "activities!",
-        detection_context.suspicious_count);
+        "STATE_NETWORK_TRACE: Found %u network "
+        "activities to be reviewed.",
+        detection_context.to_be_reviewed);
   } else {
     log_info("STATE_NETWORK_TRACE: No immediate threats detected");
   }

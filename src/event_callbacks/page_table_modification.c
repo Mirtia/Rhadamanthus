@@ -13,7 +13,7 @@ event_response_t event_page_table_modification_callback(vmi_instance_t vmi,
 
   pt_watch_ctx_t* ctx = (pt_watch_ctx_t*)event->data;
   if (!ctx) {
-    log_warn("PAGE_TABLE_MODIFICATION: Missing context (event->data == NULL)");
+    log_error("PAGE_TABLE_MODIFICATION: Missing context (event->data == NULL)");
     return VMI_EVENT_RESPONSE_NONE;
   }
 
@@ -21,7 +21,7 @@ event_response_t event_page_table_modification_callback(vmi_instance_t vmi,
   uint64_t pml4_snapshot[512] = {0};
   if (vmi_read_pa(vmi, ctx->pml4_pa, sizeof(pml4_snapshot), pml4_snapshot,
                   NULL) != VMI_SUCCESS) {
-    log_warn("PAGE_TABLE_MODIFICATION: vmi_read_pa failed @0x%lx",
+    log_error("PAGE_TABLE_MODIFICATION: vmi_read_pa failed @0x%lx",
              (unsigned long)ctx->pml4_pa);
     return VMI_EVENT_RESPONSE_NONE;
   }
@@ -55,7 +55,7 @@ event_response_t event_page_table_modification_callback(vmi_instance_t vmi,
     unsigned long old_noexec = (old_entry >> 63) & 1;
     unsigned long new_noexec = (new_entry >> 63) & 1;
 
-    log_info(
+    log_warn(
         "PAGE_TABLE_MODIFICATION: PML4 entry [%3u] updated "
         "(old=0x%016llx, new=0x%016llx): "
         "Present %d→%d, Writable %d→%d, User-access %d→%d, NX %d→%d",

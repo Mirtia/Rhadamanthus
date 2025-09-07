@@ -17,17 +17,17 @@ static event_response_t event_io_uring_ring_write_ss_callback(
   // Re-arm the breakpoint by writing INT3 back
   uint8_t int3 = 0xCC;
   if (vmi_write_8_va(vmi, ctx->kaddr, 0, &int3) != VMI_SUCCESS) {
-    log_warn("Failed to re-arm breakpoint");
+    log_warn("Failed to re-arm breakpoint.");
   }
 
   // Disable single-step on this VCPU
   if (vmi_toggle_single_step_vcpu(vmi, event, event->vcpu_id, false) !=
       VMI_SUCCESS) {
-    log_warn("Failed to disable single-step");
+    log_warn("Failed to disable single-step.");
   }
 
-  log_info("EVENT_IO_URING_RING_WRITE: Breakpoint re-armed on vCPU %u",
-           event->vcpu_id);
+  log_debug("EVENT_IO_URING_RING_WRITE: Breakpoint re-armed on vCPU %u.",
+            event->vcpu_id);
 
   log_vcpu_state(vmi, event->vcpu_id, ctx->kaddr, "SS exit");
   return VMI_EVENT_RESPONSE_NONE;
@@ -57,15 +57,15 @@ event_response_t event_io_uring_ring_write_callback(vmi_instance_t vmi,
 
   addr_t regs_addr = 0;
   if (vmi_get_vcpureg(vmi, &regs_addr, RDI, event->vcpu_id) != VMI_SUCCESS) {
-    log_error("EVENT_IO_URING_RING_WRITE: Failed to get RDI for vCPU %u",
+    log_error("EVENT_IO_URING_RING_WRITE: Failed to get RDI for vCPU %u.",
               event->vcpu_id);
     return VMI_EVENT_INVALID;
   }
-  
+
   if (regs_addr == 0) {
     log_error(
         "EVENT_IO_URING_RING_WRITE: Invalid pt_regs address (RDI=0) for vCPU "
-        "%u",
+        "%u.",
         event->vcpu_id);
     return VMI_EVENT_INVALID;
   }
@@ -90,8 +90,9 @@ event_response_t event_io_uring_ring_write_callback(vmi_instance_t vmi,
   unsigned long user_ip = ip;
   unsigned long scno = (unsigned long)orig_ax;
 
-  log_info(
-      "__x64_sys_io_uring_enter: scno=%lu fd=%u submit=%u min_cq=%u flags=0x%x "
+  log_warn(
+      "EVENT_IO_URING_RING_WRITE: __x64_sys_io_uring_enter: scno=%lu fd=%u "
+      "submit=%u min_cq=%u flags=0x%x "
       "sig=%#" PRIx64 " sigsz=%zu RIP=%#" PRIx64,
       scno, file_descriptor, to_submit, min_cq, flags, sig_ptr, sigsz, user_ip);
 
@@ -112,21 +113,21 @@ event_response_t event_io_uring_ring_write_callback(vmi_instance_t vmi,
 
   if (vmi_register_event(vmi, &ctx->ss_evt) != VMI_SUCCESS) {
     log_warn(
-        "EVENT_IO_URING_RING_WRITE: Failed to register SINGLESTEP event; "
-        "breakpoint will not be re-armed");
+        "EVENT_IO_URING_RING_WRITE: Failed to register SINGLESTEP event. "
+        "Breakpoint will not be re-armed");
     return VMI_EVENT_RESPONSE_NONE;
   }
 
   if (vmi_toggle_single_step_vcpu(vmi, &ctx->ss_evt, event->vcpu_id, true) !=
       VMI_SUCCESS) {
     log_warn(
-        "EVENT_IO_URING_RING_WRITE: Failed to enable single-step on vCPU %u; "
-        "breakpoint will not be re-armed",
+        "EVENT_IO_URING_RING_WRITE: Failed to enable single-step on vCPU %u. "
+        "Breakpoint will not be re-armed",
         event->vcpu_id);
   }
 
-  log_info("EVENT_IO_URING_RING_WRITE: Single-step enabled on vCPU %u",
-           event->vcpu_id);
+  log_debug("EVENT_IO_URING_RING_WRITE: Single-step enabled on vCPU %u.",
+            event->vcpu_id);
 
   log_vcpu_state(vmi, event->vcpu_id, ctx->kaddr, "CB exit");
 

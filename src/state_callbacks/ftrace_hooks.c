@@ -326,8 +326,8 @@ uint32_t state_ftrace_hooks_callback(vmi_instance_t vmi, void* context) {
       walk_ftrace_ops_list(vmi, kernel_start, kernel_end);
 
   int total_count = global_count + syscall_count + hook_detections_count;
-  log_info("STATE_FTRACE_HOOKS: Global ftrace issues: %d", global_count);
-  log_info("STATE_FTRACE_HOOKS: Syscall-related issues: %d", syscall_count);
+  log_debug("STATE_FTRACE_HOOKS: Global ftrace issues: %d", global_count);
+  log_debug("STATE_FTRACE_HOOKS: Syscall-related issues: %d", syscall_count);
   log_info("STATE_FTRACE_HOOKS: Active hooks detected: %d",
            hook_detections_count);
   log_info("STATE_FTRACE_HOOKS: Total suspicious findings: %d", total_count);

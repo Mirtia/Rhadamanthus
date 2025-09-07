@@ -106,25 +106,25 @@ uint32_t state_msr_registers_callback(vmi_instance_t vmi, void* context) {
       continue;
     }
 
-    log_info("STATE_MSR_REGISTERS: vCPU %u MSR_LSTAR: 0x%" PRIx64, cpu,
-             (uint64_t)lstar_value);
+    log_debug("STATE_MSR_REGISTERS: vCPU %u MSR_LSTAR: 0x%" PRIx64, cpu,
+              (uint64_t)lstar_value);
 
     if (!is_in_kernel_text(vmi, lstar_value)) {
-      log_info(
+      log_warn(
           "STATE_MSR_REGISTERS: vCPU %u MSR_LSTAR points outside "
           "kernel text "
           "section (0x%" PRIx64 " not in [0x%" PRIx64 ", 0x%" PRIx64 "])",
           cpu, (uint64_t)lstar_value, (uint64_t)kernel_start,
           (uint64_t)kernel_end);
     } else {
-      log_info(
+      log_debug(
           "STATE_MSR_REGISTERS: vCPU %u MSR_LSTAR within kernel text "
           "bounds",
           cpu);
     }
 
     if (has_legitimate_ref && lstar_value != legitimate_syscall) {
-      log_info(
+      log_warn(
           "STATE_MSR_REGISTERS: vCPU %u MSR_LSTAR differs from "
           "expected "
           "syscall entry (0x%" PRIx64 " vs 0x%" PRIx64 ")",

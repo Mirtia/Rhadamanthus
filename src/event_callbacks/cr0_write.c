@@ -66,15 +66,16 @@ event_response_t event_cr0_write_callback(vmi_instance_t vmi,
   const char* cache_disabled = (cr0_value & CR0_CD) ? "ON" : "OFF";
   const char* alignment_mask = (cr0_value & CR0_AM) ? "ON" : "OFF";
 
-  log_info("CR0 WRITE Event: PE=%s PG=%s WP=%s CD=%s AM=%s", protection_enabled,
-           paging_enabled, write_protect, cache_disabled, alignment_mask);
+  log_debug("CR0 WRITE Event: PE=%s PG=%s WP=%s CD=%s AM=%s",
+            protection_enabled, paging_enabled, write_protect, cache_disabled,
+            alignment_mask);
 
   // Rootkits often clear write protection bit to modify read-only kernel structures (e.g. syscall table).
   // TODO: Is there a scenario where a malicious actor modifies the CR0_CD?
   if (!(cr0_value & CR0_WP)) {
     log_warn(
-        "Write protection disabled (WP=0)—possible kernel modification in "
-        "progress.");
+        "Write protection disabled (WP=0). Possible kernel modification of "
+        "read-only structures.");
   }
 
   return VMI_EVENT_RESPONSE_NONE;

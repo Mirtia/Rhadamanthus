@@ -14,7 +14,8 @@ event_response_t event_ftrace_hook_callback(vmi_instance_t vmi,
   addr_t rip = 0;
 
   if (vmi_get_vcpureg(vmi, &rip, RIP, vcpu_id) != VMI_SUCCESS) {
-    log_warn("EVENT_FTRACE_HOOK: Failed to get RIP for VCPU %u", vcpu_id);
+    log_error("EVENT_FTRACE_HOOK: Failed to get RIP for VCPU %u", vcpu_id);
+    return VMI_EVENT_INVALID;
   }
 
   uint64_t gla = event->mem_event.gla;

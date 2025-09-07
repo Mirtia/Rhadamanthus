@@ -237,7 +237,7 @@ static int check_idt_for_vcpu(vmi_instance_t vmi,
     return -1;
   }
 
-  log_info("IDTR base (vCPU %u): 0x%" PRIx64, vcpu_id, (uint64_t)idt_base);
+  log_debug("IDTR base (vCPU %u): 0x%" PRIx64, vcpu_id, (uint64_t)idt_base);
 
   const bool ia32e = (vmi_get_page_mode(vmi, vcpu_id) == VMI_PM_IA32E);
   const uint16_t gate_size = ia32e ? 16 : 8;
@@ -362,7 +362,7 @@ uint32_t state_idt_table_callback(vmi_instance_t vmi, void* context) {
     log_info(
         "STATE_IDT_TABLE: No unexpected interrupt handler addresses detected.");
   } else {
-    log_info(
+    log_warn(
         "STATE_IDT_TABLE: Total interrupt handlers flagged across all vCPUs: "
         "%d",
         total_hooked);
@@ -374,8 +374,9 @@ uint32_t state_idt_table_callback(vmi_instance_t vmi, void* context) {
         "targeted attack.");
   }
 
-  if (vec_names)
+  if (vec_names) {
     g_ptr_array_free(vec_names, TRUE);
+  }
 
   log_info("STATE_IDT_TABLE callback completed.");
   return VMI_SUCCESS;

@@ -183,7 +183,7 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
     // Read PID
     if (vmi_read_32_va(vmi, current_process + pid_offset, 0,
                        (uint32_t*)&proc_info.pid) != VMI_SUCCESS) {
-      log_warn("STATE_PROCESS_LIST: Failed to read PID at 0x%" PRIx64,
+      log_debug("STATE_PROCESS_LIST: Failed to read PID at 0x%" PRIx64,
                current_process);
       process_valid = false;
     }
@@ -192,7 +192,7 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
     if (process_valid) {
       proc_info.name = vmi_read_str_va(vmi, current_process + name_offset, 0);
       if (!proc_info.name) {
-        log_warn(
+        log_debug(
             "STATE_PROCESS_LIST: Failed to read process name for PID "
             "%u",
             proc_info.pid);
@@ -204,7 +204,7 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
     if (process_valid) {
       if (vmi_read_32_va(vmi, current_process + LINUX_STATE_OFFSET, 0,
                          &proc_info.state) != VMI_SUCCESS) {
-        log_warn(
+        log_debug(
             "STATE_PROCESS_LIST: Failed to read process state for PID "
             "%u",
             proc_info.pid);
@@ -218,7 +218,7 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
       if (!proc_info.is_kernel_thread) {
         if (!read_process_credentials(vmi, current_process, LINUX_CRED_OFFSET,
                                       &proc_info)) {
-          log_warn(
+          log_debug(
               "STATE_PROCESS_LIST: Failed to read credentials for PID "
               "%u",
               proc_info.pid);

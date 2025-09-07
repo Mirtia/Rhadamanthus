@@ -28,7 +28,7 @@ static event_response_t event_netfilter_hook_write_ss_callback(
     log_warn("Failed to disable single-step");
   }
 
-  log_info("EVENT_NETFILTER_HOOK_WRITE: Breakpoint re-armed on vCPU %u",
+  log_debug("EVENT_NETFILTER_HOOK_WRITE: Breakpoint re-armed on vCPU %u",
            event->vcpu_id);
 
   log_vcpu_state(vmi, event->vcpu_id, ctx->kaddr, "SS exit");
@@ -78,7 +78,7 @@ event_response_t event_netfilter_hook_write_callback(vmi_instance_t vmi,
     return VMI_EVENT_INVALID;
   }
 
-  log_info("EVENT_NETFILTER_HOOK_WRITE: %s @0x%" PRIx64 " net=0x%" PRIx64
+  log_debug("EVENT_NETFILTER_HOOK_WRITE: %s @0x%" PRIx64 " net=0x%" PRIx64
            " ops=0x%" PRIx64 " n=%llu",
            ctx->symname ? ctx->symname : "nf_register_net_hook", ctx->kaddr,
            (uint64_t)rdi, (uint64_t)rsi, (unsigned long long)rdx);
@@ -101,20 +101,20 @@ event_response_t event_netfilter_hook_write_callback(vmi_instance_t vmi,
 
   if (vmi_register_event(vmi, &ctx->ss_evt) != VMI_SUCCESS) {
     log_warn(
-        "EVENT_NETFILTER_HOOK_WRITE: Failed to register SINGLESTEP event; "
-        "breakpoint will not be re-armed");
+        "EVENT_NETFILTER_HOOK_WRITE: Failed to register SINGLESTEP event. "
+        "Breakpoint will not be re-armed");
     return VMI_EVENT_RESPONSE_NONE;
   }
 
   if (vmi_toggle_single_step_vcpu(vmi, &ctx->ss_evt, event->vcpu_id, true) !=
       VMI_SUCCESS) {
     log_warn(
-        "EVENT_NETFILTER_HOOK_WRITE: Failed to enable single-step on vCPU %u; "
-        "breakpoint will not be re-armed",
+        "EVENT_NETFILTER_HOOK_WRITE: Failed to enable single-step on vCPU %u. "
+        "Breakpoint will not be re-armed",
         event->vcpu_id);
   }
 
-  log_info("EVENT_NETFILTER_HOOK_WRITE: Single-step enabled on vCPU %u",
+  log_debug("EVENT_NETFILTER_HOOK_WRITE: Single-step enabled on vCPU %u",
            event->vcpu_id);
 
   log_vcpu_state(vmi, event->vcpu_id, ctx->kaddr, "CB exit");
