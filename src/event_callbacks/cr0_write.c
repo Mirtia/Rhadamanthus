@@ -30,7 +30,6 @@ event_response_t event_cr0_write_callback(vmi_instance_t vmi,
     return VMI_EVENT_INVALID;
   }
 
-  // ADDED: Create a cr0 write response object
   cr0_write_data_t* response = g_malloc0(sizeof(cr0_write_data_t));
   if (!response) {
     log_error("Failed to allocate memory for CR0 write response.");
@@ -43,9 +42,18 @@ event_response_t event_cr0_write_callback(vmi_instance_t vmi,
   uint32_t vcpu_id = event->vcpu_id;
 
   uint64_t rip = 0, cr3 = 0, rsp = 0;
-  vmi_get_vcpureg(vmi, &rip, RIP, vcpu_id);
-  vmi_get_vcpureg(vmi, &cr3, CR3, vcpu_id);
-  vmi_get_vcpureg(vmi, &rsp, RSP, vcpu_id);
+  if(vmi_get_vcpureg(vmi, &rip, RIP, vcpu_id) != VMI_SUCCESS) {
+    log_error("Failed to get RIP register value.");
+    return VMI_EVENT_INVALID;
+  }
+  if(vmi_get_vcpureg(vmi, &cr3, CR3, vcpu_id) != VMI_SUCCESS) {
+    log_error("Failed to get CR3 register value.");
+    return VMI_EVENT_INVALID;
+  }
+  if(vmi_get_vcpureg(vmi, &rsp, RSP, vcpu_id) != VMI_SUCCESS) {
+    log_error("Failed to get RSP register value.");
+    return VMI_EVENT_INVALID;
+  }
 
   const char* protection_enabled = (cr0_value & CR0_PE) ? "ON" : "OFF";
   const char* paging_enabled = (cr0_value & CR0_PG) ? "ON" : "OFF";

@@ -14,18 +14,17 @@ void cjson_add_bool(cJSON* parent, const char* key, bool val) {
 }
 
 void cr0_decode_flags(uint64_t cr0, cr0_flags_t* out_flags) {
-  out_flags->PE = (cr0 & CR0_PE) != 0;
-  out_flags->WP = (cr0 & CR0_WP) != 0;
-  out_flags->AM = (cr0 & CR0_AM) != 0;
-  out_flags->CD = (cr0 & CR0_CD) != 0;
-  out_flags->PG = (cr0 & CR0_PG) != 0;
+  out_flags->protected_mode = (cr0 & CR0_PE) != 0;
+  out_flags->write_protection = (cr0 & CR0_WP) != 0;
+  out_flags->alignment_mask = (cr0 & CR0_AM) != 0;
+  out_flags->cache_disable = (cr0 & CR0_CD) != 0;
+  out_flags->paging_enable = (cr0 & CR0_PG) != 0;
 }
 
 // NOLINTNEXTLINE
 cr0_write_data_t* cr0_write_data_new(uint32_t vcpu_id, uint64_t rip,
                                      uint64_t rsp, uint64_t cr3,
-                                     uint64_t cr0_new, bool has_old,
-                                     uint64_t cr0_old) {
+                                     uint64_t cr0_new) {
   cr0_write_data_t* data = g_malloc0(sizeof(*data));
   if (!data) {
     log_error("Failed to allocate memory for CR0 write data.");
@@ -36,12 +35,6 @@ cr0_write_data_t* cr0_write_data_new(uint32_t vcpu_id, uint64_t rip,
   data->rip = rip;
   data->rsp = rsp;
   data->cr3 = cr3;
-
-  data->cr0.new_val = cr0_new;
-  data->cr0.has_old = has_old;
-  if (has_old) {
-    data->cr0.old_val = cr0_old;
-  }
 
   cr0_decode_flags(cr0_new, &data->flags);
 
@@ -76,19 +69,14 @@ cJSON* cr0_write_data_to_json(const cr0_write_data_t* data) {
   cjson_add_hex_u64(regs, "cr3", data->cr3);
 
   cJSON* cr0 = cJSON_CreateObject();
-  cJSON_AddItemToObject(root, "cr0", cr0);
-  cjson_add_hex_u64(cr0, "new", data->cr0.new_val);
-  if (data->cr0.has_old) {
-    cjson_add_hex_u64(cr0, "old", data->cr0.old_val);
-  }
-
   cJSON* flags = cJSON_CreateObject();
   cJSON_AddItemToObject(cr0, "flags", flags);
-  cjson_add_bool(flags, "PE", data->flags.PE);
-  cjson_add_bool(flags, "WP", data->flags.WP);
-  cjson_add_bool(flags, "AM", data->flags.AM);
-  cjson_add_bool(flags, "CD", data->flags.CD);
-  cjson_add_bool(flags, "PG", data->flags.PG);
+  cjson_add_bool(flags, "protected_mode", data->flags.protected_mode);
+  cjson_add_bool(flags, "write_protection", data->flags.write_protection);
+  cjson_add_bool(flags, "alignment_mask", data->flags.alignment_mask);
+  cjson_add_bool(flags, "cache_disable", data->flags.cache_disable);
+  cjson_add_bool(flags, "paging_enable", data->flags.paging_enable);
 
+  cJSON_AddItemToObject(root, "cr0", cr0);
   return root;
 }

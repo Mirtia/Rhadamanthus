@@ -19,14 +19,12 @@
  *     "cr3": "0x0000000123456000"
  *   },
  *   "cr0": {
- *     "new": "0x80050033",
- *     "old": "0x80050013",
  *     "flags": {
- *       "PE": true,
- *       "WP": true,
- *       "AM": false,
- *       "CD": false,
- *       "PG": true
+ *       "protected_mode": true,
+ *       "write_protection": true,
+ *       "alignment_mask": false,
+ *       "cache_disable": false,
+ *       "paging_enable": true
  *     }
  *   }
  * }
@@ -52,21 +50,12 @@
  * @brief Decoded flag view of the CR0 control register.
  */
 typedef struct cr0_flags {
-  bool PE;  ///< Protected mode enable (CR0.PE).
-  bool WP;  ///< Write protect (CR0.WP).
-  bool AM;  ///< Alignment mask (CR0.AM).
-  bool CD;  ///< Cache disable (CR0.CD).
-  bool PG;  ///< Paging enable (CR0.PG).
+  bool protected_mode;    ///< Protected mode enable (CR0.PE).
+  bool write_protection;  ///< Write protect (CR0.WP).
+  bool alignment_mask;    ///< Alignment mask (CR0.AM).
+  bool cache_disable;     ///< Cache disable (CR0.CD).
+  bool paging_enable;     ///< Paging enable (CR0.PG).
 } cr0_flags_t;
-
-/**
- * @brief CR0 transition values (old may be unknown).
- */
-typedef struct cr0_transition {
-  uint64_t new_val;  ///< New CR0 value after the write.
-  uint64_t old_val;  ///< Previous CR0 value, valid only if has_old is true.
-  bool has_old;      ///< Whether old_val contains a valid previous CR0 value.
-} cr0_transition_t;
 
 /**
  * @brief Event payload for a CR0 write.
@@ -77,7 +66,6 @@ typedef struct cr0_write_data {
   uint64_t rsp;      ///< Stack pointer (RSP) at the time of the event.
   uint64_t cr3;      ///< CR3 register value at the time of the event.
 
-  cr0_transition_t cr0;  ///< New (and optionally old) CR0 values.
   cr0_flags_t flags;     ///< Decoded CR0 flags from the new CR0 value.
 } cr0_write_data_t;
 
@@ -95,8 +83,7 @@ typedef struct cr0_write_data {
  */
 cr0_write_data_t* cr0_write_data_new(uint32_t vcpu_id, uint64_t rip,
                                      uint64_t rsp, uint64_t cr3,
-                                     uint64_t cr0_new, bool has_old,
-                                     uint64_t cr0_old);
+                                     uint64_t cr0_new);
 
 /**
  * @brief Free a CR0 write data object.
