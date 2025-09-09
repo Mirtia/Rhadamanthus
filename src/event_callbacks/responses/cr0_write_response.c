@@ -59,7 +59,6 @@ cJSON* cr0_write_data_to_json(const cr0_write_data_t* data) {
     return NULL;
   }
 
-  cJSON_AddStringToObject(root, "event", "CR0_WRITE");
   cJSON_AddNumberToObject(root, "vcpu_id", (double)data->vcpu_id);
 
   cJSON* regs = cJSON_CreateObject();
@@ -77,6 +76,6 @@ cJSON* cr0_write_data_to_json(const cr0_write_data_t* data) {
   cjson_add_bool(flags, "cache_disable", data->flags.cache_disable);
   cjson_add_bool(flags, "paging_enable", data->flags.paging_enable);
 
-  cJSON_AddItemToObject(root, "cr0", cr0);
+  cJSON_AddItemToObject(root, "cr0_write", cr0);
   return root;
 }

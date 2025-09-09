@@ -3,6 +3,93 @@
 #include <inttypes.h>
 #include <log.h>
 
+event_response_t log_error_and_queue_response_event(const char* event_name,
+                                                    event_task_id_t event_type,
+                                                    int error_code,
+                                                    const char* message) {
+  log_error("%s", message);
+
+  if (json_serializer_is_global_initialized()) {
+    struct response* error_resp = create_error_response(
+        EVENT, (void*)(uintptr_t)event_type, error_code, message);
+    if (error_resp) {
+      json_serializer_queue_global(event_name, error_resp);
+    }
+  }
+  return VMI_EVENT_INVALID;
+}
+
+int log_error_and_queue_response_task(const char* task_name,
+                                      state_task_id_t task_type, int error_code,
+                                      const char* message) {
+  log_error("%s", message);
+
+  if (json_serializer_is_global_initialized()) {
+    struct response* error_resp = create_error_response(
+        EVENT, (void*)(uintptr_t)task_type, error_code, message);
+    if (error_resp) {
+      json_serializer_queue_global(task_name, error_resp);
+    }
+  }
+  return VMI_FAILURE;
+}
+
+event_response_t log_success_and_queue_response_event(
+    const char* event_name, event_task_id_t event_type, void* data_ptr,
+    void (*data_free_func)(void*)) {
+  if (json_serializer_is_global_initialized()) {
+    struct response* success_resp =
+        create_success_response(EVENT, (void*)(uintptr_t)event_type, data_ptr);
+    if (success_resp) {
+      json_serializer_queue_global(event_name, success_resp);
+      return VMI_EVENT_RESPONSE_NONE;
+    }
+    log_error("Failed to create success response for %s event.", event_name);
+    if (data_free_func && data_ptr) {
+      data_free_func(data_ptr);
+    }
+    return VMI_EVENT_INVALID;
+  }
+
+  if (data_free_func && data_ptr) {
+    data_free_func(data_ptr);
+  }
+  return VMI_EVENT_RESPONSE_NONE;
+}
+
+/**
+ * @brief Log success and queue response task with data
+ * 
+ * @param task_name Name of the task for logging/queueing
+ * @param task_type The state task ID type
+ * @param data_ptr Pointer to the data to include in response
+ * @param data_free_func Function to free the data if response creation fails (can be NULL)
+ * @return int VMI_SUCCESS on success, VMI_FAILURE on failure
+ */
+int log_success_and_queue_response_task(const char* task_name,
+                                        state_task_id_t task_type,
+                                        void* data_ptr,
+                                        void (*data_free_func)(void*)) {
+  if (json_serializer_is_global_initialized()) {
+    struct response* success_resp =
+        create_success_response(STATE, (void*)(uintptr_t)task_type, data_ptr);
+    if (success_resp) {
+      json_serializer_queue_global(task_name, success_resp);
+      return VMI_SUCCESS;
+    }
+    log_error("Failed to create success response for %s task.", task_name);
+    if (data_free_func && data_ptr) {
+      data_free_func(data_ptr);
+    }
+    return VMI_FAILURE;
+  }
+
+  if (data_free_func && data_ptr) {
+    data_free_func(data_ptr);
+  }
+  return VMI_SUCCESS;
+}
+
 uint32_t get_kernel_text_section_range(vmi_instance_t vmi, addr_t* start_addr,
                                        addr_t* end_addr) {
   if (!vmi) {

@@ -1,5 +1,6 @@
 #include "json_serializer.h"
 #include <log.h>
+#include "event_callbacks/responses/cr0_write_response.h"
 #include "event_handler.h"
 
 // Global serializer for event callback access
@@ -12,9 +13,16 @@ static int write_response_to_individual_file(json_serializer_t* serializer,
     return -1;
   }
 
-  // Create filename: cr0_write_1694123456789.json
+  // Create directory if it doesn't exist
+  if (g_mkdir_with_parents(JSON_LOG_OUTPUT_DIR, 0755) == -1 &&
+      errno != EEXIST) {
+    log_error("Failed to create directory %s: %s", JSON_LOG_OUTPUT_DIR,
+              strerror(errno));
+    return -1;
+  }
+  // Create filename: cr0_write_1694123456789.jsonx
   char* filename = g_strdup_printf("%s/%s_%lu.json", JSON_LOG_OUTPUT_DIR,
-                                   item->event_name, item->timestamp_ms);
+                                   item->event_name, item->timestamp_us);
 
   FILE* file = fopen(filename, "w");
   if (!file) {
@@ -49,7 +57,7 @@ static int write_response_to_individual_file(json_serializer_t* serializer,
   g_free(filename);
 
   log_debug("Wrote JSON response to: %s_%lu.json", item->event_name,
-            item->timestamp_ms);
+            item->timestamp_us);
   return 0;
 }
 
@@ -181,7 +189,8 @@ response_item_t* response_item_new(const char* event_name,
 
   item->event_name = g_strdup(event_name);
   item->response_data = response_data;
-  item->timestamp_ms = g_get_monotonic_time() / 1000;
+  // microseconds
+  item->timestamp_us = g_get_monotonic_time();
 
   return item;
 }
@@ -306,17 +315,20 @@ cJSON* response_to_json(const struct response* response) {
 
     // TODO: Add type-specific JSON conversion based on metadata subtype
     // Example:
-    // if (response->metadata && response->metadata->task_type == EVENT) {
-    //   event_task_id_t event_id = (event_task_id_t)(uintptr_t)response->metadata->subtype;
-    //   if (event_id == EVENT_CR0_WRITE) {
-    //     cr0_write_data_t* cr0_data = (cr0_write_data_t*)response->data;
-    //     // Convert cr0_data to JSON and replace data_json
-    //   }
-    // }
-
-    // For now, placeholder
-    cJSON_AddStringToObject(data_json, "_note",
-                            "Data conversion needed based on subtype");
+    if (response->metadata && response->metadata->task_type == EVENT) {
+      event_task_id_t event_id =
+          (event_task_id_t)(uintptr_t)response->metadata->subtype;
+      if (event_id == EVENT_CR0_WRITE) {
+        cr0_write_data_t* cr0_data = (cr0_write_data_t*)response->data;
+        cJSON* cr0_data_json = cr0_write_data_to_json(cr0_data);
+        if (cr0_data_json) {
+          cJSON_AddItemToObject(data_json, "cr0_write", cr0_data_json);
+        } else {
+          cJSON_AddStringToObject(data_json, "_note",
+                                  "Failed to convert CR0 data to JSON");
+        }
+      }
+    }
 
     cJSON_AddItemToObject(json, "data", data_json);
   }

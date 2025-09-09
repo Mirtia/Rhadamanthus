@@ -14,7 +14,7 @@
 typedef struct response_item {
   char* event_name;  ///< e.g., "cr0_write", "syscall_table_write".
   struct response* response_data;  ///< Your response.h structure.
-  uint64_t timestamp_ms;           ///< For filename generation.
+  uint64_t timestamp_us;           ///< For filename generation.
 } response_item_t;
 
 /**
