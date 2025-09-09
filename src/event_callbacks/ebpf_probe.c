@@ -2,6 +2,7 @@
 #include <glib-2.0/glib.h>
 #include <inttypes.h>
 #include <log.h>
+#include "event_callbacks/responses/ebpf_probe_response.h"
 #include "offsets.h"
 #include "utils.h"
 
@@ -13,9 +14,18 @@
  * 
  * @param vmi VMI instance
  * @param vcpu_id VCPU identifier
+ * @param target_symbol_out Output parameter for target symbol name
+ * @param target_addr_out Output parameter for target address
  * @return void
  */
-static void extract_kprobe_info(vmi_instance_t vmi, uint32_t vcpu_id) {
+static void extract_kprobe_info(vmi_instance_t vmi, uint32_t vcpu_id,
+                                char** target_symbol_out,
+                                addr_t* target_addr_out) {
+  if (target_symbol_out)
+    *target_symbol_out = NULL;
+  if (target_addr_out)
+    *target_addr_out = 0;
+
   registers_t regs;
   if (vmi_get_vcpuregs(vmi, &regs, vcpu_id) != VMI_SUCCESS) {
     log_debug("Failed to get CPU registers for VCPU %u", vcpu_id);
@@ -62,6 +72,9 @@ static void extract_kprobe_info(vmi_instance_t vmi, uint32_t vcpu_id) {
                  symbol_name);
       }
 
+      if (target_symbol_out) {
+        *target_symbol_out = g_strdup(symbol_name);
+      }
       g_free(symbol_name);
     }
   }
@@ -71,6 +84,9 @@ static void extract_kprobe_info(vmi_instance_t vmi, uint32_t vcpu_id) {
   if (vmi_read_addr_va(vmi, kprobe_ptr + 0x0, 0, &target_addr) == VMI_SUCCESS &&
       target_addr) {
     log_debug("EVENT_EBPF_PROBE: Target Address: 0x%" PRIx64, target_addr);
+    if (target_addr_out) {
+      *target_addr_out = target_addr;
+    }
   }
 }
 
@@ -83,14 +99,23 @@ static void extract_kprobe_info(vmi_instance_t vmi, uint32_t vcpu_id) {
  * @param vmi VMI instance
  * @param vcpu_id VCPU identifier
  * @param func_name Function name being called
+ * @param attach_type_out Output parameter for attach type
+ * @param tracepoint_name_out Output parameter for tracepoint name
  * @return void
  */
 static void extract_bpf_attach_info(vmi_instance_t vmi, uint32_t vcpu_id,
-                                    const char* func_name) {
+                                    const char* func_name,
+                                    uint32_t* attach_type_out,
+                                    char** tracepoint_name_out) {
+  if (attach_type_out)
+    *attach_type_out = 0;
+  if (tracepoint_name_out)
+    *tracepoint_name_out = NULL;
+
   registers_t regs;
   if (vmi_get_vcpuregs(vmi, &regs, vcpu_id) != VMI_SUCCESS) {
     log_debug("EVENT_EBPF_PROBE: Failed to get CPU registers for VCPU %u",
-             vcpu_id);
+              vcpu_id);
     return;
   }
 
@@ -99,7 +124,7 @@ static void extract_bpf_attach_info(vmi_instance_t vmi, uint32_t vcpu_id,
     uint32_t attach_type = (uint32_t)regs.x86.rdx;
 
     log_debug("EVENT_EBPF_PROBE: Program FD: %u, Attach Type: %u", prog_fd,
-             attach_type);
+              attach_type);
 
     if (attach_type == 1 || attach_type == 2) {
       log_warn(
@@ -108,6 +133,10 @@ static void extract_bpf_attach_info(vmi_instance_t vmi, uint32_t vcpu_id,
       log_warn(
           "EVENT_EBPF_PROBE: Container/cgroup manipulation capability "
           "detected");
+    }
+
+    if (attach_type_out) {
+      *attach_type_out = attach_type;
     }
 
   } else if (strstr(func_name, "bpf_raw_tracepoint")) {
@@ -125,6 +154,9 @@ static void extract_bpf_attach_info(vmi_instance_t vmi, uint32_t vcpu_id,
           log_warn("EVENT_EBPF_PROBE: Network monitoring capability detected");
         }
 
+        if (tracepoint_name_out) {
+          *tracepoint_name_out = g_strdup(tp_name);
+        }
         g_free(tp_name);
       }
     }
@@ -174,30 +206,46 @@ event_response_t event_ebpf_probe_callback(vmi_instance_t vmi,
                                            vmi_event_t* event) {
   // Preconditions
   if (!vmi || !event) {
-    log_error("EVENT_EBPF_PROBE: Invalid arguments to eBPF probe callback.");
-    return VMI_EVENT_INVALID;
+    return log_error_and_queue_response_interrupt(
+        "ebpf_probe", INTERRUPT_EBPF_PROBE, INVALID_ARGUMENTS,
+        "Invalid arguments to eBPF probe callback.");
   }
 
   ebpf_probe_ctx_t* ctx = (ebpf_probe_ctx_t*)event->data;
   if (!ctx) {
-    log_error("EVENT_EBPF_PROBE: NULL context in INT3 handler.");
-    return VMI_EVENT_INVALID;
+    return log_error_and_queue_response_interrupt(
+        "ebpf_probe", INTERRUPT_EBPF_PROBE, INVALID_ARGUMENTS,
+        "NULL context in INT3 handler.");
   }
 
   if (ctx->kaddr == 0) {
-    log_error("EVENT_EBPF_PROBE: Invalid kaddr in context.");
-    return VMI_EVENT_INVALID;
+    return log_error_and_queue_response_interrupt(
+        "ebpf_probe", INTERRUPT_EBPF_PROBE, INVALID_ARGUMENTS,
+        "Invalid kaddr in context.");
   }
 
   event->interrupt_event.reinject = 0;
   event->interrupt_event.insn_length = 0;
 
   uint32_t vcpu_id = event->vcpu_id;
-  addr_t rip = 0;
+  uint64_t rip = 0, cr3 = 0, rsp = 0;
 
   if (vmi_get_vcpureg(vmi, &rip, RIP, vcpu_id) != VMI_SUCCESS) {
-    log_error("EVENT_EBPF_PROBE: Failed to get RIP for VCPU %u", vcpu_id);
-    return VMI_EVENT_INVALID;
+    return log_error_and_queue_response_interrupt(
+        "ebpf_probe", INTERRUPT_EBPF_PROBE, VMI_OP_FAILURE,
+        "Failed to get RIP register value.");
+  }
+
+  if (vmi_get_vcpureg(vmi, &cr3, CR3, vcpu_id) != VMI_SUCCESS) {
+    return log_error_and_queue_response_interrupt(
+        "ebpf_probe", INTERRUPT_EBPF_PROBE, VMI_OP_FAILURE,
+        "Failed to get CR3 register value.");
+  }
+
+  if (vmi_get_vcpureg(vmi, &rsp, RSP, vcpu_id) != VMI_SUCCESS) {
+    return log_error_and_queue_response_interrupt(
+        "ebpf_probe", INTERRUPT_EBPF_PROBE, VMI_OP_FAILURE,
+        "Failed to get RSP register value.");
   }
 
   vmi_pid_t pid = 0;
@@ -213,13 +261,22 @@ event_response_t event_ebpf_probe_callback(vmi_instance_t vmi,
       vcpu_id, (uint64_t)rip, pid, ctx->symname ? ctx->symname : "unknown",
       ctx->kaddr);
 
+  // Initialize extracted data
+  char* target_symbol = NULL;
+  addr_t target_addr = 0;
+  uint32_t attach_type = 0;
+  char* tracepoint_name = NULL;
+  const char* probe_type = "unknown";
+
   // Extract function-specific details
   if (ctx->symname && (strstr(ctx->symname, "register_kprobe") ||
                        strstr(ctx->symname, "register_kretprobe"))) {
     log_debug("EVENT_EBPF_PROBE: Type - Kernel probe registration");
-    extract_kprobe_info(vmi, vcpu_id);
+    probe_type = "kprobe";
+    extract_kprobe_info(vmi, vcpu_id, &target_symbol, &target_addr);
   } else if (ctx->symname && strstr(ctx->symname, "register_uprobe")) {
     log_debug("EVENT_EBPF_PROBE: Type - User-space probe registration");
+    probe_type = "uprobe";
     registers_t regs;
     if (vmi_get_vcpuregs(vmi, &regs, vcpu_id) == VMI_SUCCESS) {
       uint64_t file_offset = regs.x86.rsi;
@@ -227,15 +284,36 @@ event_response_t event_ebpf_probe_callback(vmi_instance_t vmi,
     }
   } else if (ctx->symname && strstr(ctx->symname, "bpf_")) {
     log_debug("EVENT_EBPF_PROBE: Type - eBPF program attachment");
-    extract_bpf_attach_info(vmi, vcpu_id, ctx->symname);
+    probe_type = "bpf_prog";
+    extract_bpf_attach_info(vmi, vcpu_id, ctx->symname, &attach_type,
+                            &tracepoint_name);
   } else if (ctx->symname && strstr(ctx->symname, "tracepoint")) {
     log_debug("EVENT_EBPF_PROBE: Type - Tracepoint probe registration");
+    probe_type = "tracepoint";
+  }
+
+  // Create eBPF probe data structure
+  ebpf_probe_data_t* ebpf_data = ebpf_probe_data_new(
+      vcpu_id, rip, rsp, cr3, pid, ctx->kaddr, ctx->symname, probe_type,
+      target_symbol, target_addr, attach_type, tracepoint_name);
+
+  // Clean up extracted strings
+  if (target_symbol)
+    g_free(target_symbol);
+  if (tracepoint_name)
+    g_free(tracepoint_name);
+
+  if (!ebpf_data) {
+    return log_error_and_queue_response_interrupt(
+        "ebpf_probe", INTERRUPT_EBPF_PROBE, MEMORY_ALLOCATION_FAILURE,
+        "Failed to allocate memory for eBPF probe data.");
   }
 
   // Restore original byte
   if (vmi_write_8_va(vmi, ctx->kaddr, 0, &ctx->orig) != VMI_SUCCESS) {
     log_error("EVENT_EBPF_PROBE: Failed to restore original byte at 0x%" PRIx64,
               ctx->kaddr);
+    ebpf_probe_data_free(ebpf_data);
     return VMI_EVENT_INVALID;
   }
 
@@ -250,7 +328,9 @@ event_response_t event_ebpf_probe_callback(vmi_instance_t vmi,
     log_warn(
         "EVENT_EBPF_PROBE: Failed to register SINGLESTEP event. "
         "Breakpoint will not be re-armed.");
-    return VMI_EVENT_RESPONSE_NONE;
+    return log_success_and_queue_response_interrupt(
+        "ebpf_probe", INTERRUPT_EBPF_PROBE, (void*)ebpf_data,
+        (void (*)(void*))ebpf_probe_data_free);
   }
 
   if (vmi_toggle_single_step_vcpu(vmi, &ctx->ss_evt, vcpu_id, true) !=
@@ -265,5 +345,7 @@ event_response_t event_ebpf_probe_callback(vmi_instance_t vmi,
 
   log_vcpu_state(vmi, vcpu_id, ctx->kaddr, "CB exit");
 
-  return VMI_EVENT_RESPONSE_NONE;
+  return log_success_and_queue_response_interrupt(
+      "ebpf_probe", INTERRUPT_EBPF_PROBE, (void*)ebpf_data,
+      (void (*)(void*))ebpf_probe_data_free);
 }

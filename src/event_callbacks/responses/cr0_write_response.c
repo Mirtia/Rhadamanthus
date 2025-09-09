@@ -3,12 +3,6 @@
 #include <stdio.h>
 #include <string.h>
 
-void cjson_add_hex_u64(cJSON* parent, const char* key, uint64_t val) {
-  char buffer[20];
-  (void)snprintf(buffer, sizeof(buffer), "0x%016" PRIx64, val);
-  cJSON_AddStringToObject(parent, key, buffer);
-}
-
 void cjson_add_bool(cJSON* parent, const char* key, bool val) {
   cJSON_AddBoolToObject(parent, key, val);
 }
@@ -61,6 +55,7 @@ cJSON* cr0_write_data_to_json(const cr0_write_data_t* data) {
     return NULL;
   }
 
+  // vcpu_id as a JSON number (cJSON stores numbers as doubles)
   cJSON_AddNumberToObject(root, "vcpu_id", (double)data->vcpu_id);
 
   cJSON* regs = cJSON_CreateObject();

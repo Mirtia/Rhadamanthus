@@ -32,6 +32,18 @@ int log_error_and_queue_response_task(const char* task_name,
                                       const char* message);
 
 /**
+ * @brief Log an error message and queue an interrupt task response.
+ * 
+ * @param interrupt_name The name of the interrupt task.
+ * @param interrupt_type The type of the interrupt task.
+ * @param error_code The error code.
+ * @param message The message to log.
+ * @return event_response_t VMI_EVENT_RESPONSE_NONE on success, VMI_EVENT_INVALID on failure
+ */
+event_response_t log_error_and_queue_response_interrupt(
+    const char* interrupt_name, interrupt_task_id_t interrupt_type,
+    int error_code, const char* message);
+/**
  * @brief Log success and queue response event with data
  * 
  * @param event_name Name of the event for logging/queueing
@@ -57,7 +69,20 @@ int log_success_and_queue_response_task(const char* task_name,
                                         state_task_id_t task_type,
                                         void* data_ptr,
                                         void (*data_free_func)(void*));
-                                        
+
+/**
+ * @brief Log success and queue response interrupt with data
+ * 
+ * @param interrupt_name Name of the interrupt task for logging/queueing
+ * @param interrupt_type The interrupt task ID type
+ * @param data_ptr Nointer to the data to include in response
+ * @param data_free_func Function to free the data if response creation fails (can be NULL)
+ * @return event_response_t VMI_EVENT_RESPONSE_NONE on success, VMI_EVENT_INVALID on failure
+ */
+event_response_t log_success_and_queue_response_interrupt(
+    const char* interrupt_name, interrupt_task_id_t interrupt_type,
+    void* data_ptr, void (*data_free_func)(void*));
+
 /**
  * @brief Get the kernel .text section start and end address.
  * 
@@ -88,5 +113,23 @@ bool is_in_kernel_text(vmi_instance_t vmi, addr_t addr);
  */
 void log_vcpu_state(vmi_instance_t vmi, uint32_t vcpu_id, addr_t kaddr,
                     const char* context);
+
+/**
+ * @brief Add a uint64_t value as a hexadecimal string to a cJSON object.
+ * 
+ * @param parent The parent cJSON object to which the new item will be added.
+ * @param key The key for the new item.
+ * @param val The uint64_t value to add, which will be converted to a hex string.
+ */
+void cjson_add_hex_u64(cJSON* parent, const char* key, uint64_t val);
+
+/**
+ * @brief Add an addr_t value as a hexadecimal string to a cJSON object.
+ * 
+ * @param parent The parent cJSON object to which the new item will be added.
+ * @param key The key for the new item.
+ * @param val The addr_t value to add, which will be converted to a hex string.
+ */
+void cjson_add_hex_addr(cJSON* parent, const char* key, addr_t val);
 
 #endif

@@ -34,6 +34,21 @@ int log_error_and_queue_response_task(const char* task_name,
   return VMI_FAILURE;
 }
 
+event_response_t log_error_and_queue_response_interrupt(
+    const char* interrupt_name, interrupt_task_id_t interrupt_type,
+    int error_code, const char* message) {
+  log_error("%s", message);
+
+  if (json_serializer_is_global_initialized()) {
+    struct response* error_resp = create_error_response(
+        INTERRUPT, (void*)(uintptr_t)interrupt_type, error_code, message);
+    if (error_resp) {
+      json_serializer_queue_global(interrupt_name, error_resp);
+    }
+  }
+  return VMI_EVENT_INVALID;
+}
+
 event_response_t log_success_and_queue_response_event(
     const char* event_name, event_task_id_t event_type, void* data_ptr,
     void (*data_free_func)(void*)) {
@@ -57,15 +72,31 @@ event_response_t log_success_and_queue_response_event(
   return VMI_EVENT_RESPONSE_NONE;
 }
 
-/**
- * @brief Log success and queue response task with data
- * 
- * @param task_name Name of the task for logging/queueing
- * @param task_type The state task ID type
- * @param data_ptr Pointer to the data to include in response
- * @param data_free_func Function to free the data if response creation fails (can be NULL)
- * @return int VMI_SUCCESS on success, VMI_FAILURE on failure
- */
+event_response_t log_success_and_queue_response_interrupt(
+    const char* interrupt_name, interrupt_task_id_t interrupt_type,
+    void* data_ptr, void (*data_free_func)(void*)) {
+
+  if (json_serializer_is_global_initialized()) {
+    struct response* success_resp = create_success_response(
+        EVENT, (void*)(uintptr_t)interrupt_type, data_ptr);
+    if (success_resp) {
+      json_serializer_queue_global(interrupt_name, success_resp);
+      return VMI_EVENT_RESPONSE_NONE;
+    }
+    log_error("Failed to create success response for %s event.",
+              interrupt_name);
+    if (data_free_func && data_ptr) {
+      data_free_func(data_ptr);
+    }
+    return VMI_EVENT_INVALID;
+  }
+
+  if (data_free_func && data_ptr) {
+    data_free_func(data_ptr);
+  }
+  return VMI_EVENT_RESPONSE_NONE;
+}
+
 int log_success_and_queue_response_task(const char* task_name,
                                         state_task_id_t task_type,
                                         void* data_ptr,
@@ -162,4 +193,16 @@ void log_vcpu_state(vmi_instance_t vmi, uint32_t vcpu_id, addr_t kaddr,
                context ? context : "VCPU", (uint64_t)rip, tf_flag, vcpu_id);
     }
   }
+}
+
+void cjson_add_hex_u64(cJSON* parent, const char* key, uint64_t val) {
+  char buffer[20];
+  (void)snprintf(buffer, sizeof(buffer), "0x%016" PRIx64, val);
+  cJSON_AddStringToObject(parent, key, buffer);
+}
+
+void cjson_add_hex_addr(cJSON* parent, const char* key, addr_t val) {
+  char buffer[20];
+  (void)snprintf(buffer, sizeof(buffer), "0x%016" PRIx64, (uint64_t)val);
+  cJSON_AddStringToObject(parent, key, buffer);
 }
