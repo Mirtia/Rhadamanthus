@@ -4,11 +4,11 @@
 #include <sys/time.h>
 
 /**
- * @brief Create a new metadata object
+ * @brief Create a new metadata object.
  * 
- * @param task_type The type of task (STATE, EVENT, or INTERRUPT)
- * @param subtype Pointer to the specific subtype enum (cast to void*)
- * @return Allocated metadata object or NULL on failure
+ * @param task_type The type of task (STATE, EVENT, or INTERRUPT).
+ * @param subtype Pointer to the specific subtype enum (cast to void*).
+ * @return Allocated metadata object or NULL on failure.
  */
 metadata* create_metadata(task_type task_type, void* subtype) {
   metadata* meta = g_malloc0(sizeof(metadata));
@@ -147,12 +147,13 @@ struct response* create_error_response(task_type task_type, void* subtype,
 }
 
 /**
- * @brief Free a response object and all its components
+ * @brief Free a response object and all its components.
  * 
- * @param response Response object to free (can be NULL)
+ * @param response Response object to free (can be NULL).
  */
 void free_response(struct response* response) {
   if (!response) {
+    log_warn("Attempted to free NULL response pointer.");
     return;
   }
 
@@ -186,6 +187,7 @@ const char* error_code_to_string(int code) {
     case VMI_OP_FAILURE:
       return "VMI_OP_FAILURE";
     default:
+      log_warn("Unknown error code: %d", code);
       return "UNKNOWN_ERROR";
   }
 }

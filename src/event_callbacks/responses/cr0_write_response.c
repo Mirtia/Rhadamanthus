@@ -42,8 +42,10 @@ cr0_write_data_t* cr0_write_data_new(uint32_t vcpu_id, uint64_t rip,
 }
 
 void cr0_write_data_free(cr0_write_data_t* data) {
-  if (!data)
+  if (!data) {
+    log_warn("Attempted to free NULL cr0_write_data_t pointer.");
     return;
+  }
   g_free(data);
 }
 
@@ -62,20 +64,26 @@ cJSON* cr0_write_data_to_json(const cr0_write_data_t* data) {
   cJSON_AddNumberToObject(root, "vcpu_id", (double)data->vcpu_id);
 
   cJSON* regs = cJSON_CreateObject();
+  if (!regs) {
+    cJSON_Delete(root);
+    return NULL;
+  }
   cJSON_AddItemToObject(root, "regs", regs);
   cjson_add_hex_u64(regs, "rip", data->rip);
   cjson_add_hex_u64(regs, "rsp", data->rsp);
   cjson_add_hex_u64(regs, "cr3", data->cr3);
 
-  cJSON* cr0 = cJSON_CreateObject();
   cJSON* flags = cJSON_CreateObject();
-  cJSON_AddItemToObject(cr0, "flags", flags);
+  if (!flags) {
+    cJSON_Delete(root);
+    return NULL;
+  }
+  cJSON_AddItemToObject(root, "flags", flags);
   cjson_add_bool(flags, "protected_mode", data->flags.protected_mode);
   cjson_add_bool(flags, "write_protection", data->flags.write_protection);
   cjson_add_bool(flags, "alignment_mask", data->flags.alignment_mask);
   cjson_add_bool(flags, "cache_disable", data->flags.cache_disable);
   cjson_add_bool(flags, "paging_enable", data->flags.paging_enable);
 
-  cJSON_AddItemToObject(root, "cr0_write", cr0);
   return root;
 }

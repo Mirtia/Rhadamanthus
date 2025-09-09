@@ -13,16 +13,18 @@ static int write_response_to_individual_file(json_serializer_t* serializer,
     return -1;
   }
 
-  // Create directory if it doesn't exist
+  // Create directory if it doesn't exist.
   if (g_mkdir_with_parents(JSON_LOG_OUTPUT_DIR, 0755) == -1 &&
       errno != EEXIST) {
     log_error("Failed to create directory %s: %s", JSON_LOG_OUTPUT_DIR,
               strerror(errno));
     return -1;
   }
-  // Create filename: cr0_write_1694123456789.jsonx
-  char* filename = g_strdup_printf("%s/%s_%lu.json", JSON_LOG_OUTPUT_DIR,
-                                   item->event_name, item->timestamp_us);
+
+  // Generate filename.
+  char* filename =
+      g_strdup_printf("%s/%s_%" G_GINT64_FORMAT ".json", JSON_LOG_OUTPUT_DIR,
+                      item->event_name, item->timestamp_us);
 
   FILE* file = fopen(filename, "w");
   if (!file) {
@@ -197,7 +199,8 @@ response_item_t* response_item_new(const char* event_name,
 
 void response_item_free(response_item_t* item) {
   if (!item) {
-    return;  // Don't log warning for NULL - normal in cleanup
+    log_warn("Attempted to free NULL response item.");
+    return;
   }
 
   g_free(item->event_name);
@@ -313,8 +316,6 @@ cJSON* response_to_json(const struct response* response) {
   if (!response->error && response->data) {
     cJSON* data_json = cJSON_CreateObject();
 
-    // TODO: Add type-specific JSON conversion based on metadata subtype
-    // Example:
     if (response->metadata && response->metadata->task_type == EVENT) {
       event_task_id_t event_id =
           (event_task_id_t)(uintptr_t)response->metadata->subtype;
@@ -333,7 +334,6 @@ cJSON* response_to_json(const struct response* response) {
     cJSON_AddItemToObject(json, "data", data_json);
   }
 
-  // Add error (FAILURE case only)
   if (response->error) {
     cJSON* error_json = cJSON_CreateObject();
     cJSON_AddNumberToObject(error_json, "code", response->error->code);
