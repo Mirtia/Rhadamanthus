@@ -24,13 +24,11 @@
  *   "metadata": {
  *     "task_type": "",
  *     "subtype": "",
- *     "iteration": 0,
- *     "system": { }
  *   },
  *   "data": { },
  *   "error": {
  *     "code": 0,
- *     "message": ""
+ *     "message": "Something went wrong!"
  *   }
  * }
  *
@@ -40,46 +38,30 @@
  * • "data" is present only if status == "SUCCESS".
  */
 
-
-enum callback_status { SUCCESS = 0, FAILURE };
-
 enum task_type { STATE = 0, EVENT, INTERRUPT };
 
 typedef enum task_type task_type;
 
 struct metadata {
-  task_type task_type;
-  // TODO: We have different enums for each task.
-  void* subtype;
-  int iteration;  ///< The iteration that the response was generated for. If time window sampling implemented.
-  // TODO: Any relevant system details
+  task_type task_type;  ///< The type of the task (state/event/interrupt).
+  void*
+      subtype;  ///< The subtype of the task (e.g., for event: CR0_WRITE, MSR_WRITE etc).
 };
 
 typedef struct metadata metadata;
-typedef enum callback_status callback_status;
 
-/**
- * @brief The data of the response.
- * 
- */
-struct data {
-  void*
-      data;  ///< Each event/state/interrupt response has a custom `data` response struture type.
-};
-
-typedef struct data data;
-
-#define MESSAGE_LENGTH 512
+#define MESSAGE_LENGTH 1064
 
 /**
  * @brief The error codes.
  */
 enum error_code {
   MEMORY_ALLOCATION_FAILURE = 0,
+  INVALID_ARGUMENTS,
+  VMI_OP_FAILURE,
   ERROR_CODE_MAX,
-// TODO: TO BE FILLED
+  // TODO: TO BE FILLED
 };
-
 
 struct error {
   int code;  ///< The error code.
@@ -100,16 +82,14 @@ typedef struct error error;
 error* create_error(int code, const char* message);
 
 /**
- * @brief 
- * 
+ * @brief The general response structure.
  */
 struct response {
-  const char* timestamp;   ///< The timestamp generated for the response.
-  callback_status status;  ///< The status of the response (SUCCESS, FAILURE).
-  metadata
+  const char* timestamp;  ///< The timestamp generated for the response.
+  error* error;            ///< The error associated with the response.
+  void* data;             ///< The data associated with the response.
+  metadata*
       metadata;  ///< The metadata associated with the response (task type, system details etc).
-  error error;  ///< The error associated with the response.
-  data* data;   ///< The data associated with the response.
 };
 
 /**
@@ -118,3 +98,26 @@ struct response {
  * @return a pointer to a null-terminated string containing the timestamp else `NULL` if memory allocation fails.
  */
 char* generate_timestamp(void);
+
+/**
+ * @brief Create a new response object for successful operations
+ * 
+ * @param task_type The type of task
+ * @param subtype The specific subtype (cast to void*)
+ * @param data_ptr Pointer to the response data
+ * @return Allocated response object or NULL on failure
+ */
+struct response* create_success_response(task_type task_type, void* subtype, void* data_ptr);
+
+/**
+ * @brief Create a new response object for failed operations
+ * 
+ * @param task_type The type of task
+ * @param subtype The specific subtype (cast to void*)
+ * @param error_code The error code
+ * @param error_message The error message
+ * @return Allocated response object or NULL on failure
+ */
+struct response* create_error_response(task_type task_type, void* subtype,
+                                       int error_code,
+                                       const char* error_message);

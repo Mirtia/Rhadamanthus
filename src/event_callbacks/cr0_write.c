@@ -3,7 +3,7 @@
 #include <glib.h>
 #include <inttypes.h>
 #include <log.h>
-
+#include "response.h"
 
 /*
  * CR0 control register semantics and attacker relevance. These definitions were taken from "Intel® 64 and IA-32 Architectures
@@ -33,8 +33,6 @@ event_response_t event_cr0_write_callback(vmi_instance_t vmi,
   cr0_write_data_t* response = g_malloc0(sizeof(cr0_write_data_t));
   if (!response) {
     log_error("Failed to allocate memory for CR0 write response.");
-    // ADDED: The response should return an error to the event handler.
-    // error* error = create_error(VMI_EVENT_INVALID, "Failed to allocate memory for CR0 write response.");
     return VMI_EVENT_INVALID;
   }
 

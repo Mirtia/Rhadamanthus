@@ -2,7 +2,7 @@
 #define CR0_WRITE_RESPONSE_H
 
 #include <cjson/cJSON.h>
-#include <glib.h>
+#include <glib-2.0/glib.h>
 #include <inttypes.h>
 #include <stdbool.h>
 
@@ -76,9 +76,6 @@ typedef struct cr0_write_data {
  * @param rip The RIP register value.
  * @param rsp The RSP register value.
  * @param cr3 The CR3 register value.
- * @param cr0_new The new CR0 value after the write.
- * @param has_old Whether the old CR0 value is available.
- * @param cr0_old The old CR0 value (valid only if has_old is true).
  * @return Pointer to a newly allocated cr0_write_data_t, or NULL on failure.
  */
 cr0_write_data_t* cr0_write_data_new(uint32_t vcpu_id, uint64_t rip,

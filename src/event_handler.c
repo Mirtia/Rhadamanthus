@@ -4,7 +4,6 @@
 #include "event_callbacks/ebpf_probe.h"
 #include "event_callbacks/io_uring_ring_write.h"
 #include "event_callbacks/netfilter_hook_write.h"
-#include "serializer.h"
 
 const char* state_task_id_to_str(state_task_id_t task_id) {
   switch (task_id) {
@@ -157,6 +156,14 @@ event_handler_t* event_handler_initialize(vmi_instance_t vmi,
   for (int i = 0; i < INTERRUPT_TASK_ID_MAX; ++i)
     event_handler->interrupt_tasks[i] = false;
 
+  event_handler->serializer = json_serializer_new();
+  json_serializer_set_global(event_handler->serializer);
+  if (!event_handler->serializer) {
+    log_error("Failed to create JSON serializer");
+    g_free(event_handler);
+    return NULL;
+  }
+
   return event_handler;
 }
 
@@ -214,6 +221,12 @@ void event_handler_free(event_handler_t* event_handler) {
       g_free(event_handler->global_interrupt_event);
       event_handler->global_interrupt_event = NULL;
     }
+  }
+
+  if (event_handler->serializer) {
+    json_serializer_set_global(NULL);
+    json_serializer_free(event_handler->serializer);
+    event_handler->serializer = NULL;
   }
 
   if (event_handler->vmi) {
@@ -339,6 +352,7 @@ static gpointer event_loop_thread(gpointer data) {
       log_error("vmi_events_listen failed.");
     }
   }
+  // Process any remaining events.
   log_info("Event loop thread has finished processing events, exiting...");
   return NULL;
 }
@@ -389,10 +403,39 @@ static gpointer json_serialization(gpointer data) {
   }
 
   event_handler_t* event_handler = (event_handler_t*)data;
+  if (!event_handler || !event_handler->serializer) {
+    log_error("json_serialization: invalid event_handler or serializer");
+    return NULL;
+  }
+
+  json_serializer_t* serializer = event_handler->serializer;
+  uint64_t last_flush = g_get_monotonic_time() / 1000;
 
   while (!g_atomic_int_get(&event_handler->stop_signal)) {
-    // TODO: Add listening event behavior here.
+    int result = json_serializer_process_one(serializer);
+
+    // Poll for 1ms
+    if (result == 0) {
+      g_usleep(1000);
+    }
+
+    uint64_t current_time = g_get_monotonic_time() / 1000;
+    if (current_time - last_flush > serializer->flush_interval_ms) {
+      last_flush = current_time;
+    }
   }
+
+  log_info("JSON serialization stopping, processing remaining responses...");
+
+  int remaining = json_serializer_drain_queue(serializer);
+
+  log_info("JSON serialization finished, processed %d remaining responses",
+           remaining);
+
+  uint64_t queued, written, errors;
+  json_serializer_get_stats(serializer, &queued, &written, &errors);
+  log_info("Final JSON stats - queued: %lu, written: %lu, errors: %lu", queued,
+           written, errors);
 
   return NULL;
 }

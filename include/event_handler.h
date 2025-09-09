@@ -5,6 +5,7 @@
 #include <libvmi/events.h>
 #include <libvmi/libvmi.h>
 #include "interrupt_context.h"
+#include "json_serializer.h"
 
 /**
  * @brief Constants
@@ -84,9 +85,9 @@ struct event_handler {
       signal_event_thread;  ///< The thread that signals the event loop to stop processing events after window ms.
   GThread*
       json_serialization_thread;  ///< The thread that handles JSON serialization of events. We do not want blocking I/O operations in the event callbacks.
+  json_serializer_t* serializer;  ///< The JSON serializer instance.
   volatile sig_atomic_t
       stop_signal;  ///< Signal to stop the event loop after the time window.
-  // TODO: Add thread that does post-processing / serialization / storage of the events.
   volatile bool is_paused;  ///< Flag to indicate if vm is paused.
 };
 
