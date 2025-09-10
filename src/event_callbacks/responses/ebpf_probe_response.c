@@ -1,8 +1,8 @@
 #include "event_callbacks/responses/ebpf_probe_response.h"
+#include <inttypes.h>
 #include <log.h>
 #include <stdio.h>
 #include <string.h>
-#include <inttypes.h>
 #include "utils.h"
 
 ebpf_probe_data_t* ebpf_probe_data_new(

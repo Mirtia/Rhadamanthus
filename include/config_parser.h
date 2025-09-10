@@ -15,7 +15,7 @@ struct config_t {
   uint32_t state_sampling_ms;  ///< Frequency of state sampling in milliseconds.
   GList* state_tasks;          ///< List of state_task_id_t.
   GList* event_tasks;          ///< List of event_task_id_t.
-  GList* interrupt_tasks;     ///< List of interrupt_task_id_t.
+  GList* interrupt_tasks;      ///< List of interrupt_task_id_t.
 };
 
 // Type definition for the config_t structure.

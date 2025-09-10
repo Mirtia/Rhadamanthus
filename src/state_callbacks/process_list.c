@@ -61,7 +61,7 @@ static bool read_process_credentials(vmi_instance_t vmi, addr_t task_struct,
 
   // Read credentials.
   // See: https://docs.kernel.org/security/credentials.html.
-  if (vmi_read_32_va(vmi, cred_addr + LINUX_EUID_OFFSET, 0, &proc_info->uid) !=
+  if (vmi_read_32_va(vmi, cred_addr + LINUX_UID_OFFSET, 0, &proc_info->uid) !=
           VMI_SUCCESS ||
       vmi_read_32_va(vmi, cred_addr + LINUX_GID_OFFSET, 0, &proc_info->gid) !=
           VMI_SUCCESS ||
@@ -184,7 +184,7 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
     if (vmi_read_32_va(vmi, current_process + pid_offset, 0,
                        (uint32_t*)&proc_info.pid) != VMI_SUCCESS) {
       log_debug("STATE_PROCESS_LIST: Failed to read PID at 0x%" PRIx64,
-               current_process);
+                current_process);
       process_valid = false;
     }
 

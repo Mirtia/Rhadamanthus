@@ -261,14 +261,12 @@ event_response_t event_ebpf_probe_callback(vmi_instance_t vmi,
       vcpu_id, (uint64_t)rip, pid, ctx->symname ? ctx->symname : "unknown",
       ctx->kaddr);
 
-  // Initialize extracted data
   char* target_symbol = NULL;
   addr_t target_addr = 0;
   uint32_t attach_type = 0;
   char* tracepoint_name = NULL;
   const char* probe_type = "unknown";
 
-  // Extract function-specific details
   if (ctx->symname && (strstr(ctx->symname, "register_kprobe") ||
                        strstr(ctx->symname, "register_kretprobe"))) {
     log_debug("EVENT_EBPF_PROBE: Type - Kernel probe registration");

@@ -230,12 +230,12 @@ uint32_t state_kallsyms_symbols_callback(vmi_instance_t vmi, void* context) {
 
     // Log a small sample for inspection.
     if (logged < log_sample) {
-      log_debug("STATE_KALLSYMS_SYMBOLS: kallsyms[%u]: 0x%" PRIx64 "  %s%s%s", i,
-               (uint64_t)va, name_buf,
-               (have_text && va >= ktext_s && va <= ktext_e) ? "  [.text]" : "",
-               (vmi_read_8_va(vmi, va, 0, &tmp) == VMI_SUCCESS)
-                   ? "  [reachable]"
-                   : "");
+      log_debug(
+          "STATE_KALLSYMS_SYMBOLS: kallsyms[%u]: 0x%" PRIx64 "  %s%s%s", i,
+          (uint64_t)va, name_buf,
+          (have_text && va >= ktext_s && va <= ktext_e) ? "  [.text]" : "",
+          (vmi_read_8_va(vmi, va, 0, &tmp) == VMI_SUCCESS) ? "  [reachable]"
+                                                           : "");
       logged++;
     }
   }

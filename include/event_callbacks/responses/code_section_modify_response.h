@@ -10,20 +10,20 @@
 #ifndef CODE_SECTION_MODIFY_RESPONSE_H
 #define CODE_SECTION_MODIFY_RESPONSE_H
 
-#include <stdint.h>
-#include <stdbool.h>
-#include <libvmi/libvmi.h>
 #include <cjson/cJSON.h>
 #include <glib.h>
+#include <libvmi/libvmi.h>
+#include <stdbool.h>
+#include <stdint.h>
 
 typedef struct {
-    uint32_t vcpu_id;
-    uint64_t rip;
-    uint64_t rsp;
-    uint64_t cr3;
-    addr_t write_gla;
-    addr_t write_gpa;
-    char* kernel_symbol;
+  uint32_t vcpu_id;
+  uint64_t rip;
+  uint64_t rsp;
+  uint64_t cr3;
+  addr_t write_gla;
+  addr_t write_gpa;
+  char* kernel_symbol;
 } code_section_modify_data_t;
 
 /**
@@ -38,13 +38,9 @@ typedef struct {
  * @param kernel_symbol Resolved kernel symbol name (can be NULL)
  * @return code_section_modify_data_t* Pointer to allocated structure or NULL on failure
  */
-code_section_modify_data_t* code_section_modify_data_new(uint32_t vcpu_id,
-                                                         uint64_t rip,
-                                                         uint64_t rsp,
-                                                         uint64_t cr3,
-                                                         addr_t write_gla,
-                                                         addr_t write_gpa,
-                                                         const char* kernel_symbol);
+code_section_modify_data_t* code_section_modify_data_new(
+    uint32_t vcpu_id, uint64_t rip, uint64_t rsp, uint64_t cr3,
+    addr_t write_gla, addr_t write_gpa, const char* kernel_symbol);
 
 /**
  * @brief Free code section modify data structure
@@ -61,4 +57,4 @@ void code_section_modify_data_free(code_section_modify_data_t* data);
  */
 cJSON* code_section_modify_data_to_json(const code_section_modify_data_t* data);
 
-#endif // CODE_SECTION_MODIFY_RESPONSE_H
+#endif  // CODE_SECTION_MODIFY_RESPONSE_H

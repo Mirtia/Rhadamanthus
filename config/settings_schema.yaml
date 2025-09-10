@@ -3,7 +3,7 @@ domain_name: "ubuntu-20-04-new-kernel"
 
 # How long the entire introspection window should last (in miliseconds)
 monitor:
-  window_ms: 50000
+  window_ms: 10000
   state_sampling_ms: 1000
 
 # Which detection services to dispatch.
@@ -12,7 +12,7 @@ monitor:
 # 2. Event-driven tasks (e.g., mem_event)
 # 3. Interrupt-driven tasks (e.g., breakpoint at syscall)
 features:
-  # state:
+  state:
   #   - id: STATE_KERNEL_MODULE_LIST
   #   - id: STATE_FTRACE_HOOKS
   #   - id: STATE_NETWORK_TRACE
@@ -21,20 +21,19 @@ features:
   #   - id: STATE_DIR_STRING_MATCHING
   #   - id: STATE_PROCESS_LIST
   #   - id: STATE_MSR_REGISTERS
-  #   - id: STATE_EBPF_ARTIFACTS
+    - id: STATE_EBPF_ARTIFACTS
   #   - id: STATE_KALLSYMS_SYMBOLS
   #   - id: STATE_IO_URING_ARTIFACTS
   event:
     # - id: EVENT_FTRACE_HOOK
     # - id: EVENT_SYSCALL_TABLE_WRITE
     # - id: EVENT_IDT_WRITE
-    - id: EVENT_CR0_WRITE
+    # - id: EVENT_CR0_WRITE
     # - id: EVENT_PAGE_TABLE_MODIFICATION
     # - id: EVENT_MSR_WRITE
     # - id: EVENT_CODE_SECTION_MODIFY
-    # - id: EVENT_EBPF_PROBE
     # - id: EVENT_KALLSYMS_TABLE_WRITE
-  # interrupt:
-  #   - id: INTERRUPT_EBPF_PROBE
+  interrupt:
+    - id: INTERRUPT_EBPF_PROBE
   #   - id: INTERRUPT_IO_URING_RING_WRITE
   #   - id: INTERRUPT_NETFILTER_HOOK_WRITE

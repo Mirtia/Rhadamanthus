@@ -66,7 +66,7 @@ typedef struct cr0_write_data {
   uint64_t rsp;      ///< Stack pointer (RSP) at the time of the event.
   uint64_t cr3;      ///< CR3 register value at the time of the event.
 
-  cr0_flags_t flags;     ///< Decoded CR0 flags from the new CR0 value.
+  cr0_flags_t flags;  ///< Decoded CR0 flags from the new CR0 value.
 } cr0_write_data_t;
 
 /**

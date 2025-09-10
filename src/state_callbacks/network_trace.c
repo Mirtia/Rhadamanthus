@@ -49,7 +49,7 @@ typedef struct {
  */
 typedef struct {
   GArray* kernel_connections;  ///< Direct kernel connections.
-  uint32_t to_be_reviewed;   ///< Count of suspicious connections.
+  uint32_t to_be_reviewed;     ///< Count of suspicious connections.
 } detection_context_t;         ///< Context for network detection.
 
 /**

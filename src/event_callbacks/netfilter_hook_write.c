@@ -29,7 +29,7 @@ static event_response_t event_netfilter_hook_write_ss_callback(
   }
 
   log_debug("EVENT_NETFILTER_HOOK_WRITE: Breakpoint re-armed on vCPU %u",
-           event->vcpu_id);
+            event->vcpu_id);
 
   log_vcpu_state(vmi, event->vcpu_id, ctx->kaddr, "SS exit");
   return VMI_EVENT_RESPONSE_NONE;
@@ -79,9 +79,9 @@ event_response_t event_netfilter_hook_write_callback(vmi_instance_t vmi,
   }
 
   log_debug("EVENT_NETFILTER_HOOK_WRITE: %s @0x%" PRIx64 " net=0x%" PRIx64
-           " ops=0x%" PRIx64 " n=%llu",
-           ctx->symname ? ctx->symname : "nf_register_net_hook", ctx->kaddr,
-           (uint64_t)rdi, (uint64_t)rsi, (unsigned long long)rdx);
+            " ops=0x%" PRIx64 " n=%llu",
+            ctx->symname ? ctx->symname : "nf_register_net_hook", ctx->kaddr,
+            (uint64_t)rdi, (uint64_t)rsi, (unsigned long long)rdx);
 
   // Restore original byte
   if (vmi_write_8_va(vmi, ctx->kaddr, 0, &ctx->orig) != VMI_SUCCESS) {
@@ -115,7 +115,7 @@ event_response_t event_netfilter_hook_write_callback(vmi_instance_t vmi,
   }
 
   log_debug("EVENT_NETFILTER_HOOK_WRITE: Single-step enabled on vCPU %u",
-           event->vcpu_id);
+            event->vcpu_id);
 
   log_vcpu_state(vmi, event->vcpu_id, ctx->kaddr, "CB exit");
 

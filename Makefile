@@ -21,8 +21,8 @@ single_test: build
 format:
 	echo "Formatting (*.c,*.h)..."
 	find . -type f \( -name '*.c' -o -name '*.h' \) \
-		-not -path './build/*' -not -path '*/.git/*' -print0 | \
-		-not -path './tests/*' \
+		-not -path './build/*' -not -path '*/.git/*' \
+		-not -path './tests/*' -print0 | \
 		xargs -0 -n 50 $(CLANG_FORMAT) -i -style=$(FORMAT_STYLE)
 
 check-format:

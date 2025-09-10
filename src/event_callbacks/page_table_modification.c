@@ -22,7 +22,7 @@ event_response_t event_page_table_modification_callback(vmi_instance_t vmi,
   if (vmi_read_pa(vmi, ctx->pml4_pa, sizeof(pml4_snapshot), pml4_snapshot,
                   NULL) != VMI_SUCCESS) {
     log_error("PAGE_TABLE_MODIFICATION: vmi_read_pa failed @0x%lx",
-             (unsigned long)ctx->pml4_pa);
+              (unsigned long)ctx->pml4_pa);
     return VMI_EVENT_RESPONSE_NONE;
   }
 

@@ -4,8 +4,8 @@
 #include <libvmi/libvmi.h>
 #include <log.h>
 #include <stdint.h>
-#include "utils.h"
 #include "event_callbacks/responses/code_section_modify_response.h"
+#include "utils.h"
 
 /**
  * @brief Resolve the kernel symbol for a given virtual address.
@@ -37,7 +37,7 @@ event_response_t event_code_section_modify_callback(vmi_instance_t vmi,
   const uint32_t vcpu_id = event->vcpu_id;
 
   uint64_t rip = 0, cr3 = 0, rsp = 0;
-  
+
   if (vmi_get_vcpureg(vmi, &rip, RIP, vcpu_id) != VMI_SUCCESS) {
     return log_error_and_queue_response_event(
         "code_section_modify", EVENT_CODE_SECTION_MODIFY, VMI_OP_FAILURE,
@@ -76,7 +76,8 @@ event_response_t event_code_section_modify_callback(vmi_instance_t vmi,
       vcpu_id, rip, rsp, cr3, write_gla, write_gpa, ksym);
   if (!code_data) {
     return log_error_and_queue_response_event(
-        "code_section_modify", EVENT_CODE_SECTION_MODIFY, MEMORY_ALLOCATION_FAILURE,
+        "code_section_modify", EVENT_CODE_SECTION_MODIFY,
+        MEMORY_ALLOCATION_FAILURE,
         "Failed to allocate memory for code section modify data.");
   }
 
