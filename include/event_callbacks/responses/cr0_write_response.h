@@ -114,13 +114,4 @@ cJSON* cr0_write_data_to_json(const cr0_write_data_t* data);
  */
 void cjson_add_hex_u64(cJSON* parent, const char* key, uint64_t value);
 
-/**
- * @brief Add a boolean value to a cJSON object.
- *
- * @param parent Parent cJSON object.
- * @param key Key to use for the new field.
- * @param value Boolean value to add.
- */
-void cjson_add_bool(cJSON* parent, const char* key, bool value);
-
 #endif  // CR0_WRITE_RESPONSE_H

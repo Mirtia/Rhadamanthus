@@ -1,26 +1,65 @@
 #include "event_callbacks/msr_write.h"
+#include <glib.h>
 #include <inttypes.h>
 #include <log.h>
+#include "event_callbacks/responses/msr_write_response.h"
+#include "json_serializer.h"
+#include "utils.h"
 
 event_response_t event_msr_write_callback(vmi_instance_t vmi,
                                           vmi_event_t* event) {
+  // Preconditions
   if (!vmi || !event) {
-    log_error("EVENT_MSR_WRITE: Invalid arguments to MSR write callback.");
-    return VMI_EVENT_INVALID;
+    return log_error_and_queue_response_event(
+        "msr_write", EVENT_MSR_WRITE, INVALID_ARGUMENTS,
+        "Invalid arguments to MSR write callback.");
   }
 
   uint32_t vcpu_id = event->vcpu_id;
-  addr_t rip = 0;
   uint64_t msr_value = event->reg_event.value;
   uint64_t msr_index = event->reg_event.reg;
 
+  uint64_t rip = 0, cr3 = 0, rsp = 0;
+
   if (vmi_get_vcpureg(vmi, &rip, RIP, vcpu_id) != VMI_SUCCESS) {
-    log_warn("EVENT_MSR_WRITE: Failed to get RIP for VCPU %u", vcpu_id);
+    return log_error_and_queue_response_event(
+        "msr_write", EVENT_MSR_WRITE, VMI_OP_FAILURE,
+        "Failed to get RIP register value.");
+  }
+
+  if (vmi_get_vcpureg(vmi, &cr3, CR3, vcpu_id) != VMI_SUCCESS) {
+    return log_error_and_queue_response_event(
+        "msr_write", EVENT_MSR_WRITE, VMI_OP_FAILURE,
+        "Failed to get CR3 register value.");
+  }
+
+  if (vmi_get_vcpureg(vmi, &rsp, RSP, vcpu_id) != VMI_SUCCESS) {
+    return log_error_and_queue_response_event(
+        "msr_write", EVENT_MSR_WRITE, VMI_OP_FAILURE,
+        "Failed to get RSP register value.");
+  }
+
+  msr_write_data_t* msr_data =
+      msr_write_data_new(vcpu_id, rip, rsp, cr3, msr_index, msr_value);
+  if (!msr_data) {
+    return log_error_and_queue_response_event(
+        "msr_write", EVENT_MSR_WRITE, MEMORY_ALLOCATION_FAILURE,
+        "Failed to allocate memory for MSR write data.");
   }
 
   log_warn("EVENT_MSR_WRITE: VCPU: %u RIP: 0x%" PRIx64 " MSR_INDEX: 0x%" PRIx64
            " VALUE: 0x%" PRIx64,
            vcpu_id, rip, msr_index, msr_value);
 
-  return VMI_EVENT_RESPONSE_NONE;
+  // Check for security-relevant MSR writes
+  const char* msr_name = msr_get_name(msr_index);
+  if (msr_needs_further_investigation(msr_index)) {
+    log_warn("Security-relevant MSR write detected: %s (0x%" PRIx64
+             ") = 0x%" PRIx64,
+             msr_name ? msr_name : "unknown", msr_index, msr_value);
+  }
+
+  return log_success_and_queue_response_event(
+      "msr_write", EVENT_MSR_WRITE, (void*)msr_data,
+      (void (*)(void*))msr_write_data_free);
 }

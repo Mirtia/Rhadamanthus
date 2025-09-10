@@ -2,10 +2,7 @@
 #include <log.h>
 #include <stdio.h>
 #include <string.h>
-
-void cjson_add_bool(cJSON* parent, const char* key, bool val) {
-  cJSON_AddBoolToObject(parent, key, val);
-}
+#include "utils.h"
 
 void cr0_decode_flags(uint64_t cr0, cr0_flags_t* out_flags) {
   out_flags->protected_mode = (cr0 & CR0_PE) != 0;

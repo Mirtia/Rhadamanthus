@@ -195,6 +195,12 @@ void log_vcpu_state(vmi_instance_t vmi, uint32_t vcpu_id, addr_t kaddr,
   }
 }
 
+void cjson_add_hex_u32(cJSON* parent, const char* key, uint32_t val) {
+  char buf[2 + 8 + 1];  // "0x" + 8 hex digits + NUL
+  (void)snprintf(buf, sizeof(buf), "0x%08" PRIx32, val);
+  cJSON_AddStringToObject(parent, key, buf);
+}
+
 void cjson_add_hex_u64(cJSON* parent, const char* key, uint64_t val) {
   char buffer[20];
   (void)snprintf(buffer, sizeof(buffer), "0x%016" PRIx64, val);
@@ -205,4 +211,8 @@ void cjson_add_hex_addr(cJSON* parent, const char* key, addr_t val) {
   char buffer[20];
   (void)snprintf(buffer, sizeof(buffer), "0x%016" PRIx64, (uint64_t)val);
   cJSON_AddStringToObject(parent, key, buffer);
+}
+
+void cjson_add_bool(cJSON* parent, const char* key, bool val) {
+  cJSON_AddBoolToObject(parent, key, val);
 }

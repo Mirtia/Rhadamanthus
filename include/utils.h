@@ -132,4 +132,22 @@ void cjson_add_hex_u64(cJSON* parent, const char* key, uint64_t val);
  */
 void cjson_add_hex_addr(cJSON* parent, const char* key, addr_t val);
 
+/**
+ * @brief Add a boolean value to a cJSON object.
+ *
+ * @param parent Parent cJSON object.
+ * @param key Key to use for the new field.
+ * @param value Boolean value to add.
+ */
+void cjson_add_bool(cJSON* parent, const char* key, bool value);
+
+/**
+ * @brief Add a uint32_t value as a hexadecimal string to a cJSON object.
+ * 
+ * @param parent The parent cJSON object to which the new item will be added.
+ * @param key The key for the new item.
+ * @param val The uint32_t value to add, which will be converted to a hex string.
+ */
+void cjson_add_hex_u32(cJSON* parent, const char* key, uint32_t val);
+
 #endif

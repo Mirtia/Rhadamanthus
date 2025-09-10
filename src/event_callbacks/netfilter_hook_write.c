@@ -1,9 +1,11 @@
 #include "event_callbacks/netfilter_hook_write.h"
-#include <glib-2.0/glib.h>
+#include <glib.h>
 #include <inttypes.h>
 #include <log.h>
 #include <string.h>
+#include "event_callbacks/responses/netfilter_hook_write_response.h"
 #include "event_handler.h"
+#include "json_serializer.h"
 #include "offsets.h"
 #include "utils.h"
 
@@ -12,7 +14,7 @@ static event_response_t event_netfilter_hook_write_ss_callback(
 
   nf_bp_ctx_t* ctx = (nf_bp_ctx_t*)event->data;
   if (!ctx) {
-    log_error("EVENT_NETFILTER_HOOK_WRITE: NULL context in SS handler.");
+    log_error("INTERRUPT_NETFILTER_HOOK_WRITE: NULL context in SS handler.");
     return VMI_EVENT_INVALID;
   }
 
@@ -28,7 +30,7 @@ static event_response_t event_netfilter_hook_write_ss_callback(
     log_warn("Failed to disable single-step");
   }
 
-  log_debug("EVENT_NETFILTER_HOOK_WRITE: Breakpoint re-armed on vCPU %u",
+  log_debug("INTERRUPT_NETFILTER_HOOK_WRITE: Breakpoint re-armed on vCPU %u",
             event->vcpu_id);
 
   log_vcpu_state(vmi, event->vcpu_id, ctx->kaddr, "SS exit");
@@ -39,19 +41,44 @@ event_response_t event_netfilter_hook_write_callback(vmi_instance_t vmi,
                                                      vmi_event_t* event) {
   // Preconditions
   if (!vmi || !event) {
-    log_error("EVENT_NETFILTER_HOOK_WRITE: Invalid arguments to callback.");
-    return VMI_EVENT_INVALID;
+    return log_error_and_queue_response_interrupt(
+        "netfilter_hook_write", INTERRUPT_NETFILTER_HOOK_WRITE,
+        INVALID_ARGUMENTS,
+        "Invalid arguments to netfilter hook write callback.");
   }
 
   nf_bp_ctx_t* ctx = (nf_bp_ctx_t*)event->data;
   if (!ctx) {
-    log_error("EVENT_NETFILTER_HOOK_WRITE: NULL context in INT3 handler.");
-    return VMI_EVENT_INVALID;
+    return log_error_and_queue_response_interrupt(
+        "netfilter_hook_write", INTERRUPT_NETFILTER_HOOK_WRITE,
+        INVALID_ARGUMENTS, "NULL context in INT3 handler.");
   }
 
   if (ctx->kaddr == 0) {
-    log_error("EVENT_NETFILTER_HOOK_WRITE: Invalid kaddr in context.");
-    return VMI_EVENT_INVALID;
+    return log_error_and_queue_response_interrupt(
+        "netfilter_hook_write", INTERRUPT_NETFILTER_HOOK_WRITE,
+        INVALID_ARGUMENTS, "Invalid kaddr in context.");
+  }
+
+  uint32_t vcpu_id = event->vcpu_id;
+  uint64_t rip = 0, cr3 = 0, rsp = 0;
+
+  if (vmi_get_vcpureg(vmi, &rip, RIP, vcpu_id) != VMI_SUCCESS) {
+    return log_error_and_queue_response_interrupt(
+        "netfilter_hook_write", INTERRUPT_NETFILTER_HOOK_WRITE, VMI_OP_FAILURE,
+        "Failed to get RIP register value.");
+  }
+
+  if (vmi_get_vcpureg(vmi, &cr3, CR3, vcpu_id) != VMI_SUCCESS) {
+    return log_error_and_queue_response_interrupt(
+        "netfilter_hook_write", INTERRUPT_NETFILTER_HOOK_WRITE, VMI_OP_FAILURE,
+        "Failed to get CR3 register value.");
+  }
+
+  if (vmi_get_vcpureg(vmi, &rsp, RSP, vcpu_id) != VMI_SUCCESS) {
+    return log_error_and_queue_response_interrupt(
+        "netfilter_hook_write", INTERRUPT_NETFILTER_HOOK_WRITE, VMI_OP_FAILURE,
+        "Failed to get RSP register value.");
   }
 
   event->interrupt_event.reinject = 0;
@@ -62,34 +89,48 @@ event_response_t event_netfilter_hook_write_callback(vmi_instance_t vmi,
   // * RSI = const struct nf_hook_ops *ops
   // * RDX = size_t n   (only for nf_register_net_hooks)
   reg_t rdi = 0, rsi = 0, rdx = 0;
-  if (vmi_get_vcpureg(vmi, &rdi, RDI, event->vcpu_id) != VMI_SUCCESS) {
-    log_error("EVENT_NETFILTER_HOOK_WRITE: Failed to get RDI for vCPU %u",
-              event->vcpu_id);
-    return VMI_EVENT_INVALID;
+  if (vmi_get_vcpureg(vmi, &rdi, RDI, vcpu_id) != VMI_SUCCESS) {
+    return log_error_and_queue_response_interrupt(
+        "netfilter_hook_write", INTERRUPT_NETFILTER_HOOK_WRITE, VMI_OP_FAILURE,
+        "Failed to get RDI register value.");
   }
-  if (vmi_get_vcpureg(vmi, &rsi, RSI, event->vcpu_id) != VMI_SUCCESS) {
-    log_error("EVENT_NETFILTER_HOOK_WRITE: Failed to get RSI for vCPU %u",
-              event->vcpu_id);
-    return VMI_EVENT_INVALID;
+  if (vmi_get_vcpureg(vmi, &rsi, RSI, vcpu_id) != VMI_SUCCESS) {
+    return log_error_and_queue_response_interrupt(
+        "netfilter_hook_write", INTERRUPT_NETFILTER_HOOK_WRITE, VMI_OP_FAILURE,
+        "Failed to get RSI register value.");
   }
-  if (vmi_get_vcpureg(vmi, &rdx, RDX, event->vcpu_id) != VMI_SUCCESS) {
-    log_error("EVENT_NETFILTER_HOOK_WRITE: Failed to get RDX for vCPU %u",
-              event->vcpu_id);
-    return VMI_EVENT_INVALID;
+  if (vmi_get_vcpureg(vmi, &rdx, RDX, vcpu_id) != VMI_SUCCESS) {
+    return log_error_and_queue_response_interrupt(
+        "netfilter_hook_write", INTERRUPT_NETFILTER_HOOK_WRITE, VMI_OP_FAILURE,
+        "Failed to get RDX register value.");
   }
 
-  log_debug("EVENT_NETFILTER_HOOK_WRITE: %s @0x%" PRIx64 " net=0x%" PRIx64
+  netfilter_hook_write_data_t* nf_data = netfilter_hook_write_data_new(
+      vcpu_id, rip, rsp, cr3, ctx->kaddr, (uint64_t)rdi, (uint64_t)rsi,
+      (uint64_t)rdx, ctx->symname);
+  if (!nf_data) {
+    return log_error_and_queue_response_interrupt(
+        "netfilter_hook_write", INTERRUPT_NETFILTER_HOOK_WRITE,
+        MEMORY_ALLOCATION_FAILURE,
+        "Failed to allocate memory for netfilter hook write data.");
+  }
+
+  log_debug("INTERRUPT_NETFILTER_HOOK_WRITE: %s @0x%" PRIx64 " net=0x%" PRIx64
             " ops=0x%" PRIx64 " n=%llu",
             ctx->symname ? ctx->symname : "nf_register_net_hook", ctx->kaddr,
             (uint64_t)rdi, (uint64_t)rsi, (unsigned long long)rdx);
 
+  // Netfilter hook registration can be used by rootkits to intercept network traffic
+  log_warn(
+      "Netfilter hook registration detected - potential network interception "
+      "capability");
+
   // Restore original byte
   if (vmi_write_8_va(vmi, ctx->kaddr, 0, &ctx->orig) != VMI_SUCCESS) {
-    log_error(
-        "EVENT_NETFILTER_HOOK_WRITE: Failed to restore original byte at "
-        "0x%" PRIx64,
-        (uint64_t)ctx->kaddr);
-    return VMI_EVENT_INVALID;
+    netfilter_hook_write_data_free(nf_data);
+    return log_error_and_queue_response_interrupt(
+        "netfilter_hook_write", INTERRUPT_NETFILTER_HOOK_WRITE, VMI_OP_FAILURE,
+        "Failed to restore original byte.");
   }
 
   memset(&ctx->ss_evt, 0, sizeof(ctx->ss_evt));
@@ -101,23 +142,29 @@ event_response_t event_netfilter_hook_write_callback(vmi_instance_t vmi,
 
   if (vmi_register_event(vmi, &ctx->ss_evt) != VMI_SUCCESS) {
     log_warn(
-        "EVENT_NETFILTER_HOOK_WRITE: Failed to register SINGLESTEP event. "
+        "INTERRUPT_NETFILTER_HOOK_WRITE: Failed to register SINGLESTEP event. "
         "Breakpoint will not be re-armed");
-    return VMI_EVENT_RESPONSE_NONE;
+    // Still return success for the response since we captured the event
+    return log_success_and_queue_response_interrupt(
+        "netfilter_hook_write", INTERRUPT_NETFILTER_HOOK_WRITE, (void*)nf_data,
+        (void (*)(void*))netfilter_hook_write_data_free);
   }
 
-  if (vmi_toggle_single_step_vcpu(vmi, &ctx->ss_evt, event->vcpu_id, true) !=
+  if (vmi_toggle_single_step_vcpu(vmi, &ctx->ss_evt, vcpu_id, true) !=
       VMI_SUCCESS) {
     log_warn(
-        "EVENT_NETFILTER_HOOK_WRITE: Failed to enable single-step on vCPU %u. "
+        "INTERRUPT_NETFILTER_HOOK_WRITE: Failed to enable single-step on vCPU "
+        "%u. "
         "Breakpoint will not be re-armed",
-        event->vcpu_id);
+        vcpu_id);
   }
 
-  log_debug("EVENT_NETFILTER_HOOK_WRITE: Single-step enabled on vCPU %u",
-            event->vcpu_id);
+  log_debug("INTERRUPT_NETFILTER_HOOK_WRITE: Single-step enabled on vCPU %u",
+            vcpu_id);
 
-  log_vcpu_state(vmi, event->vcpu_id, ctx->kaddr, "CB exit");
+  log_vcpu_state(vmi, vcpu_id, ctx->kaddr, "CB exit");
 
-  return VMI_EVENT_RESPONSE_NONE;
+  return log_success_and_queue_response_interrupt(
+      "netfilter_hook_write", INTERRUPT_NETFILTER_HOOK_WRITE, (void*)nf_data,
+      (void (*)(void*))netfilter_hook_write_data_free);
 }
