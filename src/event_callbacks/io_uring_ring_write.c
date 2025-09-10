@@ -39,21 +39,21 @@ event_response_t event_io_uring_ring_write_callback(vmi_instance_t vmi,
                                                     vmi_event_t* event) {
   // Preconditions
   if (!vmi || !event) {
-    return log_error_and_queue_response_event(
-        "io_uring_ring_write", EVENT_IO_URING_RING_WRITE, INVALID_ARGUMENTS,
+    return log_error_and_queue_response_interrupt(
+        "io_uring_ring_write", INTERRUPT_IO_URING_RING_WRITE, INVALID_ARGUMENTS,
         "Invalid arguments to io_uring ring write callback.");
   }
 
   io_uring_bp_ctx_t* ctx = (io_uring_bp_ctx_t*)event->data;
   if (!ctx) {
-    return log_error_and_queue_response_event(
-        "io_uring_ring_write", EVENT_IO_URING_RING_WRITE, INVALID_ARGUMENTS,
+    return log_error_and_queue_response_interrupt(
+        "io_uring_ring_write", INTERRUPT_IO_URING_RING_WRITE, INVALID_ARGUMENTS,
         "NULL context in INT3 handler.");
   }
 
   if (ctx->kaddr == 0) {
-    return log_error_and_queue_response_event(
-        "io_uring_ring_write", EVENT_IO_URING_RING_WRITE, INVALID_ARGUMENTS,
+    return log_error_and_queue_response_interrupt(
+        "io_uring_ring_write", INTERRUPT_IO_URING_RING_WRITE, INVALID_ARGUMENTS,
         "Invalid kaddr in context.");
   }
 
@@ -61,20 +61,20 @@ event_response_t event_io_uring_ring_write_callback(vmi_instance_t vmi,
   uint64_t rip = 0, cr3 = 0, rsp = 0;
 
   if (vmi_get_vcpureg(vmi, &rip, RIP, vcpu_id) != VMI_SUCCESS) {
-    return log_error_and_queue_response_event(
-        "io_uring_ring_write", EVENT_IO_URING_RING_WRITE, VMI_OP_FAILURE,
+    return log_error_and_queue_response_interrupt(
+        "io_uring_ring_write", INTERRUPT_IO_URING_RING_WRITE, VMI_OP_FAILURE,
         "Failed to get RIP register value.");
   }
 
   if (vmi_get_vcpureg(vmi, &cr3, CR3, vcpu_id) != VMI_SUCCESS) {
-    return log_error_and_queue_response_event(
-        "io_uring_ring_write", EVENT_IO_URING_RING_WRITE, VMI_OP_FAILURE,
+    return log_error_and_queue_response_interrupt(
+        "io_uring_ring_write", INTERRUPT_IO_URING_RING_WRITE, VMI_OP_FAILURE,
         "Failed to get CR3 register value.");
   }
 
   if (vmi_get_vcpureg(vmi, &rsp, RSP, vcpu_id) != VMI_SUCCESS) {
-    return log_error_and_queue_response_event(
-        "io_uring_ring_write", EVENT_IO_URING_RING_WRITE, VMI_OP_FAILURE,
+    return log_error_and_queue_response_interrupt(
+        "io_uring_ring_write", INTERRUPT_IO_URING_RING_WRITE, VMI_OP_FAILURE,
         "Failed to get RSP register value.");
   }
 
@@ -83,14 +83,14 @@ event_response_t event_io_uring_ring_write_callback(vmi_instance_t vmi,
 
   addr_t regs_addr = 0;
   if (vmi_get_vcpureg(vmi, &regs_addr, RDI, vcpu_id) != VMI_SUCCESS) {
-    return log_error_and_queue_response_event(
-        "io_uring_ring_write", EVENT_IO_URING_RING_WRITE, VMI_OP_FAILURE,
+    return log_error_and_queue_response_interrupt(
+        "io_uring_ring_write", INTERRUPT_IO_URING_RING_WRITE, VMI_OP_FAILURE,
         "Failed to get RDI register value.");
   }
 
   if (regs_addr == 0) {
-    return log_error_and_queue_response_event(
-        "io_uring_ring_write", EVENT_IO_URING_RING_WRITE, INVALID_ARGUMENTS,
+    return log_error_and_queue_response_interrupt(
+        "io_uring_ring_write", INTERRUPT_IO_URING_RING_WRITE, INVALID_ARGUMENTS,
         "Invalid pt_regs address (RDI=0).");
   }
 
@@ -118,8 +118,8 @@ event_response_t event_io_uring_ring_write_callback(vmi_instance_t vmi,
       vcpu_id, rip, rsp, cr3, ctx->kaddr, regs_addr, file_descriptor, to_submit,
       min_cq, flags, sig_ptr, sigsz, user_ip, scno);
   if (!io_uring_data) {
-    return log_error_and_queue_response_event(
-        "io_uring_ring_write", EVENT_IO_URING_RING_WRITE,
+    return log_error_and_queue_response_interrupt(
+        "io_uring_ring_write", INTERRUPT_IO_URING_RING_WRITE,
         MEMORY_ALLOCATION_FAILURE,
         "Failed to allocate memory for io_uring ring write data.");
   }
@@ -138,8 +138,8 @@ event_response_t event_io_uring_ring_write_callback(vmi_instance_t vmi,
   // Restore original byte
   if (vmi_write_8_va(vmi, ctx->kaddr, 0, &ctx->orig) != VMI_SUCCESS) {
     io_uring_ring_write_data_free(io_uring_data);
-    return log_error_and_queue_response_event(
-        "io_uring_ring_write", EVENT_IO_URING_RING_WRITE, VMI_OP_FAILURE,
+    return log_error_and_queue_response_interrupt(
+        "io_uring_ring_write", INTERRUPT_IO_URING_RING_WRITE, VMI_OP_FAILURE,
         "Failed to restore original byte.");
   }
 
@@ -155,9 +155,9 @@ event_response_t event_io_uring_ring_write_callback(vmi_instance_t vmi,
         "EVENT_IO_URING_RING_WRITE: Failed to register SINGLESTEP event. "
         "Breakpoint will not be re-armed");
     // Still return success for the response since we captured the event
-    return log_success_and_queue_response_event(
-        "io_uring_ring_write", EVENT_IO_URING_RING_WRITE, (void*)io_uring_data,
-        (void (*)(void*))io_uring_ring_write_data_free);
+    return log_success_and_queue_response_interrupt(
+        "io_uring_ring_write", INTERRUPT_IO_URING_RING_WRITE,
+        (void*)io_uring_data, (void (*)(void*))io_uring_ring_write_data_free);
   }
 
   if (vmi_toggle_single_step_vcpu(vmi, &ctx->ss_evt, vcpu_id, true) !=
@@ -173,7 +173,7 @@ event_response_t event_io_uring_ring_write_callback(vmi_instance_t vmi,
 
   log_vcpu_state(vmi, vcpu_id, ctx->kaddr, "CB exit");
 
-  return log_success_and_queue_response_event(
-      "io_uring_ring_write", EVENT_IO_URING_RING_WRITE, (void*)io_uring_data,
-      (void (*)(void*))io_uring_ring_write_data_free);
+  return log_success_and_queue_response_interrupt(
+      "io_uring_ring_write", INTERRUPT_IO_URING_RING_WRITE,
+      (void*)io_uring_data, (void (*)(void*))io_uring_ring_write_data_free);
 }
