@@ -242,8 +242,6 @@ uint32_t state_io_uring_artifacts_callback(vmi_instance_t vmi, void* context) {
   uint64_t iou_worker_count = 0;  // threads named "iou-wrk*"
   uint64_t iou_sqp_count = 0;     // threads named "iou-sqp*"
 
-  log_info("Executing STATE_IO_URING_ARTIFACTS callback.");
-
   if (vmi_get_offset(vmi, "linux_tasks", &tasks_offset) != VMI_SUCCESS ||
       vmi_get_offset(vmi, "linux_pid", &pid_offset) != VMI_SUCCESS ||
       vmi_get_offset(vmi, "linux_name", &name_offset) != VMI_SUCCESS) {
@@ -371,7 +369,7 @@ uint32_t state_io_uring_artifacts_callback(vmi_instance_t vmi, void* context) {
   }
 
   log_info("STATE_IO_URING_ARTIFACTS callback completed.");
-  // Queue success response
+
   return log_success_and_queue_response_task(
       "io_uring_artifacts_state", STATE_IO_URING_ARTIFACTS, artifacts_data,
       (void (*)(void*))io_uring_artifacts_state_data_free);

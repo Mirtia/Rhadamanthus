@@ -290,12 +290,10 @@ event_response_t event_ebpf_probe_callback(vmi_instance_t vmi,
     probe_type = "tracepoint";
   }
 
-  // Create eBPF probe data structure
   ebpf_probe_data_t* ebpf_data = ebpf_probe_data_new(
       vcpu_id, rip, rsp, cr3, pid, ctx->kaddr, ctx->symname, probe_type,
       target_symbol, target_addr, attach_type, tracepoint_name);
 
-  // Clean up extracted strings
   if (target_symbol)
     g_free(target_symbol);
   if (tracepoint_name)

@@ -52,9 +52,9 @@ event_response_t event_syscall_table_write_callback(vmi_instance_t vmi,
            " GLA: 0x%" PRIx64 " GPA: 0x%" PRIx64,
            vcpu_id, rip, write_gla, write_gpa);
 
-  // Syscall table modifications are highly suspicious and often indicate rootkit activity
   log_warn(
-      "Potential rootkit activity detected: syscall table modification at GPA: "
+      "SYSCALL_TABLE_WRITE Event: Suspicious activity detected. Syscall table "
+      "modification at GPA: "
       "0x%" PRIx64,
       write_gpa);
 

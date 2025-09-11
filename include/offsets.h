@@ -135,20 +135,22 @@
 #define LINUX_PTREGS_OFF_FLAGS 0x90
 #define LINUX_PTREGS_OFF_SP 0x98
 
-// dentry structure offsets (placeholder values - would need to be extracted from actual kernel)
-#define LINUX_OFF_DENTRY_D_NAME 0x20
-#define LINUX_OFF_DENTRY_D_INODE 0x30
-#define LINUX_OFF_DENTRY_D_SUBDIRS 0x40
-#define LINUX_OFF_DENTRY_D_CHILD 0x48
+// TODO: These offsets have to be extracted using pahole and may be later used for the directory string matching state callback.
+
+// dentry structure offsets
+#define LINUX_OFF_DENTRY_D_NAME 0x00
+#define LINUX_OFF_DENTRY_D_INODE 0x00
+#define LINUX_OFF_DENTRY_D_SUBDIRS 0x00
+#define LINUX_OFF_DENTRY_D_CHILD 0x00
 
 // qstr structure offsets
-#define LINUX_OFF_QSTR_NAME 0x08
+#define LINUX_OFF_QSTR_NAME 0x00
 
-// inode structure offsets (placeholder values - would need to be extracted from actual kernel)
+// inode structure offsets
 #define LINUX_OFF_INODE_I_MODE 0x00
-#define LINUX_OFF_INODE_I_SIZE 0x40
-#define LINUX_OFF_INODE_I_UID 0x04
-#define LINUX_OFF_INODE_I_GID 0x08
-#define LINUX_OFF_INODE_I_MTIME 0x20
+#define LINUX_OFF_INODE_I_SIZE 0x00
+#define LINUX_OFF_INODE_I_UID 0x00
+#define LINUX_OFF_INODE_I_GID 0x00
+#define LINUX_OFF_INODE_I_MTIME 0x00
 
 #endif  // OFFSETS_H

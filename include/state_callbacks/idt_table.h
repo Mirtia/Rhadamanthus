@@ -1,6 +1,6 @@
 /**
  * @file idt_table.h
- * @brief Inspect IDT entries and log handlers outside kernel text.
+ * @brief This file contains the callback function to inspect IDT entries and log handlers outside kernel text.
  * @version 0.0
  * @date 2025-08-10
  * 

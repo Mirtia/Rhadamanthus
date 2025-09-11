@@ -343,7 +343,7 @@ uint32_t state_ftrace_hooks_callback(vmi_instance_t vmi, void* context) {
         "STATE_FTRACE_HOOKS: Callback requires a valid event handler context");
   }
 
-  log_info("STATE_FTRACE_HOOKS: Executing STATE_FTRACE_HOOKS callback.");
+  log_info("Executing STATE_FTRACE_HOOKS callback.");
 
   // Create ftrace hooks state data structure
   ftrace_hooks_state_data_t* hooks_data = ftrace_hooks_state_data_new();
@@ -407,7 +407,6 @@ uint32_t state_ftrace_hooks_callback(vmi_instance_t vmi, void* context) {
     log_info("STATE_FTRACE_HOOKS: No ftrace-based hooks detected");
   }
 
-  // Queue success response
   int result = log_success_and_queue_response_task(
       "ftrace_hooks_state", STATE_FTRACE_HOOKS, hooks_data,
       (void (*)(void*))ftrace_hooks_state_data_free);

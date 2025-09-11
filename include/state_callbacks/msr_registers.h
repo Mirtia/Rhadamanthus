@@ -1,6 +1,6 @@
 /**
  * @file msr_registers.h
- * @brief Inspect if MSR register dispatcher is modified.
+ * @brief This file contains the callback function to check if MSR register dispatcher is modified.
  * @version 0.0
  * @date 2025-08-21
  * 

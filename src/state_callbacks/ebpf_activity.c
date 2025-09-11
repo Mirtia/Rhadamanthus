@@ -61,12 +61,6 @@ static void resolve_bpf_fops(vmi_instance_t vmi, struct bpf_fops_syms* s) {
   vmi_translate_ksym2v(vmi, "bpf_link_fops", &s->link_fops);
 }
 
-/* =============================================================================
- * XArray entry helpers.
- * IDR is implemented on top of XArray since 4.20+.
- * References: XArray: https://docs.kernel.org/core-api/xarray.html
- *             IDR:    https://docs.kernel.org/core-api/idr.html
- * ========================================================================== */
 static inline int xa_is_value(addr_t e) {
   return (e & 1UL) != 0;
 }
@@ -466,7 +460,6 @@ uint32_t state_ebpf_activity_callback(vmi_instance_t vmi, void* context) {
   log_info("STATE_EBPF_ACTIVITY: Found %u programs, %u maps, %u links",
            total_programs, total_maps, total_links);
 
-  // Queue success response
   int result = log_success_and_queue_response_task(
       "ebpf_activity_state", STATE_EBPF_ARTIFACTS, activity_data,
       (void (*)(void*))ebpf_activity_state_data_free);

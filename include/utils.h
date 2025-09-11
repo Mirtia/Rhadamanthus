@@ -84,7 +84,7 @@ int log_success_and_queue_response_task(const char* task_name,
  * 
  * @param interrupt_name Name of the interrupt task for logging/queueing
  * @param interrupt_type The interrupt task ID type
- * @param data_ptr Nointer to the data to include in response
+ * @param data_ptr Pointer to the data to include in response
  * @param data_free_func Function to free the data if response creation fails (can be NULL)
  * @return event_response_t VMI_EVENT_RESPONSE_NONE on success, VMI_EVENT_INVALID on failure
  */

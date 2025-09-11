@@ -13,7 +13,7 @@
 metadata* create_metadata(task_type task_type, void* subtype) {
   metadata* meta = g_malloc0(sizeof(metadata));
   if (!meta) {
-    log_error("Failed to allocate memory for metadata");
+    log_error("Failed to allocate memory for metadata.");
     return NULL;
   }
 
@@ -29,7 +29,7 @@ char* generate_timestamp(void) {
   char* buffer = g_malloc0(32);
 
   if (buffer == NULL) {
-    log_error("Allocation of buffer for timestamp string literal failed");
+    log_error("Allocation of buffer for timestamp string literal failed.");
     return NULL;
   }
 
@@ -49,13 +49,13 @@ char* generate_timestamp(void) {
 
 error* create_error(int code, const char* message) {
   if (!message) {
-    log_error("Cannot create error with NULL message");
+    log_error("Cannot create error with NULL message.");
     return NULL;
   }
 
   error* err = g_malloc0(sizeof(error));
   if (!err) {
-    log_error("Failed to allocate memory for error object");
+    log_error("Failed to allocate memory for error object.");
     return NULL;
   }
 

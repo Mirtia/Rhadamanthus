@@ -87,7 +87,7 @@ static int write_response_to_individual_file(json_serializer_t* serializer,
 json_serializer_t* json_serializer_new() {
   json_serializer_t* serializer = g_malloc0(sizeof(json_serializer_t));
   if (!serializer) {
-    log_error("Failed to allocate JSON serializer");
+    log_error("Failed to allocate JSON serializer.");
     return NULL;
   }
 
@@ -170,12 +170,12 @@ int json_serializer_queue_response(json_serializer_t* serializer,
                                    const char* event_name,
                                    struct response* response_data) {
   if (!serializer) {
-    log_error("Invalid JSON serializer pointer");
+    log_error("JSON_SERIALIZER: Invalid JSON serializer pointer");
     return -1;
   }
 
   if (!event_name || !response_data) {
-    log_error("Invalid arguments to queue response");
+    log_error("JSON_SERIALIZER: Invalid arguments to queue response");
     return -1;
   }
 
@@ -646,18 +646,6 @@ cJSON* response_to_json(const struct response* response) {
             cJSON_AddStringToObject(
                 data_json, "note",
                 "Failed to convert eBPF activity data to JSON");
-          }
-          break;
-        }
-        case STATE_DIR_STRING_MATCHING: {
-          dir_string_matching_state_data_t* matching_data =
-              (dir_string_matching_state_data_t*)response->data;
-          cJSON* matching_data_json = dir_string_matching_state_data_to_json(matching_data);
-          if (matching_data_json) {
-            cJSON_AddItemToObject(data_json, "dir_string_matching", matching_data_json);
-          } else {
-            cJSON_AddStringToObject(data_json, "note",
-                                    "Failed to convert directory string matching data to JSON");
           }
           break;
         }

@@ -303,7 +303,6 @@ uint32_t state_kallsyms_symbols_callback(vmi_instance_t vmi, void* context) {
         total, num_syms);
   }
 
-  // Queue success response
   int result = log_success_and_queue_response_task(
       "kallsyms_symbols_state", STATE_KALLSYMS_SYMBOLS, symbols_data,
       (void (*)(void*))kallsyms_symbols_state_data_free);

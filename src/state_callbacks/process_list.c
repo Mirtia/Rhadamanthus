@@ -39,7 +39,8 @@ static bool is_kernel_thread(vmi_instance_t vmi, addr_t task_struct,
   addr_t mm_addr = 0;
   if (vmi_read_addr_va(vmi, task_struct + mm_offset, 0, &mm_addr) !=
       VMI_SUCCESS) {
-    log_debug("Failed to read mm field at 0x%" PRIx64, task_struct);
+    log_debug("STATE_PROCESS_LIST: Failed to read mm field at 0x%" PRIx64,
+              task_struct);
     return false;
   }
 
@@ -52,7 +53,7 @@ static bool read_process_credentials(vmi_instance_t vmi, addr_t task_struct,
   addr_t cred_addr = 0;
   if (vmi_read_addr_va(vmi, task_struct + cred_offset, 0, &cred_addr) !=
       VMI_SUCCESS) {
-    log_debug("Failed to read credentials pointer");
+    log_debug("STATE_PROCESS_LIST: Failed to read credentials pointer");
     return false;
   }
 
@@ -71,7 +72,7 @@ static bool read_process_credentials(vmi_instance_t vmi, addr_t task_struct,
           VMI_SUCCESS ||
       vmi_read_32_va(vmi, cred_addr + LINUX_EGID_OFFSET, 0, &proc_info->egid) !=
           VMI_SUCCESS) {
-    log_debug("Failed to read credential values");
+    log_debug("STATE_PROCESS_LIST: Failed to read credential values");
     return false;
   }
 
@@ -142,7 +143,7 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
         "STATE_PROCESS_LIST: Callback requires a valid event handler context.");
   }
 
-  log_info("Executing STATE_PROCESS_LIST_CALLBACK callback.");
+  log_info("Executing STATE_PROCESS_LIST callback.");
 
   // Create process list state data structure
   process_list_state_data_t* process_data = process_list_state_data_new();
@@ -330,11 +331,10 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
       "kernel threads)",
       total_processes, user_processes, kernel_threads);
 
-  // Queue success response
   int result = log_success_and_queue_response_task(
       "process_list_state", STATE_PROCESS_LIST, process_data,
       (void (*)(void*))process_list_state_data_free);
 
-  log_info("STATE_PROCESS_LIST_CALLBACK callback completed.");
+  log_info("STATE_PROCESS_LIST callback completed.");
   return result;
 }

@@ -71,7 +71,6 @@ event_response_t event_code_section_modify_callback(vmi_instance_t vmi,
     ksym = resolve_kernel_symbol(vmi, write_gla);
   }
 
-  // Create code section modify data structure
   code_section_modify_data_t* code_data = code_section_modify_data_new(
       vcpu_id, rip, rsp, cr3, write_gla, write_gpa, ksym);
   if (!code_data) {

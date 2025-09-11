@@ -1,6 +1,6 @@
 /**
  * @file syscall_table.h
- * @brief Inspect if there are modifications in the system call table.
+ * @brief This file contains the callback function to check if there are modifications in the system call table.
  * @version 0.0
  * @date 2025-08-10
  * 

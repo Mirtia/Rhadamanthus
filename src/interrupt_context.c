@@ -21,7 +21,7 @@ interrupt_context_t* interrupt_context_init(size_t initial_capacity) {
   }
 
   // First, I tried to implement a hash table for fast lookups, but for some reason,
-  // wether with custom hash function and comparison or not, the keys appeared to be the same
+  // whether with custom hash function and comparison or not, the keys appeared to be the same
   // but they were not. So, I reverted to a simple array search for now.
   // Fortunately, the list of interrupts is not huge, so performance is not that bad even with O(n).
 
@@ -89,14 +89,16 @@ int interrupt_context_add_breakpoint(interrupt_context_t* ctx,
   // Read original byte and plant INT3 at the target address.
   uint8_t orig_byte = 0;
   if (vmi_read_8_va(vmi, kaddr, 0, &orig_byte) != VMI_SUCCESS) {
-    log_warn("Failed to read original byte at %s @0x%" PRIx64, symbol_name,
-             kaddr);
+    log_warn(
+        "INTERRUPT_CONTEXT: Failed to read original byte at %s @0x%" PRIx64,
+        symbol_name, kaddr);
     return -1;
   }
 
   uint8_t int3 = 0xCC;
   if (vmi_write_8_va(vmi, kaddr, 0, &int3) != VMI_SUCCESS) {
-    log_warn("Failed to plant INT3 at %s @0x%" PRIx64, symbol_name, kaddr);
+    log_warn("INTERRUPT_CONTEXT: Failed to plant INT3 at %s @0x%" PRIx64,
+             symbol_name, kaddr);
     return -1;
   }
 
@@ -111,28 +113,30 @@ int interrupt_context_add_breakpoint(interrupt_context_t* ctx,
 
   ctx->count++;
 
-  log_info("Added breakpoint: %s @0x%" PRIx64 " (type=%s)", symbol_name, kaddr,
-           breakpoint_type_to_str(type));
+  log_info("INTERRUPT_CONTEXT: Added breakpoint: %s @0x%" PRIx64 " (type=%s)",
+           symbol_name, kaddr, breakpoint_type_to_str(type));
   return 0;
 }
 
 breakpoint_entry_t* interrupt_context_lookup_breakpoint(
     interrupt_context_t* ctx, addr_t kaddr) {
   if (!ctx) {
-    log_debug("Context is uninitialized.");
+    log_debug("INTERRUPT_CONTEXT: Context is uninitialized.");
     return NULL;
   }
 
   // Simple linear search through the breakpoints array :(
   for (size_t i = 0; i < ctx->count; i++) {
     if (ctx->breakpoints[i].active && ctx->breakpoints[i].kaddr == kaddr) {
-      log_debug("Found breakpoint at index %zu for address 0x%" PRIx64, i,
-                kaddr);
+      log_debug(
+          "INTERRUPT_CONTEXT: Found breakpoint at index %zu for address "
+          "0x%" PRIx64,
+          i, kaddr);
       return &ctx->breakpoints[i];
     }
   }
 
-  log_debug("No breakpoint found at 0x%" PRIx64, kaddr);
+  log_debug("INTERRUPT_CONTEXT: No breakpoint found at 0x%" PRIx64, kaddr);
   return NULL;
 }
 
@@ -149,7 +153,7 @@ static event_response_t handle_ebpf_breakpoint(vmi_instance_t vmi,
                                                breakpoint_entry_t* breakpoint) {
   ebpf_probe_ctx_t* ctx = (ebpf_probe_ctx_t*)breakpoint->type_specific_data;
   if (!ctx) {
-    log_error("Missing eBPF context data.");
+    log_error("INTERRUPT_CONTEXT: Missing eBPF context data.");
     return VMI_EVENT_RESPONSE_NONE;
   }
 
@@ -177,7 +181,7 @@ static event_response_t handle_netfilter_breakpoint(
     vmi_instance_t vmi, vmi_event_t* event, breakpoint_entry_t* breakpoint) {
   nf_bp_ctx_t* ctx = (nf_bp_ctx_t*)breakpoint->type_specific_data;
   if (!ctx) {
-    log_error("Missing netfilter context data.");
+    log_error("INTERRUPT_CONTEXT: Missing netfilter context data.");
     return VMI_EVENT_RESPONSE_NONE;
   }
 
@@ -208,7 +212,7 @@ static event_response_t handle_io_uring_breakpoint(
   // but we need to populate it with the breakpoint info
   io_uring_bp_ctx_t* ctx = (io_uring_bp_ctx_t*)breakpoint->type_specific_data;
   if (!ctx) {
-    log_error("Missing io_uring context data.");
+    log_error("INTERRUPT_CONTEXT: Missing io_uring context data.");
     return VMI_EVENT_RESPONSE_NONE;
   }
 
@@ -228,13 +232,14 @@ static event_response_t handle_io_uring_breakpoint(
 event_response_t interrupt_context_global_callback(vmi_instance_t vmi,
                                                    vmi_event_t* event) {
   if (!vmi || !event) {
-    log_error("Invalid arguments to global interrupt callback");
+    log_error(
+        "INTERRUPT_CONTEXT: Invalid arguments to global interrupt callback");
     return VMI_EVENT_INVALID;
   }
 
   interrupt_context_t* ctx = (interrupt_context_t*)event->data;
   if (!ctx) {
-    log_error("No interrupt context in event data");
+    log_error("INTERRUPT_CONTEXT: No interrupt context in event data");
     return VMI_EVENT_INVALID;
   }
 
@@ -296,7 +301,8 @@ int interrupt_context_remove_breakpoint(interrupt_context_t* ctx,
 
   // Restore original add
   if (vmi_write_8_va(vmi, kaddr, 0, &breakpoint->orig_byte) != VMI_SUCCESS) {
-    log_warn("Failed to restore original byte at 0x%" PRIx64, kaddr);
+    log_warn("INTERRUPT_CONTEXT: Failed to restore original byte at 0x%" PRIx64,
+             kaddr);
     return -1;
   }
 

@@ -597,7 +597,7 @@ uint32_t state_network_trace_callback(vmi_instance_t vmi, void* context) {
         "STATE_NETWORK_TRACE: Callback requires a valid event handler context");
   }
 
-  log_info("Executing STATE_NETWORK_TRACE_CALLBACK callback.");
+  log_info("Executing STATE_NETWORK_TRACE callback.");
 
   // Create network trace state data structure
   network_trace_state_data_t* network_data = network_trace_state_data_new();
@@ -697,7 +697,6 @@ uint32_t state_network_trace_callback(vmi_instance_t vmi, void* context) {
   // Clean up detection context
   cleanup_detection_context(&detection_context);
 
-  // Queue success response
   int result = log_success_and_queue_response_task(
       "network_trace_state", STATE_NETWORK_TRACE, network_data,
       (void (*)(void*))network_trace_state_data_free);

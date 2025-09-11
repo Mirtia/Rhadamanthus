@@ -1,6 +1,6 @@
 /**
  * @file io_uring_artifacts.h
- * @brief Inspects io_uring artifacts in the kernel.
+ * @brief This file contains the callback function to inspect io_uring artifacts in the kernel.
  * @version 0.0
  * @date 2025-08-24
  * 

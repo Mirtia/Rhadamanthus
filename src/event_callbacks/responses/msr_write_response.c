@@ -47,6 +47,7 @@ bool msr_needs_further_investigation(uint64_t msr_index) {
   }
 }
 
+// NOLINTNEXTLINE
 msr_write_data_t* msr_write_data_new(uint32_t vcpu_id, uint64_t rip,
                                      uint64_t rsp, uint64_t cr3,
                                      uint64_t msr_index, uint64_t msr_value) {

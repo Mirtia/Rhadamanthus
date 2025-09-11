@@ -1,6 +1,6 @@
 /**
  * @file process_list.h
- * @brief Inspect the process list.
+ * @brief This file contains the callback function to list processes.
  * @version 0.0
  * @date 2025-08-10
  * 

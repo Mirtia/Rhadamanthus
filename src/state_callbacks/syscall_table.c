@@ -180,12 +180,10 @@ uint32_t state_syscall_table_callback(vmi_instance_t vmi, void* context) {
       syscall_hit_count++;
     }
 
-    // Add syscall information to data structure
     syscall_table_state_add_syscall(syscall_data, (uint32_t)i, sys_index[i],
                                     sys_call_addr, is_hooked);
   }
 
-  // Set summary information
   syscall_table_state_set_summary(syscall_data, syscall_hit_count);
 
   if (syscall_hit_count > 0) {
@@ -195,10 +193,8 @@ uint32_t state_syscall_table_callback(vmi_instance_t vmi, void* context) {
     log_info("STATE_SYSCALL_TABLE: No hooked syscalls detected.");
   }
 
-  // Clean up temporary data
   cleanup_sys_index(sys_index, syscall_number);
 
-  // Queue success response
   int result = log_success_and_queue_response_task(
       "syscall_table_state", STATE_SYSCALL_TABLE, syscall_data,
       (void (*)(void*))syscall_table_state_data_free);
