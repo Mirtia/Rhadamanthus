@@ -1,7 +1,18 @@
 #include "json_serializer.h"
 #include <log.h>
+#include "event_callbacks/responses/code_section_modify_response.h"
 #include "event_callbacks/responses/cr0_write_response.h"
+#include "event_callbacks/responses/ebpf_probe_response.h"
+#include "event_callbacks/responses/ftrace_hook_response.h"
+#include "event_callbacks/responses/idt_write_response.h"
+#include "event_callbacks/responses/io_uring_ring_write_response.h"
+#include "event_callbacks/responses/kallsyms_table_write_response.h"
+#include "event_callbacks/responses/msr_write_response.h"
+#include "event_callbacks/responses/netfilter_hook_write_response.h"
+#include "event_callbacks/responses/page_table_modification_response.h"
+#include "event_callbacks/responses/syscall_table_write_response.h"
 #include "event_handler.h"
+#include "state_callbacks/responses/idt_table_response.h"
 
 // Global serializer for event callback access
 static json_serializer_t* g_serializer = NULL;
@@ -319,29 +330,204 @@ cJSON* response_to_json(const struct response* response) {
     if (response->metadata && response->metadata->task_type == EVENT) {
       event_task_id_t event_id =
           (event_task_id_t)(uintptr_t)response->metadata->subtype;
-      if (event_id == EVENT_CR0_WRITE) {
-        cr0_write_data_t* cr0_data = (cr0_write_data_t*)response->data;
-        cJSON* cr0_data_json = cr0_write_data_to_json(cr0_data);
-        if (cr0_data_json) {
-          cJSON_AddItemToObject(data_json, "cr0_write", cr0_data_json);
+      switch (event_id) {
+        case EVENT_CR0_WRITE: {
+          cr0_write_data_t* cr0_data = (cr0_write_data_t*)response->data;
+          cJSON* cr0_data_json = cr0_write_data_to_json(cr0_data);
+          if (cr0_data_json) {
+            cJSON_AddItemToObject(data_json, "cr0_write", cr0_data_json);
+          } else {
+            cJSON_AddStringToObject(data_json, "note",
+                                    "Failed to convert CR0 data to JSON");
+          }
+          break;
+        }
+        case EVENT_CODE_SECTION_MODIFY: {
+          code_section_modify_data_t* code_section_data =
+              (code_section_modify_data_t*)response->data;
+          cJSON* code_section_data_json =
+              code_section_modify_data_to_json(code_section_data);
+          if (code_section_data_json) {
+            cJSON_AddItemToObject(data_json, "code_section_modify",
+                                  code_section_data_json);
+          } else {
+            cJSON_AddStringToObject(
+                data_json, "note",
+                "Failed to convert code section modify data to JSON");
+          }
+          break;
+        }
+        case EVENT_IDT_WRITE: {
+          idt_write_data_t* idt_data = (idt_write_data_t*)response->data;
+          cJSON* idt_data_json = idt_write_data_to_json(idt_data);
+          if (idt_data_json) {
+            cJSON_AddItemToObject(data_json, "idt_write", idt_data_json);
+          } else {
+            cJSON_AddStringToObject(data_json, "note",
+                                    "Failed to convert IDT write data to JSON");
+          }
+          break;
+        }
+        case EVENT_SYSCALL_TABLE_WRITE: {
+          syscall_table_write_data_t* syscall_table_data =
+              (syscall_table_write_data_t*)response->data;
+          cJSON* syscall_table_data_json =
+              syscall_table_write_data_to_json(syscall_table_data);
+          if (syscall_table_data_json) {
+            cJSON_AddItemToObject(data_json, "syscall_table_write",
+                                  syscall_table_data_json);
+          } else {
+            cJSON_AddStringToObject(
+                data_json, "note",
+                "Failed to convert syscall table write data to JSON");
+          }
+          break;
+        }
+        case EVENT_KALLSYMS_TABLE_WRITE: {
+          kallsyms_table_write_data_t* kallsyms_table_data =
+              (kallsyms_table_write_data_t*)response->data;
+          cJSON* kallsyms_table_data_json =
+              kallsyms_table_write_data_to_json(kallsyms_table_data);
+          if (kallsyms_table_data_json) {
+            cJSON_AddItemToObject(data_json, "kallsyms_table_write",
+                                  kallsyms_table_data_json);
+          } else {
+            cJSON_AddStringToObject(
+                data_json, "note",
+                "Failed to convert kallsyms table write data to JSON");
+          }
+          break;
+        }
+        case EVENT_MSR_WRITE: {
+          msr_write_data_t* msr_data = (msr_write_data_t*)response->data;
+          cJSON* msr_data_json = msr_write_data_to_json(msr_data);
+          if (msr_data_json) {
+            cJSON_AddItemToObject(data_json, "msr_write", msr_data_json);
+          } else {
+            cJSON_AddStringToObject(data_json, "note",
+                                    "Failed to convert MSR write data to JSON");
+          }
+          break;
+        }
+        case EVENT_FTRACE_HOOK: {
+          ftrace_hook_data_t* ftrace_data = (ftrace_hook_data_t*)response->data;
+          cJSON* ftrace_data_json = ftrace_hook_data_to_json(ftrace_data);
+          if (ftrace_data_json) {
+            cJSON_AddItemToObject(data_json, "ftrace_hook", ftrace_data_json);
+          } else {
+            cJSON_AddStringToObject(
+                data_json, "note",
+                "Failed to convert ftrace hook data to JSON");
+          }
+          break;
+        }
+        case EVENT_PAGE_TABLE_MODIFICATION: {
+          page_table_modification_data_t* page_table_data =
+              (page_table_modification_data_t*)response->data;
+          cJSON* page_table_data_json =
+              page_table_modification_data_to_json(page_table_data);
+          if (page_table_data_json) {
+            cJSON_AddItemToObject(data_json, "page_table_modification",
+                                  page_table_data_json);
+          } else {
+            cJSON_AddStringToObject(
+                data_json, "note",
+                "Failed to convert page table modification data to JSON");
+          }
+          break;
+        }
+        default:
+          cJSON_AddStringToObject(data_json, "note",
+                                  "No specific data handler for this event");
+          break;
+      }
+    } else if (response->metadata &&
+               response->metadata->task_type == INTERRUPT) {
+      interrupt_task_id_t interrupt_id =
+          (interrupt_task_id_t)(uintptr_t)response->metadata->subtype;
+      switch (interrupt_id) {
+        case INTERRUPT_NETFILTER_HOOK_WRITE: {
+          netfilter_hook_write_data_t* netfilter_data =
+              (netfilter_hook_write_data_t*)response->data;
+          if (netfilter_data) {
+            cJSON* netfilter_data_json =
+                netfilter_hook_write_data_to_json(netfilter_data);
+            if (netfilter_data_json) {
+              cJSON_AddItemToObject(data_json, "netfilter_hook_write",
+                                    netfilter_data_json);
+            } else {
+              cJSON_AddStringToObject(
+                  data_json, "note",
+                  "Failed to convert netfilter hook write data to JSON");
+            }
+          }
+          break;
+        }
+        case INTERRUPT_IO_URING_RING_WRITE: {
+          io_uring_ring_write_data_t* io_uring_data =
+              (io_uring_ring_write_data_t*)response->data;
+          cJSON* io_uring_data_json =
+              io_uring_ring_write_data_to_json(io_uring_data);
+          if (io_uring_data_json) {
+            cJSON_AddItemToObject(data_json, "io_uring_ring_write",
+                                  io_uring_data_json);
+          } else {
+            cJSON_AddStringToObject(
+                data_json, "note",
+                "Failed to convert io_uring ring write data to JSON");
+          }
+          break;
+        }
+        case INTERRUPT_EBPF_PROBE: {
+          ebpf_probe_data_t* ebpf_data = (ebpf_probe_data_t*)response->data;
+          cJSON* ebpf_data_json = ebpf_probe_data_to_json(ebpf_data);
+          if (ebpf_data_json) {
+            cJSON_AddItemToObject(data_json, "ebpf_probe", ebpf_data_json);
+          } else {
+            cJSON_AddStringToObject(
+                data_json, "note", "Failed to convert ebpf probe data to JSON");
+          }
+          break;
+        }
+        default:
+          cJSON_AddStringToObject(
+              data_json, "note", "No specific data handler for this interrupt");
+          break;
+      }
+    } else if (response->metadata && response->metadata->task_type == STATE) {
+
+      state_task_id_t state_id =
+          (state_task_id_t)(uintptr_t)response->metadata->subtype;
+      if (state_id == STATE_IDT_TABLE) {
+        idt_table_state_data_t* idt_data =
+            (idt_table_state_data_t*)response->data;
+        cJSON* idt_data_json = idt_table_state_data_to_json(idt_data);
+        if (idt_data_json) {
+          cJSON_AddItemToObject(data_json, "idt_table", idt_data_json);
         } else {
-          cJSON_AddStringToObject(data_json, "_note",
-                                  "Failed to convert CR0 data to JSON");
+          cJSON* idt_data_json = idt_table_state_data_to_json(idt_data);
+          if (idt_data_json) {
+            cJSON_AddItemToObject(data_json, "idt_table", idt_data_json);
+          } else {
+            cJSON_AddStringToObject(data_json, "note",
+                                    "Failed to convert IDT table data to JSON");
+          }
         }
       }
     }
-
     cJSON_AddItemToObject(json, "data", data_json);
+
+    if (response->error) {
+      cJSON* error_json = cJSON_CreateObject();
+      cJSON_AddNumberToObject(error_json, "code", response->error->code);
+      cJSON_AddStringToObject(error_json, "message", response->error->message);
+      cJSON_AddItemToObject(json, "error", error_json);
+    }
+
+    return json;
   }
 
-  if (response->error) {
-    cJSON* error_json = cJSON_CreateObject();
-    cJSON_AddNumberToObject(error_json, "code", response->error->code);
-    cJSON_AddStringToObject(error_json, "message", response->error->message);
-    cJSON_AddItemToObject(json, "error", error_json);
-  }
-
-  return json;
+  return NULL;
 }
 
 int json_serializer_drain_queue(json_serializer_t* serializer) {
