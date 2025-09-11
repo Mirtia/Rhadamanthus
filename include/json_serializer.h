@@ -1,7 +1,7 @@
 /**
  * @file json_serializer.h
  * @brief Header for JSON serializer to serialize responses to individual files.
- * @version 0.1
+ * @version 0.0
  * @date 2025-09-11
  * 
  * @copyright Copyright (c) 2025

@@ -1,8 +1,7 @@
 /**
  * @file netfilter_hook_write_response.h
- * @author your name (you@domain.com)
- * @brief 
- * @version 0.1
+ * @brief Response structure and functions for netfilter hook write events. 
+ * @version 0.0
  * @date 2025-09-11
  * 
  * @copyright Copyright (c) 2025

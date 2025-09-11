@@ -4,7 +4,7 @@
  * @version 0.0
  * @date 2025-09-09
  * 
- * @copyright  GNU Lesser General Public License v2.1
+ * @copyright GNU Lesser General Public License v2.1
  */
 
 #ifndef CODE_SECTION_MODIFY_RESPONSE_H
@@ -15,6 +15,26 @@
 #include <libvmi/libvmi.h>
 #include <stdbool.h>
 #include <stdint.h>
+
+/**
+ * ─────────────────────────────────────────────
+ * JSON Response Structure (code_section_modify_response)
+ * ─────────────────────────────────────────────
+ * {
+ *   "event": "CODE_SECTION_MODIFY",
+ *   "vcpu_id": 0,
+ *   "regs": {
+ *     "rip": "0xfffff80000010234",
+ *     "rsp": "0xfffff8000010ff00",
+ *     "cr3": "0x0000000123456000"
+ *   },
+ *   "memory": {
+ *     "write_gla": "0xfffff80000234567",
+ *     "write_gpa": "0x0000000012345678"
+ *   },
+ *   "kernel_symbol": "sys_call_table"
+ * }
+ */
 
 /**
  * @brief The structure representing a code section modify event.

@@ -17,8 +17,8 @@ find_package(OpenSSL REQUIRED)
 
 file(GLOB STATE_CALLBACKS "src/state_callbacks/*.c")
 file(GLOB EVENT_CALLBACKS "src/event_callbacks/*.c")
-file(GLOB RESPONSES "src/state_callbacks/responses/*.c")
-file(GLOB RESPONSES "src/event_callbacks/responses/*.c")
+file(GLOB STATE_RESPONSES "src/state_callbacks/responses/*.c")
+file(GLOB EVENT_RESPONSES "src/event_callbacks/responses/*.c")
 
 add_library(vmi_event_handler STATIC
     src/event_handler.c
@@ -29,7 +29,8 @@ add_library(vmi_event_handler STATIC
     src/utils.c
     src/interrupt_context.c
     src/response.c
-    ${RESPONSES}
+    ${STATE_RESPONSES}
+    ${EVENT_RESPONSES}
     ${STATE_CALLBACKS}
     ${EVENT_CALLBACKS}
 )

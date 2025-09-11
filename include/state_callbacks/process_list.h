@@ -1,6 +1,5 @@
 /**
  * @file process_list.h
-
  * @brief Inspect the process list.
  * @version 0.0
  * @date 2025-08-10

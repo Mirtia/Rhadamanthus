@@ -1,11 +1,10 @@
 /**
  * @file kallsyms_table_write_response.h
- * @author your name (you@domain.com)
- * @brief 
- * @version 0.1
+ * @brief Response structure and functions for kallsyms table write events.
+ * @version 0.0
  * @date 2025-09-11
  * 
- * @copyright Copyright (c) 2025
+ * @copyright GNU Lesser General Public License v2.1
  * 
  */
 #ifndef KALLSYMS_TABLE_WRITE_RESPONSE_H

@@ -1,7 +1,7 @@
 /**
  * @file idt_write_response.h
  * @brief Response structure for IDT write events.
- * @version 0.1
+ * @version 0.0
  * @date 2025-09-11
  * 
  * @copyright GNU Lesser General Public License v2.1

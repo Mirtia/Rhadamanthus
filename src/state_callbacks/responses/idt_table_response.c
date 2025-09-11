@@ -1,6 +1,97 @@
 #include "state_callbacks/responses/idt_table_response.h"
 #include <log.h>
+#include <stdio.h>
+#include <string.h>
 #include "utils.h"
+
+idt_table_state_data_t* idt_table_state_data_new(void) {
+  idt_table_state_data_t* data = g_malloc0(sizeof(*data));
+  if (!data) {
+    log_error("Failed to allocate memory for IDT table state data.");
+    return NULL;
+  }
+
+  data->vcpu_infos = g_array_new(FALSE, FALSE, sizeof(vcpu_idt_info_t));
+  data->handlers = g_array_new(FALSE, FALSE, sizeof(idt_handler_info_t));
+
+  if (!data->vcpu_infos || !data->handlers) {
+    idt_table_state_data_free(data);
+    log_error("Failed to allocate arrays for IDT table state data.");
+    return NULL;
+  }
+
+  return data;
+}
+
+void idt_table_state_set_kernel_range(idt_table_state_data_t* data,
+                                      uint64_t kernel_start,
+                                      uint64_t kernel_end) {
+  if (!data)
+    return;
+  data->kernel_start = kernel_start;
+  data->kernel_end = kernel_end;
+}
+
+void idt_table_state_add_vcpu_info(idt_table_state_data_t* data,
+                                   uint32_t vcpu_id, uint64_t idt_base) {
+  if (!data || !data->vcpu_infos)
+    return;
+
+  vcpu_idt_info_t info = {.vcpu_id = vcpu_id, .idt_base = idt_base};
+
+  g_array_append_val(data->vcpu_infos, info);
+}
+
+void idt_table_state_add_hooked_handler(idt_table_state_data_t* data,
+                                        uint32_t vcpu_id, uint16_t vector,
+                                        const char* name,
+                                        uint64_t handler_address,
+                                        bool is_hooked) {
+  if (!data || !data->handlers)
+    return;
+
+  idt_handler_info_t handler = {
+      .vcpu_id = vcpu_id,
+      .vector = vector,
+      .name = name ? g_strdup(name) : g_strdup("unknown"),
+      .handler_address = handler_address,
+      .is_hooked = is_hooked};
+
+  g_array_append_val(data->handlers, handler);
+}
+
+void idt_table_state_set_summary(idt_table_state_data_t* data, int total_hooked,
+                                 bool vcpu_inconsistency) {
+  if (!data)
+    return;
+  data->total_hooked = total_hooked;
+  data->vcpu_inconsistency = vcpu_inconsistency;
+}
+
+void idt_table_state_data_free(idt_table_state_data_t* data) {
+  if (!data) {
+    log_warn("Attempted to free NULL idt_table_state_data_t pointer.");
+    return;
+  }
+
+  if (data->handlers) {
+    // Free handler name strings
+    for (guint i = 0; i < data->handlers->len; i++) {
+      idt_handler_info_t* handler =
+          &g_array_index(data->handlers, idt_handler_info_t, i);
+      if (handler->name) {
+        g_free(handler->name);
+      }
+    }
+    g_array_free(data->handlers, TRUE);
+  }
+
+  if (data->vcpu_infos) {
+    g_array_free(data->vcpu_infos, TRUE);
+  }
+
+  g_free(data);
+}
 
 cJSON* idt_table_state_data_to_json(const idt_table_state_data_t* data) {
   if (!data) {

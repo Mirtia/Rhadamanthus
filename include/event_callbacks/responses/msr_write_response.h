@@ -1,10 +1,10 @@
 /**
  * @file msr_write_response.h
- * @brief 
- * @version 0.1
+ * @brief Response structure and functions for MSR write events.
+ * @version 0.0
  * @date 2025-09-11
  * 
- * @copyright Copyright (c) 2025
+ * @copyright GNU Lesser General Public License v2.1
  * 
  */
 #ifndef MSR_WRITE_RESPONSE_H

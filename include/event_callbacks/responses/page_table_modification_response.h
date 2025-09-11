@@ -1,8 +1,7 @@
 /**
  * @file page_table_modification_response.h
-
- * @brief 
- * @version 0.1
+ * @brief Response structure and functions for page table modification events.
+ * @version 0.0
  * @date 2025-09-11
  * 
  * @copyright GNU Lesser General Public License v2.1
