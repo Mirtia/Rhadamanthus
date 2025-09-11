@@ -1,6 +1,5 @@
 /**
  * @file idt_table.h
- * @author Myrsini Gkolemi
  * @brief Inspect IDT entries and log handlers outside kernel text.
  * @version 0.0
  * @date 2025-08-10

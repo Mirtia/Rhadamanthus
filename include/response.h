@@ -1,6 +1,5 @@
 /**
  * @file response.h
- * @author Myrsini Gkolemi
  * @brief The file with the generic response schema.
  * @version 0.0
  * @date 2025-09-06

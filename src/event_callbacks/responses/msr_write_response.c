@@ -62,7 +62,6 @@ msr_write_data_t* msr_write_data_new(uint32_t vcpu_id, uint64_t rip,
   data->cr3 = cr3;
   data->msr_index = msr_index;
   data->msr_value = msr_value;
-  data->note = msr_needs_further_investigation(msr_index);
 
   const char* name = msr_get_name(msr_index);
   if (name) {
@@ -134,8 +133,6 @@ cJSON* msr_write_data_to_json(const msr_write_data_t* data) {
   } else {
     cJSON_AddStringToObject(msr, "name", "unknown");
   }
-
-  cjson_add_bool(msr, "note", data->note);
 
   return root;
 }

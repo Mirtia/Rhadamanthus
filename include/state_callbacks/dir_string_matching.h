@@ -1,3 +1,12 @@
+/**
+ * @file dir_string_matching.h
+ * @brief The file contains the callback function to detect potentially hidden or known directories or files associated with observed kernel-mode rootkits..
+ * @version 0.0
+ * @date 2025-09-11
+ * 
+ * @copyright GNU Lesser General Public License v2.1
+ * 
+ */
 #ifndef DIR_STRING_MATCHING_H
 #define DIR_STRING_MATCHING_H
 

@@ -1,6 +1,5 @@
 /**
  * @file page_table_modification.h
- * @author Myrsini Gkolemi
  * @brief This file monitors the page table modifications by tracking changes in the PML4 entries.
  * @version 0.0
  * @date 2025-08-24

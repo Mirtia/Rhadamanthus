@@ -1,6 +1,6 @@
 /**
  * @file ebpf_probe_response.h
- * @brief Response structure and functions for eBPF probe events
+ * @brief Response structure and functions for eBPF probe events.
  * @version 0.0
  * @date 2025-09-09
  * 
@@ -20,39 +20,39 @@
  * @brief Structure to hold eBPF probe event data
  */
 typedef struct {
-  uint32_t vcpu_id;  ///< Virtual CPU identifier where the event occurred
-  uint64_t rip;      ///< Instruction pointer register value
-  uint64_t rsp;      ///< Stack pointer register value
-  uint64_t cr3;      ///< Control register 3 value (page table base)
-  vmi_pid_t pid;     ///< Process identifier (0 if unknown)
-  addr_t kaddr;      ///< Kernel address where the probe was inserted
-  char* symname;     ///< Function name being probed (can be NULL)
-  char* probe_type;  ///< Type of probe (kprobe, uprobe, bpf_prog, tracepoint)
+  uint32_t vcpu_id;  ///< Virtual CPU identifier where the event occurred.
+  uint64_t rip;      ///< Instruction pointer register value.
+  uint64_t rsp;      ///< Stack pointer register value.
+  uint64_t cr3;      ///< CR3 value (page table base).
+  vmi_pid_t pid;     ///< Process identifier (0 if unknown).
+  addr_t kaddr;      ///< Kernel address where the probe was inserted.
+  char* symname;     ///< Function name being probed (may be NULL).
+  char* probe_type;  ///< Type of probe (kprobe, uprobe, bpf_prog, tracepoint).
   char*
-      target_symbol;  ///< Target symbol name for kprobe/kretprobe (can be NULL)
-  addr_t target_addr;  ///< Target address for kprobe/kretprobe (0 if unknown)
+      target_symbol;  ///< Target symbol name for kprobe/kretprobe (may be NULL).
+  addr_t target_addr;  ///< Target address for kprobe/kretprobe (0 if unknown).
   uint32_t
-      attach_type;  ///< BPF attach type for bpf_prog probes (0 if not applicable)
+      attach_type;  ///< BPF attach type for bpf_prog probes (0 if not applicable).
   char*
-      tracepoint_name;  ///< Tracepoint name for tracepoint probes (can be NULL)
+      tracepoint_name;  ///< Tracepoint name for tracepoint probes (may be NULL).
 } ebpf_probe_data_t;
 
 /**
  * @brief Create a new eBPF probe data structure
  * 
- * @param vcpu_id Virtual CPU identifier
- * @param rip Instruction pointer register value
- * @param rsp Stack pointer register value
- * @param cr3 Control register 3 value
- * @param pid Process identifier
- * @param kaddr Kernel address of the probe
- * @param symname Symbol name being probed
- * @param probe_type Type of probe (kprobe, uprobe, bpf_prog, etc.)
- * @param target_symbol Target symbol name (can be NULL)
- * @param target_addr Target address (can be 0)
- * @param attach_type BPF attach type (can be 0)
- * @param tracepoint_name Tracepoint name (can be NULL)
- * @return ebpf_probe_data_t* Pointer to allocated structure or NULL on failure
+ * @param vcpu_id Virtual CPU identifier.
+ * @param rip Instruction pointer register value.
+ * @param rsp Stack pointer register value.
+ * @param cr3 CR3 value.
+ * @param pid Process identifier.
+ * @param kaddr Kernel address of the probe.
+ * @param symname Symbol name being probed.
+ * @param probe_type Type of probe (kprobe, uprobe, bpf_prog, etc.).
+ * @param target_symbol Target symbol name (may be NULL).
+ * @param target_addr Target address (may be 0).
+ * @param attach_type BPF attach type (may be 0).
+ * @param tracepoint_name Tracepoint name (may be NULL).
+ * @return ebpf_probe_data_t* Pointer to allocated structure or NULL on failure.
  */
 ebpf_probe_data_t* ebpf_probe_data_new(
     uint32_t vcpu_id, uint64_t rip, uint64_t rsp, uint64_t cr3, vmi_pid_t pid,
@@ -61,17 +61,17 @@ ebpf_probe_data_t* ebpf_probe_data_new(
     const char* tracepoint_name);
 
 /**
- * @brief Free eBPF probe data structure
+ * @brief Free eBPF probe data structure.
  * 
- * @param data Pointer to the structure to free
+ * @param data Pointer to the structure to free.
  */
 void ebpf_probe_data_free(ebpf_probe_data_t* data);
 
 /**
- * @brief Convert eBPF probe data to JSON representation
+ * @brief Convert eBPF probe data to JSON representation.
  * 
- * @param data Pointer to the data structure
- * @return cJSON* JSON object or NULL on failure
+ * @param data Pointer to the data structure.
+ * @return cJSON* JSON object or NULL on failure.
  */
 cJSON* ebpf_probe_data_to_json(const ebpf_probe_data_t* data);
 

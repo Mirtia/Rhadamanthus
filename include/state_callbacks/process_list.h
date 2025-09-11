@@ -1,6 +1,6 @@
 /**
  * @file process_list.h
- * @author Myrsini Gkolemi
+
  * @brief Inspect the process list.
  * @version 0.0
  * @date 2025-08-10

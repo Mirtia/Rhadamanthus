@@ -1,7 +1,6 @@
 /**
  * @file ebpf_artifacts.h
- * @author Myrsini Gkolemi
- * @brief TThis file contains the callback function to detect eBPF artifacts.
+ * @brief This file contains the callback function to detect eBPF artifacts.
  * @version 0.0
  * @date 2025-09-01
  * 

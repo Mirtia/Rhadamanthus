@@ -1,6 +1,6 @@
 #include "state_callbacks/idt_table.h"
 
-#include <glib-2.0/glib.h>
+#include <glib.h>
 #include <inttypes.h>
 #include <log.h>
 #include <stdbool.h>
@@ -8,7 +8,10 @@
 #include <stdio.h>
 #include <string.h>
 #include "event_handler.h"
+#include "json_serializer.h"
+#include "state_callbacks/responses/idt_table_response.h"
 #include "utils.h"
+
 /**
  * @brief Parse a decimal unsigned integer in the range [0, 255] from the start of a string.
  *
@@ -224,12 +227,14 @@ static bool read_idt_entry_addr_ia32(vmi_instance_t vmi, addr_t idt_base,
  * @param kernel_start_addr Start of kernel text section
  * @param kernel_end_addr End of kernel text section
  * @param vec_names Array of interrupt vector names
+ * @param idt_data IDT state data to populate
  * @return Number of hooked handlers detected
  */
 static int check_idt_for_vcpu(vmi_instance_t vmi,
                               //NOLINTNEXTLINE
                               unsigned int vcpu_id, addr_t kernel_start_addr,
-                              addr_t kernel_end_addr, GPtrArray* vec_names) {
+                              addr_t kernel_end_addr, GPtrArray* vec_names,
+                              idt_table_state_data_t* idt_data) {
   // Read IDTR base from specific vCPU
   addr_t idt_base = 0;
   if (vmi_get_vcpureg(vmi, &idt_base, IDTR_BASE, vcpu_id) != VMI_SUCCESS) {
@@ -238,6 +243,9 @@ static int check_idt_for_vcpu(vmi_instance_t vmi,
   }
 
   log_debug("IDTR base (vCPU %u): 0x%" PRIx64, vcpu_id, (uint64_t)idt_base);
+
+  // Store vCPU info
+  idt_table_state_add_vcpu_info(idt_data, vcpu_id, idt_base);
 
   const bool ia32e = (vmi_get_page_mode(vmi, vcpu_id) == VMI_PM_IA32E);
   const uint16_t gate_size = ia32e ? 16 : 8;
@@ -271,10 +279,18 @@ static int check_idt_for_vcpu(vmi_instance_t vmi,
             "vCPU %u: Interrupt handler %s (vector %u) address changed to "
             "0x%" PRIx64,
             vcpu_id, name, vec, (uint64_t)handler);
+
+        // Add hooked handler to data structure
+        idt_table_state_add_hooked_handler(idt_data, vcpu_id, vec, name,
+                                           handler, true);
         hooked++;
       } else {
         log_debug("vCPU %u: Vector %u (%s) handler at 0x%" PRIx64, vcpu_id, vec,
                   name, (uint64_t)handler);
+
+        // Add normal handler to data structure
+        idt_table_state_add_hooked_handler(idt_data, vcpu_id, vec, name,
+                                           handler, false);
       }
     }
   }
@@ -285,22 +301,40 @@ static int check_idt_for_vcpu(vmi_instance_t vmi,
 uint32_t state_idt_table_callback(vmi_instance_t vmi, void* context) {
   // Preconditions
   if (!vmi || !context) {
-    log_error(
+    return log_error_and_queue_response_task(
+        "idt_table_state", STATE_IDT_TABLE, INVALID_ARGUMENTS,
         "STATE_IDT_TABLE: Invalid arguments to IDT table state callback.");
-    return VMI_FAILURE;
   }
 
   event_handler_t* event_handler = (event_handler_t*)context;
   if (!event_handler || !event_handler->is_paused) {
-    log_error("STATE_IDT_TABLE: Callback requires a paused VM instance.");
-    return VMI_FAILURE;
+    return log_error_and_queue_response_task(
+        "idt_table_state", STATE_IDT_TABLE, INVALID_ARGUMENTS,
+        "STATE_IDT_TABLE: Callback requires a valid event handler context.");
   }
 
   log_info("Executing STATE_IDT_TABLE callback.");
 
+  // Create IDT state data structure
+  idt_table_state_data_t* idt_data = idt_table_state_data_new();
+  if (!idt_data) {
+    return log_error_and_queue_response_task(
+        "idt_table_state", STATE_IDT_TABLE, MEMORY_ALLOCATION_FAILURE,
+        "STATE_IDT_TABLE: Failed to allocate memory for IDT state data.");
+  }
+
   // Resolve kernel text bounds
   addr_t kernel_start_addr = 0, kernel_end_addr = 0;
-  get_kernel_text_section_range(vmi, &kernel_start_addr, &kernel_end_addr);
+  if (get_kernel_text_section_range(vmi, &kernel_start_addr,
+                                    &kernel_end_addr) != VMI_SUCCESS) {
+    idt_table_state_data_free(idt_data);
+    return log_error_and_queue_response_task(
+        "idt_table_state", STATE_IDT_TABLE, VMI_OP_FAILURE,
+        "STATE_IDT_TABLE: Failed to resolve kernel text section range.");
+  }
+
+  idt_table_state_set_kernel_range(idt_data, kernel_start_addr,
+                                   kernel_end_addr);
 
   log_info("STATE_IDT_TABLE: Kernel text range: [0x%" PRIx64 ", 0x%" PRIx64 "]",
            (uint64_t)kernel_start_addr, (uint64_t)kernel_end_addr);
@@ -308,10 +342,11 @@ uint32_t state_idt_table_callback(vmi_instance_t vmi, void* context) {
   // Get number of vCPUs
   unsigned int num_vcpus = vmi_get_num_vcpus(vmi);
   if (num_vcpus == 0) {
-    log_error(
+    idt_table_state_data_free(idt_data);
+    return log_error_and_queue_response_task(
+        "idt_table_state", STATE_IDT_TABLE, VMI_OP_FAILURE,
         "STATE_IDT_TABLE: Failed to get number of vCPUs or no vCPUs "
         "available.");
-    return VMI_FAILURE;
   }
 
   log_info("Checking IDT on %u vCPU(s).", num_vcpus);
@@ -319,7 +354,6 @@ uint32_t state_idt_table_callback(vmi_instance_t vmi, void* context) {
   // Load vector names (never NULL; defaults to "unknown")
   GPtrArray* vec_names = load_interrupt_index_table(INTERRUPT_INDEX_FILE);
   if (!vec_names || vec_names->len != 256) {
-    // Highly unexpected, but guard anyway
     log_warn(
         "STATE_IDT_TABLE: Interrupt index table not fully initialized; "
         "proceeding with "
@@ -330,10 +364,9 @@ uint32_t state_idt_table_callback(vmi_instance_t vmi, void* context) {
   bool vcpu_inconsistency = false;
   addr_t first_idt_base = 0;
 
-  // Check IDT on each vCPU
   for (unsigned int cpu = 0; cpu < num_vcpus; cpu++) {
     int hooked = check_idt_for_vcpu(vmi, cpu, kernel_start_addr,
-                                    kernel_end_addr, vec_names);
+                                    kernel_end_addr, vec_names, idt_data);
 
     if (hooked < 0) {
       log_warn("STATE_IDT_TABLE: Skipping vCPU %u due to IDT read failure.",
@@ -358,6 +391,9 @@ uint32_t state_idt_table_callback(vmi_instance_t vmi, void* context) {
     }
   }
 
+  // Set final state information
+  idt_table_state_set_summary(idt_data, total_hooked, vcpu_inconsistency);
+
   if (total_hooked == 0) {
     log_info(
         "STATE_IDT_TABLE: No unexpected interrupt handler addresses detected.");
@@ -374,10 +410,14 @@ uint32_t state_idt_table_callback(vmi_instance_t vmi, void* context) {
         "targeted attack.");
   }
 
+  // Clean up vector names before returning
   if (vec_names) {
     g_ptr_array_free(vec_names, TRUE);
   }
 
   log_info("STATE_IDT_TABLE callback completed.");
-  return VMI_SUCCESS;
+
+  return log_success_and_queue_response_task(
+      "idt_table_state", STATE_IDT_TABLE, idt_data,
+      (void (*)(void*))idt_table_state_data_free);
 }

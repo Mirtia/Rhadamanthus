@@ -1,6 +1,5 @@
 /**
   * @file ebpf_probe.h
-  * @author Myrsini Gkolemi
   * @brief This file monitors eBPF probes.
   * @version 0.0
   * @date 2025-08-24

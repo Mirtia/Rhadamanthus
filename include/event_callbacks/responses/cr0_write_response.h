@@ -1,3 +1,12 @@
+/**
+ * @file cr0_write_response.h
+ * @brief Response structure and functions for CR0 write events.
+ * @version 0.0
+ * @date 2025-09-11
+ * 
+ * @copyright GNU Lesser General Public License v2.1
+ * 
+ */
 #ifndef CR0_WRITE_RESPONSE_H
 #define CR0_WRITE_RESPONSE_H
 
@@ -104,14 +113,5 @@ void cr0_decode_flags(uint64_t cr0, cr0_flags_t* out_flags);
  * @return Newly allocated cJSON object representing the data, or NULL on failure.
  */
 cJSON* cr0_write_data_to_json(const cr0_write_data_t* data);
-
-/**
- * @brief Add a uint64_t value to a cJSON object as a zero-padded hex string.
- *
- * @param parent Parent cJSON object.
- * @param key Key to use for the new field.
- * @param value Value to format as hex.
- */
-void cjson_add_hex_u64(cJSON* parent, const char* key, uint64_t value);
 
 #endif  // CR0_WRITE_RESPONSE_H

@@ -1,3 +1,13 @@
+/**
+ * @file syscall_table_write_response.h
+ * @author your name (you@domain.com)
+ * @brief 
+ * @version 0.1
+ * @date 2025-09-11
+ * 
+ * @copyright GNU Lesser General Public License v2.1
+ * 
+ */
 #ifndef SYSCALL_TABLE_WRITE_RESPONSE_H
 #define SYSCALL_TABLE_WRITE_RESPONSE_H
 

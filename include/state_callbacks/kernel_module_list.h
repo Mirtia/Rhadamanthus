@@ -1,6 +1,5 @@
 /**
  * @file kernel_module_list.h
- * @author Myrsini Gkolemi
  * @brief This file contains the callback function to list kernel modules.
  * @version 0.0
  * @date 2025-08-10

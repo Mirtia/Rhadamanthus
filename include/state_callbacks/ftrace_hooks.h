@@ -1,6 +1,5 @@
 /**
  * @file ftrace_hooks.h
- * @author Myrsini Gkolemi  
  * @brief This file contains the callback function to detect ftrace hooks.
  * @version 0.0
  * @date 2025-08-24

@@ -1,3 +1,12 @@
+/**
+ * @file idt_write_response.h
+ * @brief Response structure for IDT write events.
+ * @version 0.1
+ * @date 2025-09-11
+ * 
+ * @copyright GNU Lesser General Public License v2.1
+ * 
+ */
 #ifndef IDT_WRITE_RESPONSE_H
 #define IDT_WRITE_RESPONSE_H
 

@@ -1,6 +1,5 @@
 /**
  * @file kallsyms_symbols.h
- * @author Myrsini Gkolemi
  * @brief This file contains the callback function to enumerate kernel symbols from in-memory kallsyms arrays.
  * @version 0.0
  * @date 2025-08-24

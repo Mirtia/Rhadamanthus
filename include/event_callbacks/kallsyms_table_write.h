@@ -1,6 +1,5 @@
 /**
  * @file kallsyms_table_write.h
- * @author Myrsini Gkolemi
  * @brief The file monitors kernel symbols modifications.
  * @version 0.0
  * @date 2025-08-24

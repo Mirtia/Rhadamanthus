@@ -1,3 +1,12 @@
+/**
+ * @file ftrace_hook_response.h
+ * @brief Response structure and functions for ftrace hook events.
+ * @version 0.1
+ * @date 2025-09-11
+ * 
+ * @copyright Copyright (c) 2025
+ * 
+ */
 #ifndef FTRACE_HOOK_RESPONSE_H
 #define FTRACE_HOOK_RESPONSE_H
 

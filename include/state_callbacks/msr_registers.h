@@ -1,6 +1,5 @@
 /**
  * @file msr_registers.h
- * @author Myrsini Gkolemi
  * @brief Inspect if MSR register dispatcher is modified.
  * @version 0.0
  * @date 2025-08-21

@@ -1,3 +1,12 @@
+/**
+ * @file interrupt_context.h
+ * @brief The file defining the global interrupt context and breakpoint management. 
+ * @version 0.0
+ * @date 2025-09-11
+ * 
+ * @copyright GNU Lesser General Public License v2.1
+ * 
+ */
 #ifndef INTERRUPT_CONTEXT_H
 #define INTERRUPT_CONTEXT_H
 

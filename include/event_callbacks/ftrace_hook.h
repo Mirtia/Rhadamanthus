@@ -1,6 +1,5 @@
 /**
  * @file ftrace_hook.h
- * @author Myrsini Gkolemi
  * @brief This file monitors ftrace hook events.
  * @version 0.0
  * @date 2025-08-24

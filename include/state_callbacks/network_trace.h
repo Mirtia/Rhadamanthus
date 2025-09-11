@@ -1,6 +1,5 @@
 /**
  * @file network_trace.h
- * @author Myrsini Gkolemi
  * @brief This file contains the callback function to detect network hooks and suspicious network activities related to kernel-mode rootkits.
  * @version 0.0
  * @date 2025-08-24

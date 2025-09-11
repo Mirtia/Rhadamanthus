@@ -1,3 +1,13 @@
+/**
+ * @file page_table_modification_response.h
+
+ * @brief 
+ * @version 0.1
+ * @date 2025-09-11
+ * 
+ * @copyright GNU Lesser General Public License v2.1
+ * 
+ */
 #ifndef PAGE_TABLE_MODIFICATION_RESPONSE_H
 #define PAGE_TABLE_MODIFICATION_RESPONSE_H
 
@@ -47,21 +57,21 @@
  * @brief Flags for a page table entry.
  */
 typedef struct pt_entry_flags {
-  bool present;   ///< Page present bit
-  bool writable;  ///< Page writable bit
-  bool user;      ///< User-mode accessible bit
-  bool noexec;    ///< No-execute bit
+  bool present;   ///< Page present bit.
+  bool writable;  ///< Page writable bit.
+  bool user;      ///< User-mode accessible bit.
+  bool noexec;    ///< No-execute bit.
 } pt_entry_flags_t;
 
 /**
  * @brief Information about a single page table entry modification.
  */
 typedef struct pt_entry_modification {
-  uint32_t index;              ///< Index of the modified entry
-  uint64_t old_entry;          ///< Previous entry value
-  uint64_t new_entry;          ///< New entry value
-  pt_entry_flags_t old_flags;  ///< Decoded flags from old entry
-  pt_entry_flags_t new_flags;  ///< Decoded flags from new entry
+  uint32_t index;              ///< Index of the modified entry.
+  uint64_t old_entry;          ///< Previous entry value.
+  uint64_t new_entry;          ///< New entry value.
+  pt_entry_flags_t old_flags;  ///< Decoded flags from old entry.
+  pt_entry_flags_t new_flags;  ///< Decoded flags from new entry.
 } pt_entry_modification_t;
 
 /**

@@ -1,6 +1,5 @@
 /**
  * @file io_uring_artifacts.h
- * @author Myrsini Gkolemi
  * @brief Inspects io_uring artifacts in the kernel.
  * @version 0.0
  * @date 2025-08-24

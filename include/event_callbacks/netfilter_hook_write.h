@@ -1,6 +1,5 @@
 /**
  * @file netfilter_hook_write.h
- * @author Myrsini Gkolemi
  * @brief This file monitors netfilter hook registration events.
  * @version 0.0
  * @date 2025-08-24

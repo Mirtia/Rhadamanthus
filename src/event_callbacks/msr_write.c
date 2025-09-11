@@ -54,8 +54,7 @@ event_response_t event_msr_write_callback(vmi_instance_t vmi,
   // Check for security-relevant MSR writes
   const char* msr_name = msr_get_name(msr_index);
   if (msr_needs_further_investigation(msr_index)) {
-    log_warn("Security-relevant MSR write detected: %s (0x%" PRIx64
-             ") = 0x%" PRIx64,
+    log_warn("Suspicious MSR write detected: %s (0x%" PRIx64 ") = 0x%" PRIx64,
              msr_name ? msr_name : "unknown", msr_index, msr_value);
   }
 

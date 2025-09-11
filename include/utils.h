@@ -1,3 +1,12 @@
+/**
+ * @file utils.h
+ * @brief Utility functions for error handling, logging, and kernel memory operations.
+ * @version 0.0
+ * @date 2025-09-11
+ * 
+ * @copyright GNU Lesser General Public License v2.1
+ * 
+ */
 #ifndef UTILS_H
 #define UTILS_H
 #include <libvmi/events.h>

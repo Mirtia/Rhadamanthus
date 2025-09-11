@@ -10,7 +10,7 @@ ebpf_probe_data_t* ebpf_probe_data_new(
     uint32_t vcpu_id,     ///< Virtual CPU identifier where the event occurred
     uint64_t rip,         ///< Instruction pointer register value
     uint64_t rsp,         ///< Stack pointer register value
-    uint64_t cr3,         ///< Control register 3 value (page table base)
+    uint64_t cr3,         ///< CR3 value (page table base)
     vmi_pid_t pid,        ///< Process identifier (0 if unknown)
     addr_t kaddr,         ///< Kernel address where the probe was inserted
     const char* symname,  ///< Function name being probed (can be NULL)

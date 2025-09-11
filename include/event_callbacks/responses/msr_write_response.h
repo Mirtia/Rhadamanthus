@@ -1,3 +1,12 @@
+/**
+ * @file msr_write_response.h
+ * @brief 
+ * @version 0.1
+ * @date 2025-09-11
+ * 
+ * @copyright Copyright (c) 2025
+ * 
+ */
 #ifndef MSR_WRITE_RESPONSE_H
 #define MSR_WRITE_RESPONSE_H
 
@@ -22,7 +31,6 @@
  *     "index": "0x00000000c0000082",
  *     "value": "0xfffff80000234567",
  *     "name": "IA32_LSTAR",
- *     "note": true
  *   }
  * }
  */
@@ -83,7 +91,6 @@ typedef struct msr_write_data {
   uint64_t msr_index;  ///< MSR index that was written to.
   uint64_t msr_value;  ///< Value written to the MSR.
   char* msr_name;      ///< Human-readable name of the MSR (if known).
-  bool note;           ///< Mark if it needs special attention
 } msr_write_data_t;
 
 /**

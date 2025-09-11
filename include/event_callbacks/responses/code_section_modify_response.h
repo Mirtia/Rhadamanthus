@@ -1,10 +1,10 @@
 /**
  * @file code_section_modify_response.h
- * @brief Response structure and functions for code section modify events
+ * @brief Response structure and functions for code section modify events.
  * @version 0.0
  * @date 2025-09-09
  * 
- * @copyright Copyright (c) 2025
+ * @copyright  GNU Lesser General Public License v2.1
  */
 
 #ifndef CODE_SECTION_MODIFY_RESPONSE_H
@@ -16,14 +16,18 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+/**
+ * @brief The structure representing a code section modify event.
+ * 
+ */
 typedef struct {
-  uint32_t vcpu_id;
-  uint64_t rip;
-  uint64_t rsp;
-  uint64_t cr3;
-  addr_t write_gla;
-  addr_t write_gpa;
-  char* kernel_symbol;
+  uint32_t vcpu_id;     ///< Virtual CPU identifier.
+  uint64_t rip;         ///< Instruction pointer register value.
+  uint64_t rsp;         ///< Stack pointer register value.
+  uint64_t cr3;         ///< CR3 value.
+  addr_t write_gla;     ///< Guest linear address of the write.
+  addr_t write_gpa;     ///< Guest physical address of the write.
+  char* kernel_symbol;  ///< Resolved kernel symbol name (can be NULL).
 } code_section_modify_data_t;
 
 /**
@@ -32,7 +36,7 @@ typedef struct {
  * @param vcpu_id Virtual CPU identifier
  * @param rip Instruction pointer register value
  * @param rsp Stack pointer register value 
- * @param cr3 Control register 3 value
+ * @param cr3 CR3 value
  * @param write_gla Guest linear address of the write
  * @param write_gpa Guest physical address of the write
  * @param kernel_symbol Resolved kernel symbol name (can be NULL)
