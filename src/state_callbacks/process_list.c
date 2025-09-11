@@ -5,9 +5,11 @@
 #include <string.h>
 #include "event_handler.h"
 #include "offsets.h"
+#include "state_callbacks/responses/process_list_response.h"
+#include "utils.h"
 
 /**
- * @brief Structure to hold process information.
+ * @brief Local structure to hold process information during enumeration.
  */
 typedef struct {
   vmi_pid_t pid;                  ///< Process ID.
@@ -17,7 +19,7 @@ typedef struct {
   uint32_t state;                 ///< Process state.
   bool is_kernel_thread;          ///< Flag indicating if it's a kernel thread.
   addr_t mm_addr;                 ///<  Memory management struct.
-} process_info_t;
+} local_process_info_t;
 
 /**
  * @brief Check if a task_struct represents a kernel thread.
@@ -46,7 +48,7 @@ static bool is_kernel_thread(vmi_instance_t vmi, addr_t task_struct,
 
 static bool read_process_credentials(vmi_instance_t vmi, addr_t task_struct,
                                      unsigned long cred_offset,
-                                     process_info_t* proc_info) {
+                                     local_process_info_t* proc_info) {
   addr_t cred_addr = 0;
   if (vmi_read_addr_va(vmi, task_struct + cred_offset, 0, &cred_addr) !=
       VMI_SUCCESS) {
@@ -79,9 +81,9 @@ static bool read_process_credentials(vmi_instance_t vmi, addr_t task_struct,
 /**
  * @brief Print process information.
  *
- * @param proc_info Pointer to the process_info_t structure containing process details.
+ * @param proc_info Pointer to the local_process_info_t structure containing process details.
  */
-static void print_process_info(const process_info_t* proc_info) {
+static void print_process_info(const local_process_info_t* proc_info) {
   const char* thread_type = proc_info->is_kernel_thread ? "KERNEL" : "USER";
   const char* state_str;
 
@@ -128,26 +130,40 @@ static void print_process_info(const process_info_t* proc_info) {
 uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
   // Preconditions
   if (!vmi || !context) {
-    log_error("STATE_PROCESS_LIST: Invalid input parameters.");
-    return VMI_FAILURE;
+    return log_error_and_queue_response_task(
+        "process_list_state", STATE_PROCESS_LIST, INVALID_ARGUMENTS,
+        "STATE_PROCESS_LIST: Invalid arguments to process list state "
+        "callback.");
   }
   event_handler_t* event_handler = (event_handler_t*)context;
   if (!event_handler || !event_handler->is_paused) {
-    log_error("STATE_PROCESS_LIST: Callback requires a paused VM.");
-    return VMI_FAILURE;
+    return log_error_and_queue_response_task(
+        "process_list_state", STATE_PROCESS_LIST, INVALID_ARGUMENTS,
+        "STATE_PROCESS_LIST: Callback requires a valid event handler context.");
   }
 
   log_info("Executing STATE_PROCESS_LIST_CALLBACK callback.");
 
+  // Create process list state data structure
+  process_list_state_data_t* process_data = process_list_state_data_new();
+  if (!process_data) {
+    return log_error_and_queue_response_task(
+        "process_list_state", STATE_PROCESS_LIST, MEMORY_ALLOCATION_FAILURE,
+        "STATE_PROCESS_LIST: Failed to allocate memory for process list state "
+        "data.");
+  }
+
   addr_t list_head = 0, cur_list_entry = 0, next_list_entry = 0;
   addr_t current_process = 0;
-  process_info_t proc_info = {0};
+  local_process_info_t proc_info = {0};
 
   uint32_t total_processes = 0, kernel_threads = 0, user_processes = 0;
 
   if (vmi_translate_ksym2v(vmi, "init_task", &list_head) != VMI_SUCCESS) {
-    log_error("STATE_PROCESS_LIST: Failed to resolve init_task");
-    return VMI_FAILURE;
+    process_list_state_data_free(process_data);
+    return log_error_and_queue_response_task(
+        "process_list_state", STATE_PROCESS_LIST, VMI_OP_FAILURE,
+        "STATE_PROCESS_LIST: Failed to resolve init_task");
   }
 
   unsigned long tasks_offset = 0, pid_offset = 0, name_offset = 0,
@@ -157,19 +173,25 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
       vmi_get_offset(vmi, "linux_pid", &pid_offset) != VMI_SUCCESS ||
       vmi_get_offset(vmi, "linux_name", &name_offset) != VMI_SUCCESS ||
       vmi_get_offset(vmi, "linux_mm", &mm_offset) != VMI_SUCCESS) {
-
-    log_error(
-        "STATE_PROCESS_LIST: Failed to retrieve required task_struct "
-        "offsets from profile");
-    return VMI_FAILURE;
+    process_list_state_data_free(process_data);
+    return log_error_and_queue_response_task(
+        "process_list_state", STATE_PROCESS_LIST, VMI_OP_FAILURE,
+        "STATE_PROCESS_LIST: Failed to retrieve required task_struct offsets "
+        "from profile");
   }
 
   list_head += linux_tasks_offset;
 
   if (vmi_read_addr_va(vmi, list_head, 0, &next_list_entry) != VMI_SUCCESS) {
-    log_error("STATE_PROCESS_LIST: Failed to read first task pointer");
-    return VMI_FAILURE;
+    process_list_state_data_free(process_data);
+    return log_error_and_queue_response_task(
+        "process_list_state", STATE_PROCESS_LIST, VMI_OP_FAILURE,
+        "STATE_PROCESS_LIST: Failed to read first task pointer");
   }
+
+  // Set page size (assuming 4KB for now, could be made configurable)
+  uint32_t page_size = 4096;
+  process_list_state_set_basic_info(process_data, page_size, 0);
 
   log_info("STATE_PROCESS_LIST: Starting kernel task list walk...");
   cur_list_entry = list_head;
@@ -232,6 +254,51 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
       }
 
       print_process_info(&proc_info);
+
+      // Add process to data structure
+      process_credentials_t credentials = {.uid = proc_info.uid,
+                                           .gid = proc_info.gid,
+                                           .euid = proc_info.euid,
+                                           .egid = proc_info.egid};
+
+      // Convert state to character representation
+      char state_char = '?';
+      switch (proc_info.state) {
+        case 0:
+          state_char = 'R';
+          break;  // RUNNING
+        case 1:
+          state_char = 'S';
+          break;  // INTERRUPTIBLE
+        case 2:
+          state_char = 'D';
+          break;  // UNINTERRUPTIBLE
+        case 4:
+          state_char = 'T';
+          break;  // STOPPED
+        case 8:
+          state_char = 't';
+          break;  // TRACED
+        case 16:
+          state_char = 'Z';
+          break;  // ZOMBIE
+        case 32:
+          state_char = 'X';
+          break;  // DEAD
+        default:
+          state_char = '?';
+          break;
+      }
+
+      // Calculate RSS (simplified - would need actual RSS calculation)
+      uint32_t rss_pages = 0;  // Placeholder
+      uint32_t rss_bytes = rss_pages * page_size;
+
+      process_list_state_add_process(
+          process_data, proc_info.pid, proc_info.name, state_char, rss_pages,
+          rss_bytes, proc_info.task_struct_addr, proc_info.is_kernel_thread,
+          proc_info.is_kernel_thread ? NULL : &credentials);
+
       total_processes++;
     }
 
@@ -242,16 +309,20 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
 
     if (vmi_read_addr_va(vmi, cur_list_entry, 0, &next_list_entry) !=
         VMI_SUCCESS) {
-      log_error(
-          "STATE_PROCESS_LIST: Failed to read next task pointer at "
-          "0x%" PRIx64,
-          cur_list_entry);
-      return VMI_FAILURE;
+      process_list_state_data_free(process_data);
+      return log_error_and_queue_response_task(
+          "process_list_state", STATE_PROCESS_LIST, VMI_OP_FAILURE,
+          "STATE_PROCESS_LIST: Failed to read next task pointer");
     }
 
     cur_list_entry = next_list_entry;
 
   } while (cur_list_entry != list_head);
+
+  // Update count and set summary
+  process_list_state_set_basic_info(process_data, page_size, total_processes);
+  process_list_state_set_summary(process_data, total_processes, user_processes,
+                                 kernel_threads);
 
   log_info("STATE_PROCESS_LIST: Finished walking kernel task list");
   log_info(
@@ -259,6 +330,11 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
       "kernel threads)",
       total_processes, user_processes, kernel_threads);
 
+  // Queue success response
+  int result = log_success_and_queue_response_task(
+      "process_list_state", STATE_PROCESS_LIST, process_data,
+      (void (*)(void*))process_list_state_data_free);
+
   log_info("STATE_PROCESS_LIST_CALLBACK callback completed.");
-  return VMI_SUCCESS;
+  return result;
 }

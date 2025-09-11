@@ -12,7 +12,16 @@
 #include "event_callbacks/responses/page_table_modification_response.h"
 #include "event_callbacks/responses/syscall_table_write_response.h"
 #include "event_handler.h"
+#include "state_callbacks/responses/ebpf_activity_response.h"
+#include "state_callbacks/responses/ftrace_hooks_response.h"
 #include "state_callbacks/responses/idt_table_response.h"
+#include "state_callbacks/responses/io_uring_artifacts_response.h"
+#include "state_callbacks/responses/kallsyms_symbols_response.h"
+#include "state_callbacks/responses/kernel_module_list_response.h"
+#include "state_callbacks/responses/msr_registers_response.h"
+#include "state_callbacks/responses/network_trace_response.h"
+#include "state_callbacks/responses/process_list_response.h"
+#include "state_callbacks/responses/syscall_table_response.h"
 
 // Global serializer for event callback access
 static json_serializer_t* g_serializer = NULL;
@@ -323,7 +332,6 @@ cJSON* response_to_json(const struct response* response) {
     cJSON_AddItemToObject(json, "metadata", metadata_json);
   }
 
-  // Add data (SUCCESS case only)
   if (!response->error && response->data) {
     cJSON* data_json = cJSON_CreateObject();
 
@@ -495,16 +503,12 @@ cJSON* response_to_json(const struct response* response) {
           break;
       }
     } else if (response->metadata && response->metadata->task_type == STATE) {
-
       state_task_id_t state_id =
           (state_task_id_t)(uintptr_t)response->metadata->subtype;
-      if (state_id == STATE_IDT_TABLE) {
-        idt_table_state_data_t* idt_data =
-            (idt_table_state_data_t*)response->data;
-        cJSON* idt_data_json = idt_table_state_data_to_json(idt_data);
-        if (idt_data_json) {
-          cJSON_AddItemToObject(data_json, "idt_table", idt_data_json);
-        } else {
+      switch (state_id) {
+        case STATE_IDT_TABLE: {
+          idt_table_state_data_t* idt_data =
+              (idt_table_state_data_t*)response->data;
           cJSON* idt_data_json = idt_table_state_data_to_json(idt_data);
           if (idt_data_json) {
             cJSON_AddItemToObject(data_json, "idt_table", idt_data_json);
@@ -512,7 +516,142 @@ cJSON* response_to_json(const struct response* response) {
             cJSON_AddStringToObject(data_json, "note",
                                     "Failed to convert IDT table data to JSON");
           }
+          break;
         }
+        case STATE_SYSCALL_TABLE: {
+          syscall_table_state_data_t* syscall_data =
+              (syscall_table_state_data_t*)response->data;
+          cJSON* syscall_data_json =
+              syscall_table_state_data_to_json(syscall_data);
+          if (syscall_data_json) {
+            cJSON_AddItemToObject(data_json, "syscall_table",
+                                  syscall_data_json);
+          } else {
+            cJSON_AddStringToObject(
+                data_json, "note",
+                "Failed to convert syscall table data to JSON");
+          }
+          break;
+        }
+        case STATE_PROCESS_LIST: {
+          process_list_state_data_t* process_data =
+              (process_list_state_data_t*)response->data;
+          cJSON* process_data_json =
+              process_list_state_data_to_json(process_data);
+          if (process_data_json) {
+            cJSON_AddItemToObject(data_json, "process_list", process_data_json);
+          } else {
+            cJSON_AddStringToObject(
+                data_json, "note",
+                "Failed to convert process list data to JSON");
+          }
+          break;
+        }
+        case STATE_NETWORK_TRACE: {
+          network_trace_state_data_t* network_data =
+              (network_trace_state_data_t*)response->data;
+          cJSON* network_data_json =
+              network_trace_state_data_to_json(network_data);
+          if (network_data_json) {
+            cJSON_AddItemToObject(data_json, "network_trace",
+                                  network_data_json);
+          } else {
+            cJSON_AddStringToObject(
+                data_json, "note",
+                "Failed to convert network trace data to JSON");
+          }
+          break;
+        }
+        case STATE_MSR_REGISTERS: {
+          msr_registers_state_data_t* msr_data =
+              (msr_registers_state_data_t*)response->data;
+          cJSON* msr_data_json = msr_registers_state_data_to_json(msr_data);
+          if (msr_data_json) {
+            cJSON_AddItemToObject(data_json, "msr_registers", msr_data_json);
+          } else {
+            cJSON_AddStringToObject(
+                data_json, "note",
+                "Failed to convert MSR registers data to JSON");
+          }
+          break;
+        }
+        case STATE_KERNEL_MODULE_LIST: {
+          kernel_module_list_state_data_t* module_data =
+              (kernel_module_list_state_data_t*)response->data;
+          cJSON* module_data_json =
+              kernel_module_list_state_data_to_json(module_data);
+          if (module_data_json) {
+            cJSON_AddItemToObject(data_json, "kernel_module_list",
+                                  module_data_json);
+          } else {
+            cJSON_AddStringToObject(
+                data_json, "note",
+                "Failed to convert kernel module list data to JSON");
+          }
+          break;
+        }
+        case STATE_KALLSYMS_SYMBOLS: {
+          kallsyms_symbols_state_data_t* symbols_data =
+              (kallsyms_symbols_state_data_t*)response->data;
+          cJSON* symbols_data_json =
+              kallsyms_symbols_state_data_to_json(symbols_data);
+          if (symbols_data_json) {
+            cJSON_AddItemToObject(data_json, "kallsyms_symbols",
+                                  symbols_data_json);
+          } else {
+            cJSON_AddStringToObject(
+                data_json, "note",
+                "Failed to convert kallsyms symbols data to JSON");
+          }
+          break;
+        }
+        case STATE_IO_URING_ARTIFACTS: {
+          io_uring_artifacts_state_data_t* artifacts_data =
+              (io_uring_artifacts_state_data_t*)response->data;
+          cJSON* artifacts_data_json =
+              io_uring_artifacts_state_data_to_json(artifacts_data);
+          if (artifacts_data_json) {
+            cJSON_AddItemToObject(data_json, "io_uring_artifacts",
+                                  artifacts_data_json);
+          } else {
+            cJSON_AddStringToObject(
+                data_json, "note",
+                "Failed to convert io_uring artifacts data to JSON");
+          }
+          break;
+        }
+        case STATE_FTRACE_HOOKS: {
+          ftrace_hooks_state_data_t* hooks_data =
+              (ftrace_hooks_state_data_t*)response->data;
+          cJSON* hooks_data_json = ftrace_hooks_state_data_to_json(hooks_data);
+          if (hooks_data_json) {
+            cJSON_AddItemToObject(data_json, "ftrace_hooks", hooks_data_json);
+          } else {
+            cJSON_AddStringToObject(
+                data_json, "note",
+                "Failed to convert ftrace hooks data to JSON");
+          }
+          break;
+        }
+        case STATE_EBPF_ARTIFACTS: {
+          ebpf_activity_state_data_t* activity_data =
+              (ebpf_activity_state_data_t*)response->data;
+          cJSON* activity_data_json =
+              ebpf_activity_state_data_to_json(activity_data);
+          if (activity_data_json) {
+            cJSON_AddItemToObject(data_json, "ebpf_activity",
+                                  activity_data_json);
+          } else {
+            cJSON_AddStringToObject(
+                data_json, "note",
+                "Failed to convert eBPF activity data to JSON");
+          }
+          break;
+        }
+        default:
+          cJSON_AddStringToObject(data_json, "note",
+                                  "No specific data handler for this state");
+          break;
       }
     }
     cJSON_AddItemToObject(json, "data", data_json);

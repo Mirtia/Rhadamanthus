@@ -6,6 +6,7 @@
 #include <string.h>
 #include "event_handler.h"
 #include "offsets.h"
+#include "state_callbacks/responses/network_trace_response.h"
 #include "utils.h"
 
 /**
@@ -582,33 +583,102 @@ static void cleanup_detection_context(detection_context_t* ctx) {
 uint32_t state_network_trace_callback(vmi_instance_t vmi, void* context) {
   // Preconditions
   if (!context || !vmi) {
-    log_error("STATE_NETWORK_TRACE: Invalid context or VMI instance");
-    return VMI_FAILURE;
+    return log_error_and_queue_response_task(
+        "network_trace_state", STATE_NETWORK_TRACE, INVALID_ARGUMENTS,
+        "STATE_NETWORK_TRACE: Invalid context or VMI instance");
   }
 
   event_handler_t* event_handler = (event_handler_t*)context;
   if (!event_handler->is_paused) {
-    log_error("STATE_NETWORK_TRACE: Callback requires a paused VM.");
-    return VMI_FAILURE;
+    return log_error_and_queue_response_task(
+        "network_trace_state", STATE_NETWORK_TRACE, INVALID_ARGUMENTS,
+        "STATE_NETWORK_TRACE: Callback requires a valid event handler context");
   }
 
   log_info("Executing STATE_NETWORK_TRACE_CALLBACK callback.");
 
-  detection_context_t detection_context = {0};
+  // Create network trace state data structure
+  network_trace_state_data_t* network_data = network_trace_state_data_new();
+  if (!network_data) {
+    return log_error_and_queue_response_task(
+        "network_trace_state", STATE_NETWORK_TRACE, MEMORY_ALLOCATION_FAILURE,
+        "STATE_NETWORK_TRACE: Failed to allocate memory for network trace "
+        "state data");
+  }
 
+  detection_context_t detection_context = {0};
   detection_context.kernel_connections =
       g_array_new(FALSE, TRUE, sizeof(network_connection_t));
   detection_context.to_be_reviewed = 0;
 
+  // Check netfilter hooks and add to data structure
   if (check_netfilter_hooks(vmi, &detection_context) != VMI_SUCCESS) {
-    log_error("STATE_NETWORK_TRACE: Failed to check netfilter hooks");
-    return VMI_FAILURE;
+    cleanup_detection_context(&detection_context);
+    network_trace_state_data_free(network_data);
+    return log_error_and_queue_response_task(
+        "network_trace_state", STATE_NETWORK_TRACE, VMI_OP_FAILURE,
+        "STATE_NETWORK_TRACE: Failed to check netfilter hooks");
   }
 
+  // Walk TCP hash table and add connections to data structure
   if (walk_tcp_hash_table(vmi, &detection_context) != VMI_SUCCESS) {
-    log_error("STATE_NETWORK_TRACE: Failed to walk TCP hash tables");
-    return VMI_FAILURE;
+    cleanup_detection_context(&detection_context);
+    network_trace_state_data_free(network_data);
+    return log_error_and_queue_response_task(
+        "network_trace_state", STATE_NETWORK_TRACE, VMI_OP_FAILURE,
+        "STATE_NETWORK_TRACE: Failed to walk TCP hash tables");
   }
+
+  // Convert detection context data to response data structure
+  uint32_t suspicious_connections = 0;
+  uint32_t suspicious_hooks = 0;
+
+  // Process TCP connections
+  for (guint i = 0; i < detection_context.kernel_connections->len; i++) {
+    network_connection_t* conn = &g_array_index(
+        detection_context.kernel_connections, network_connection_t, i);
+
+    // Convert IP addresses to strings
+    struct in_addr laddr = {.s_addr = htonl(conn->local_ip)};
+    struct in_addr raddr = {.s_addr = htonl(conn->remote_ip)};
+    char laddr_str[INET_ADDRSTRLEN], raddr_str[INET_ADDRSTRLEN];
+    inet_ntop(AF_INET, &laddr, laddr_str, sizeof(laddr_str));
+    inet_ntop(AF_INET, &raddr, raddr_str, sizeof(raddr_str));
+
+    // Check if connection is suspicious
+    bool is_suspicious = false;
+    if (is_suspicious_port(conn->local_port) ||
+        is_suspicious_port(conn->remote_port)) {
+      is_suspicious = true;
+    }
+    if (is_suspicious_ip(conn->local_ip) || is_suspicious_ip(conn->remote_ip)) {
+      is_suspicious = true;
+    }
+
+    if (is_suspicious) {
+      suspicious_connections++;
+    }
+
+    // Convert state to hex string
+    char state_str[8];
+    snprintf(state_str, sizeof(state_str), "%02X", conn->state);
+
+    // Convert inode to string (placeholder since we don't have it in the original structure)
+    char inode_str[16];
+    snprintf(inode_str, sizeof(inode_str), "%lu",
+             (unsigned long)conn->sock_addr);
+
+    network_trace_state_add_tcp_socket(
+        network_data, laddr_str, conn->local_port, raddr_str, conn->remote_port,
+        state_str, inode_str, is_suspicious);
+  }
+
+  // Set summary information
+  network_trace_state_set_summary(
+      network_data, detection_context.kernel_connections->len,
+      suspicious_connections,
+      0,  // total_hooks - would need to track this separately
+      suspicious_hooks);
 
   if (detection_context.to_be_reviewed > 0) {
     log_warn(
@@ -622,9 +692,14 @@ uint32_t state_network_trace_callback(vmi_instance_t vmi, void* context) {
   log_info("STATE_NETWORK_TRACE: CONNECTIONS found: %u kernel",
            detection_context.kernel_connections->len);
 
+  // Clean up detection context
   cleanup_detection_context(&detection_context);
 
-  log_info("STATE_NETWORK_TRACE callback completed.");
+  // Queue success response
+  int result = log_success_and_queue_response_task(
+      "network_trace_state", STATE_NETWORK_TRACE, network_data,
+      (void (*)(void*))network_trace_state_data_free);
 
-  return VMI_SUCCESS;
+  log_info("STATE_NETWORK_TRACE callback completed.");
+  return result;
 }

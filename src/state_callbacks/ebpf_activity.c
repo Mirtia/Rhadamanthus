@@ -5,6 +5,8 @@
 #include <stdbool.h>
 #include "event_handler.h"
 #include "offsets.h"
+#include "state_callbacks/responses/ebpf_activity_response.h"
+#include "utils.h"
 
 /**
  * @brief Structure that holds information (the keys) of the LibVMI configuration file, usually at /etc/libvmi.conf.
@@ -200,7 +202,8 @@ static void report_idr(vmi_instance_t vmi, const char* label, const char* sym,
 
 static int maybe_print_bpf_file(vmi_instance_t vmi, int32_t tgid,
                                 const char comm[LINUX_TASK_COMM_LEN],
-                                addr_t file_va, const struct bpf_fops_syms* s) {
+                                addr_t file_va, const struct bpf_fops_syms* s,
+                                ebpf_activity_state_data_t* data) {
 
   // file->f_op == &bpf_*_fops => file->private_data points to bpf_{prog,map,link}.
   // References:
@@ -223,6 +226,11 @@ static int maybe_print_bpf_file(vmi_instance_t vmi, int32_t tgid,
     vmi_read_32_va(vmi, priv + LINUX_BPF_MAP_ID_OFFSET, 0, &id);
     log_info("[PID %d] %-8s FD->BPF-MAP : file=0x%lx map=0x%lx id=%u",
              (int)tgid, comm, (unsigned long)file_va, (unsigned long)priv, id);
+
+    if (data) {
+      ebpf_activity_state_add_map(data, id, (uint64_t)priv, (uint32_t)tgid,
+                                  comm);
+    }
     return 1;
   }
 
@@ -246,6 +254,13 @@ static int maybe_print_bpf_file(vmi_instance_t vmi, int32_t tgid,
         "name='%s'",
         (int)tgid, comm, (unsigned long)file_va, (unsigned long)priv,
         (unsigned long)aux, id, pname);
+
+    if (data) {
+      ebpf_activity_state_add_program(data, id, "unknown", pname, "unknown",
+                                      (uint64_t)priv, (uint64_t)aux,
+                                      (uint32_t)tgid, comm);
+      ebpf_activity_state_add_attachment_point(data, "unknown", id);
+    }
     return 1;
   }
 
@@ -254,6 +269,11 @@ static int maybe_print_bpf_file(vmi_instance_t vmi, int32_t tgid,
     vmi_read_32_va(vmi, priv + LINUX_OFF_BPF_LINK_ID, 0, &id);
     log_info("[PID %d] %-8s FD->BPF-LINK: file=0x%lx link=0x%lx id=%u",
              (int)tgid, comm, (unsigned long)file_va, (unsigned long)priv, id);
+
+    if (data) {
+      ebpf_activity_state_add_link(data, id, (uint64_t)priv, (uint32_t)tgid,
+                                   comm);
+    }
     return 1;
   }
 
@@ -267,7 +287,8 @@ static inline addr_t task_from_listnode(const config_offset_t* config_offsets,
 
 static void scan_task_bpf_fds(vmi_instance_t vmi,
                               const config_offset_t* config_offsets,
-                              addr_t task_va, const struct bpf_fops_syms* s) {
+                              addr_t task_va, const struct bpf_fops_syms* s,
+                              ebpf_activity_state_data_t* data) {
   int32_t tgid = -1, pid = -1;
   char comm[LINUX_TASK_COMM_LEN] = {0};
 
@@ -341,7 +362,7 @@ static void scan_task_bpf_fds(vmi_instance_t vmi,
       continue;
     }
 
-    hits += maybe_print_bpf_file(vmi, tgid, comm, file_va, s);
+    hits += maybe_print_bpf_file(vmi, tgid, comm, file_va, s, data);
   }
 
   if (hits > 0) {
@@ -350,7 +371,8 @@ static void scan_task_bpf_fds(vmi_instance_t vmi,
 }
 
 static void scan_all_tasks_for_bpf(vmi_instance_t vmi,
-                                   const config_offset_t* config_offsets) {
+                                   const config_offset_t* config_offsets,
+                                   ebpf_activity_state_data_t* data) {
   addr_t init_task = 0;
   if (vmi_translate_ksym2v(vmi, "init_task", &init_task) != VMI_SUCCESS ||
       !init_task) {
@@ -374,7 +396,7 @@ static void scan_all_tasks_for_bpf(vmi_instance_t vmi,
   }
   while (cur != head && guard++ < guard_max) {
     addr_t task = task_from_listnode(config_offsets, cur);
-    scan_task_bpf_fds(vmi, config_offsets, task, &symbols);
+    scan_task_bpf_fds(vmi, config_offsets, task, &symbols, data);
 
     if (vmi_read_addr_va(vmi, cur, 0, &cur) != VMI_SUCCESS || !cur) {
       break;
@@ -384,17 +406,28 @@ static void scan_all_tasks_for_bpf(vmi_instance_t vmi,
 
 uint32_t state_ebpf_activity_callback(vmi_instance_t vmi, void* context) {
   if (!vmi || !context) {
-    log_error("STATE_EBPF_ARTIFACTS: Invalid parameters.");
-    return VMI_FAILURE;
+    return log_error_and_queue_response_task(
+        "ebpf_activity_state", STATE_EBPF_ARTIFACTS, INVALID_ARGUMENTS,
+        "STATE_EBPF_ACTIVITY: Invalid parameters");
   }
 
   event_handler_t* event_handler = (event_handler_t*)context;
   if (!event_handler->is_paused) {
-    log_error("STATE_EBPF_ARTIFACTS: VM must be paused.");
-    return VMI_FAILURE;
+    return log_error_and_queue_response_task(
+        "ebpf_activity_state", STATE_EBPF_ARTIFACTS, INVALID_ARGUMENTS,
+        "STATE_EBPF_ACTIVITY: VM must be paused");
   }
 
-  log_info("Executing STATE_EBPF_ARTIFACTS callback.");
+  log_info("Executing STATE_EBPF_ACTIVITY callback.");
+
+  // Create eBPF activity state data structure
+  ebpf_activity_state_data_t* activity_data = ebpf_activity_state_data_new();
+  if (!activity_data) {
+    return log_error_and_queue_response_task(
+        "ebpf_activity_state", STATE_EBPF_ARTIFACTS, MEMORY_ALLOCATION_FAILURE,
+        "STATE_EBPF_ARTIFACTS: Failed to allocate memory for eBPF activity "
+        "state data");
+  }
 
   config_offset_t config_offsets = {0};
   resolve_kernel_offsets(vmi, &config_offsets);
@@ -415,9 +448,29 @@ uint32_t state_ebpf_activity_callback(vmi_instance_t vmi, void* context) {
   report_idr(vmi, "BTF objects [btf_idr]", "btf_idr", 0);
 
   // Per-PID association via FD tables
-  log_info("STATE_EBPF_ARTIFACTS: Scanning per-PID BPF FDs...");
-  scan_all_tasks_for_bpf(vmi, &config_offsets);
+  log_info("STATE_EBPF_ACTIVITY: Scanning per-PID BPF FDs...");
+  scan_all_tasks_for_bpf(vmi, &config_offsets, activity_data);
 
-  log_info("STATE_EBPF_ARTIFACTS callback completed.");
-  return VMI_SUCCESS;
+  // Set summary information
+  uint32_t total_programs = activity_data->loaded_programs->len;
+  uint32_t total_maps = activity_data->maps->len;
+  uint32_t total_links = activity_data->links->len;
+  uint32_t total_btf_objects =
+      0;  // Not currently tracked in this implementation
+  uint32_t processes_with_ebpf = 0;  // Could be calculated from unique PIDs
+
+  ebpf_activity_state_set_summary(activity_data, total_programs, total_maps,
+                                  total_links, total_btf_objects,
+                                  processes_with_ebpf);
+
+  log_info("STATE_EBPF_ACTIVITY: Found %u programs, %u maps, %u links",
+           total_programs, total_maps, total_links);
+
+  // Queue success response
+  int result = log_success_and_queue_response_task(
+      "ebpf_activity_state", STATE_EBPF_ARTIFACTS, activity_data,
+      (void (*)(void*))ebpf_activity_state_data_free);
+
+  log_info("STATE_EBPF_ACTIVITY callback completed.");
+  return result;
 }

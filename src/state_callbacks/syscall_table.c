@@ -3,6 +3,7 @@
 #include <inttypes.h>
 #include <log.h>
 #include "event_handler.h"
+#include "state_callbacks/responses/syscall_table_response.h"
 #include "utils.h"
 
 /**
@@ -85,67 +86,107 @@ static char** parse_syscall_index_file(size_t* count_dst) {
 uint32_t state_syscall_table_callback(vmi_instance_t vmi, void* context) {
   // Preconditions
   if (!vmi || !context) {
-    log_error("STATE_SYSCALL_TABLE: Invalid input parameters.");
-    return VMI_FAILURE;
+    return log_error_and_queue_response_task(
+        "syscall_table_state", STATE_SYSCALL_TABLE, INVALID_ARGUMENTS,
+        "STATE_SYSCALL_TABLE: Invalid arguments to syscall table state "
+        "callback.");
   }
 
   event_handler_t* event_handler = (event_handler_t*)context;
-  // By not having a paused VM we risk inconsistent state between information gathering (reads).
   if (!event_handler || !event_handler->is_paused) {
-    log_error("STATE_SYSCALL_TABLE: Callback requires a paused VM.");
-    return VMI_FAILURE;
+    return log_error_and_queue_response_task(
+        "syscall_table_state", STATE_SYSCALL_TABLE, INVALID_ARGUMENTS,
+        "STATE_SYSCALL_TABLE: Callback requires a valid event handler "
+        "context.");
   }
 
   log_info("Executing STATE_SYSCALL_TABLE callback.");
 
+  // Create syscall table state data structure
+  syscall_table_state_data_t* syscall_data = syscall_table_state_data_new();
+  if (!syscall_data) {
+    return log_error_and_queue_response_task(
+        "syscall_table_state", STATE_SYSCALL_TABLE, MEMORY_ALLOCATION_FAILURE,
+        "STATE_SYSCALL_TABLE: Failed to allocate memory for syscall table "
+        "state data.");
+  }
+
+  // Parse syscall index file
   size_t syscall_number = 0;
-  // In `data` folder, in the root repository, there is an index of the system calls available to the target system.
   char** sys_index = parse_syscall_index_file(&syscall_number);
-  if (!sys_index)
-    return VMI_FAILURE;
+  if (!sys_index) {
+    syscall_table_state_data_free(syscall_data);
+    return log_error_and_queue_response_task(
+        "syscall_table_state", STATE_SYSCALL_TABLE, VMI_OP_FAILURE,
+        "STATE_SYSCALL_TABLE: Failed to parse syscall index file.");
+  }
 
+  // Resolve kernel text bounds
+  addr_t kernel_start_addr = 0, kernel_end_addr = 0;
+  if (get_kernel_text_section_range(vmi, &kernel_start_addr,
+                                    &kernel_end_addr) != VMI_SUCCESS) {
+    cleanup_sys_index(sys_index, syscall_number);
+    syscall_table_state_data_free(syscall_data);
+    return log_error_and_queue_response_task(
+        "syscall_table_state", STATE_SYSCALL_TABLE, VMI_OP_FAILURE,
+        "STATE_SYSCALL_TABLE: Failed to resolve kernel text section range.");
+  }
+
+  syscall_table_state_set_kernel_range(syscall_data, kernel_start_addr,
+                                       kernel_end_addr);
+
+  log_info("STATE_SYSCALL_TABLE: Kernel text range: [0x%" PRIx64 ", 0x%" PRIx64
+           "]",
+           (uint64_t)kernel_start_addr, (uint64_t)kernel_end_addr);
+
+  // Resolve syscall table address
   addr_t sys_call_table_addr = 0;
-  addr_t sys_call_addr = 0;
-  addr_t kernel_start = 0, kernel_end = 0;
-  int syscall_hit_count = 0;
-
   if (vmi_translate_ksym2v(vmi, "sys_call_table", &sys_call_table_addr) ==
       VMI_FAILURE) {
-    log_error("STATE_SYSCALL_TABLE: Failed to resolve symbol sys_call_table.");
     cleanup_sys_index(sys_index, syscall_number);
-    return VMI_FAILURE;
+    syscall_table_state_data_free(syscall_data);
+    return log_error_and_queue_response_task(
+        "syscall_table_state", STATE_SYSCALL_TABLE, VMI_OP_FAILURE,
+        "STATE_SYSCALL_TABLE: Failed to resolve symbol sys_call_table.");
   }
+
+  syscall_table_state_set_table_info(syscall_data, sys_call_table_addr,
+                                     (uint32_t)syscall_number);
 
   log_info("STATE_SYSCALL_TABLE: sys_call_table address: 0x%" PRIx64,
            sys_call_table_addr);
 
-  if (get_kernel_text_section_range(vmi, &kernel_start, &kernel_end) ==
-      VMI_FAILURE) {
-    log_error(
-        "STATE_SYSCALL_TABLE: Failed to get kernel .text section boundaries.");
-    cleanup_sys_index(sys_index, syscall_number);
-    return VMI_FAILURE;
-  }
-
-  log_info("STATE_SYSCALL_TABLE: .text range: 0x%" PRIx64 " - 0x%" PRIx64,
-           kernel_start, kernel_end);
-
+  // Analyze each syscall
+  uint32_t syscall_hit_count = 0;
   for (size_t i = 0; i < syscall_number; ++i) {
+    addr_t sys_call_addr = 0;
     if (vmi_read_addr_va(vmi, sys_call_table_addr + i * sizeof(addr_t), 0,
                          &sys_call_addr) == VMI_FAILURE) {
       log_debug(
           "STATE_SYSCALL_TABLE: Failed to read syscall address at index %zu.",
           i);
+      // Add syscall with unknown address
+      syscall_table_state_add_syscall(syscall_data, (uint32_t)i, sys_index[i],
+                                      0, false);
       continue;
     }
 
-    // It is suspicious that the hook is outside the kernel text section.
-    if (sys_call_addr < kernel_start || sys_call_addr > kernel_end) {
+    // Check if syscall is hooked (outside kernel text section)
+    bool is_hooked =
+        (sys_call_addr < kernel_start_addr || sys_call_addr > kernel_end_addr);
+    if (is_hooked) {
       log_debug("STATE_SYSCALL_TABLE: Hook detected: syscall %s at 0x%" PRIx64,
                 sys_index[i], sys_call_addr);
       syscall_hit_count++;
     }
+
+    // Add syscall information to data structure
+    syscall_table_state_add_syscall(syscall_data, (uint32_t)i, sys_index[i],
+                                    sys_call_addr, is_hooked);
   }
+
+  // Set summary information
+  syscall_table_state_set_summary(syscall_data, syscall_hit_count);
 
   if (syscall_hit_count > 0) {
     log_warn("STATE_SYSCALL_TABLE: %d syscalls appear to be hooked.",
@@ -154,7 +195,14 @@ uint32_t state_syscall_table_callback(vmi_instance_t vmi, void* context) {
     log_info("STATE_SYSCALL_TABLE: No hooked syscalls detected.");
   }
 
+  // Clean up temporary data
   cleanup_sys_index(sys_index, syscall_number);
+
+  // Queue success response
+  int result = log_success_and_queue_response_task(
+      "syscall_table_state", STATE_SYSCALL_TABLE, syscall_data,
+      (void (*)(void*))syscall_table_state_data_free);
+
   log_info("STATE_SYSCALL_TABLE callback completed.");
-  return VMI_SUCCESS;
+  return result;
 }

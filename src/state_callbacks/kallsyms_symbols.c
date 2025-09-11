@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "event_handler.h"
+#include "state_callbacks/responses/kallsyms_symbols_response.h"
 #include "utils.h"
 
 #define KSYM_MAX_NAME 1024  // Max symbol name length.
@@ -15,20 +16,32 @@
 uint32_t state_kallsyms_symbols_callback(vmi_instance_t vmi, void* context) {
   // Preconditions
   if (!vmi || !context) {
-    log_error(
+    return log_error_and_queue_response_task(
+        "kallsyms_symbols_state", STATE_KALLSYMS_SYMBOLS, INVALID_ARGUMENTS,
         "STATE_KALLSYMS_SYMBOLS: Invalid arguments to kallsyms symbols state "
-        "callback.");
-    return VMI_FAILURE;
+        "callback");
   }
 
   event_handler_t* event_handler = (event_handler_t*)context;
   if (!event_handler || !event_handler->is_paused) {
-    log_error(
-        "STATE_KALLSYMS_SYMBOLS: Callback requires a paused VM instance.");
-    return VMI_FAILURE;
+    return log_error_and_queue_response_task(
+        "kallsyms_symbols_state", STATE_KALLSYMS_SYMBOLS, INVALID_ARGUMENTS,
+        "STATE_KALLSYMS_SYMBOLS: Callback requires a valid event handler "
+        "context");
   }
 
   log_info("Executing STATE_KALLSYMS_SYMBOLS callback.");
+
+  // Create kallsyms symbols state data structure
+  kallsyms_symbols_state_data_t* symbols_data =
+      kallsyms_symbols_state_data_new();
+  if (!symbols_data) {
+    return log_error_and_queue_response_task(
+        "kallsyms_symbols_state", STATE_KALLSYMS_SYMBOLS,
+        MEMORY_ALLOCATION_FAILURE,
+        "STATE_KALLSYMS_SYMBOLS: Failed to allocate memory for kallsyms "
+        "symbols state data");
+  }
 
   // Detect guest pointer width.
   const bool is_64 = (vmi_get_page_mode(vmi, 0) == VMI_PM_IA32E);
@@ -40,15 +53,20 @@ uint32_t state_kallsyms_symbols_callback(vmi_instance_t vmi, void* context) {
           VMI_SUCCESS ||
       vmi_translate_ksym2v(vmi, "kallsyms_token_index", &a_tidx) !=
           VMI_SUCCESS) {
-    log_error("Failed to resolve one or more kallsyms arrays.");
-    return VMI_FAILURE;
+    kallsyms_symbols_state_data_free(symbols_data);
+    return log_error_and_queue_response_task(
+        "kallsyms_symbols_state", STATE_KALLSYMS_SYMBOLS, VMI_OP_FAILURE,
+        "STATE_KALLSYMS_SYMBOLS: Failed to resolve one or more kallsyms "
+        "arrays");
   }
 
   uint32_t num_syms = 0;
   if (vmi_read_32_va(vmi, a_num, 0, &num_syms) != VMI_SUCCESS ||
       num_syms == 0) {
-    log_error("kallsyms_num_syms read failed or zero.");
-    return VMI_FAILURE;
+    kallsyms_symbols_state_data_free(symbols_data);
+    return log_error_and_queue_response_task(
+        "kallsyms_symbols_state", STATE_KALLSYMS_SYMBOLS, VMI_OP_FAILURE,
+        "STATE_KALLSYMS_SYMBOLS: kallsyms_num_syms read failed or zero");
   }
 
   // Prefer relative mode if available, else fall back to absolute addresses.
@@ -65,10 +83,11 @@ uint32_t state_kallsyms_symbols_callback(vmi_instance_t vmi, void* context) {
   } else {
     if (vmi_translate_ksym2v(vmi, "kallsyms_addresses", &a_addrs) !=
         VMI_SUCCESS) {
-      log_error(
+      kallsyms_symbols_state_data_free(symbols_data);
+      return log_error_and_queue_response_task(
+          "kallsyms_symbols_state", STATE_KALLSYMS_SYMBOLS, VMI_OP_FAILURE,
           "STATE_KALLSYMS_SYMBOLS: No callable address array found (neither "
-          "relative nor absolute).");
-      return VMI_FAILURE;
+          "relative nor absolute)");
     }
     log_info(
         "STATE_KALLSYMS_SYMBOLS: Using kallsyms_addresses (absolute) mode.");
@@ -79,8 +98,10 @@ uint32_t state_kallsyms_symbols_callback(vmi_instance_t vmi, void* context) {
   for (int i = 0; i < 256; i++) {
     if (vmi_read_16_va(vmi, a_tidx + (addr_t)(i * 2), 0, &token_index[i]) !=
         VMI_SUCCESS) {
-      log_error("STATE_KALLSYMS_SYMBOLS: Failed to read token_index[%d].", i);
-      return VMI_FAILURE;
+      kallsyms_symbols_state_data_free(symbols_data);
+      return log_error_and_queue_response_task(
+          "kallsyms_symbols_state", STATE_KALLSYMS_SYMBOLS, VMI_OP_FAILURE,
+          "STATE_KALLSYMS_SYMBOLS: Failed to read token_index");
     }
   }
 
@@ -104,18 +125,20 @@ uint32_t state_kallsyms_symbols_callback(vmi_instance_t vmi, void* context) {
   if (use_relative) {
     if (is_64) {
       if (vmi_read_64_va(vmi, a_relbase_sym, 0, &relbase64) != VMI_SUCCESS) {
-        log_error(
+        kallsyms_symbols_state_data_free(symbols_data);
+        return log_error_and_queue_response_task(
+            "kallsyms_symbols_state", STATE_KALLSYMS_SYMBOLS, VMI_OP_FAILURE,
             "STATE_KALLSYMS_SYMBOLS: Failed to read kallsyms_relative_base "
-            "(64-bit).");
-        return VMI_FAILURE;
+            "(64-bit)");
       }
     } else {
       uint32_t base32 = 0;
       if (vmi_read_32_va(vmi, a_relbase_sym, 0, &base32) != VMI_SUCCESS) {
-        log_error(
+        kallsyms_symbols_state_data_free(symbols_data);
+        return log_error_and_queue_response_task(
+            "kallsyms_symbols_state", STATE_KALLSYMS_SYMBOLS, VMI_OP_FAILURE,
             "STATE_KALLSYMS_SYMBOLS: Failed to read kallsyms_relative_base "
-            "(32-bit).");
-        return VMI_FAILURE;
+            "(32-bit)");
       }
       relbase64 = base32;
     }
@@ -228,6 +251,17 @@ uint32_t state_kallsyms_symbols_callback(vmi_instance_t vmi, void* context) {
     if (vmi_read_8_va(vmi, va, 0, &tmp) == VMI_SUCCESS)
       reachable++;
 
+    // Convert address to hex string
+    char addr_str[32];
+    snprintf(addr_str, sizeof(addr_str), "0x%" PRIx64, (uint64_t)va);
+
+    // Determine symbol type (simplified - would need more sophisticated detection)
+    const char* type_str = "T";  // Default to text symbol
+
+    // Add symbol to data structure
+    kallsyms_symbols_state_add_symbol(symbols_data, addr_str, type_str,
+                                      name_buf, NULL);
+
     // Log a small sample for inspection.
     if (logged < log_sample) {
       log_debug(
@@ -239,6 +273,12 @@ uint32_t state_kallsyms_symbols_callback(vmi_instance_t vmi, void* context) {
       logged++;
     }
   }
+
+  // Set summary information
+  kallsyms_symbols_state_set_summary(
+      symbols_data, total, total, -1,  // kptr_restrict unknown
+      NULL, NULL, -1,                  // no filters applied
+      reachable, zero_addr, name_fail, addr_fail, in_text, outside_text);
 
   log_info(
       "STATE_KALLSYMS_SYMBOLS: kallsyms summary: total=%u, reachable=%u, "
@@ -263,6 +303,11 @@ uint32_t state_kallsyms_symbols_callback(vmi_instance_t vmi, void* context) {
         total, num_syms);
   }
 
+  // Queue success response
+  int result = log_success_and_queue_response_task(
+      "kallsyms_symbols_state", STATE_KALLSYMS_SYMBOLS, symbols_data,
+      (void (*)(void*))kallsyms_symbols_state_data_free);
+
   log_info("STATE_KALLSYMS_SYMBOLS callback completed.");
-  return VMI_SUCCESS;
+  return result;
 }

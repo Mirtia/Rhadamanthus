@@ -5,6 +5,7 @@
 #include <string.h>
 #include "event_handler.h"
 #include "offsets.h"
+#include "state_callbacks/responses/ftrace_hooks_response.h"
 #include "utils.h"
 
 /**
@@ -65,12 +66,14 @@ static bool is_hooking_flags_pattern(unsigned long flags) {
  * @param ops_num Operation number for logging.
  * @param kernel_start Start of kernel text section.
  * @param kernel_end End of kernel text section.
+ * @param data The ftrace hooks state data to populate.
  * @return true if hooking pattern detected else false.
  */
 static bool analyze_ftrace_ops_for_hooks(vmi_instance_t vmi, addr_t ops_addr,
                                          // NOLINTNEXTLINE
                                          int ops_num, addr_t kernel_start,
-                                         addr_t kernel_end) {
+                                         addr_t kernel_end,
+                                         ftrace_hooks_state_data_t* data) {
   // Read ftrace function pointer (offset 0)
   addr_t func_addr = 0;
   if (vmi_read_addr_va(vmi, ops_addr + LINUX_FTRACE_OPS_FUNC_OFFSET, 0,
@@ -153,6 +156,37 @@ static bool analyze_ftrace_ops_for_hooks(vmi_instance_t vmi, addr_t ops_addr,
     suspicious = true;
   }
 
+  // Add hook to data structure
+  if (data) {
+    char flags_str[32];
+    snprintf(flags_str, sizeof(flags_str), "0x%lx", flags);
+
+    const char* hook_reason = NULL;
+    if (suspicious) {
+      if (is_hooking_flags_pattern(flags)) {
+        hook_reason = "Hooking flags pattern detected";
+      } else if (func_addr < kernel_start || func_addr > kernel_end) {
+        hook_reason = "Function outside kernel text";
+      } else if (trampoline_addr != 0 && (trampoline_addr < kernel_start ||
+                                          trampoline_addr > kernel_end)) {
+        hook_reason = "Trampoline outside kernel text";
+      } else if (flags & FTRACE_OPS_FL_IPMODIFY) {
+        hook_reason = "IPMODIFY flag detected";
+      } else if (saved_func != 0 && func_addr != 0 && saved_func != func_addr) {
+        hook_reason = "Function replacement detected";
+      } else {
+        hook_reason = "Suspicious pattern detected";
+      }
+    }
+
+    ftrace_hooks_state_add_hook(data, ops_num, "ftrace_hook", "unknown",
+                                "unknown", (uint64_t)func_addr, flags_str,
+                                (uint64_t)trampoline_addr, (uint64_t)saved_func,
+                                suspicious, hook_reason);
+
+    ftrace_hooks_state_add_attachment_point(data, "ftrace_hook", ops_num);
+  }
+
   return suspicious;
 }
 
@@ -160,9 +194,11 @@ static bool analyze_ftrace_ops_for_hooks(vmi_instance_t vmi, addr_t ops_addr,
  * @brief Check if any commonly targeted syscalls are being traced
  *
  * @param vmi LibVMI instance.
+ * @param data The ftrace hooks state data to populate.
  * @return Number of hooked syscalls detected.
  */
-static int check_commonly_hooked_syscalls(vmi_instance_t vmi) {
+static int check_commonly_hooked_syscalls(vmi_instance_t vmi,
+                                          ftrace_hooks_state_data_t* data) {
   int hooked_count = 0;
 
   log_debug("Checking if commonly targeted syscalls have active ftrace...");
@@ -189,10 +225,12 @@ static int check_commonly_hooked_syscalls(vmi_instance_t vmi) {
  * @param vmi LibVMI instance
  * @param kernel_start Start of kernel text section
  * @param kernel_end End of kernel text section
+ * @param data The ftrace hooks state data to populate
  * @return Number of suspicious ftrace operations found
  */
 static int walk_ftrace_ops_list(vmi_instance_t vmi, addr_t kernel_start,
-                                addr_t kernel_end) {
+                                addr_t kernel_end,
+                                ftrace_hooks_state_data_t* data) {
   addr_t ftrace_ops_list_addr = 0;
 
   // Try to find the global ftrace ops list
@@ -236,7 +274,7 @@ static int walk_ftrace_ops_list(vmi_instance_t vmi, addr_t kernel_start,
     ops_count++;
 
     if (analyze_ftrace_ops_for_hooks(vmi, current_ops, ops_count, kernel_start,
-                                     kernel_end)) {
+                                     kernel_end, data)) {
       suspicious_count++;
     }
 
@@ -293,25 +331,38 @@ static int check_ftrace_global_state(vmi_instance_t vmi) {
 uint32_t state_ftrace_hooks_callback(vmi_instance_t vmi, void* context) {
   // Preconditions
   if (!vmi || !context) {
-    log_error("STATE_FTRACE_HOOKS: Invalid input parameters.");
-    return VMI_FAILURE;
+    return log_error_and_queue_response_task(
+        "ftrace_hooks_state", STATE_FTRACE_HOOKS, INVALID_ARGUMENTS,
+        "STATE_FTRACE_HOOKS: Invalid input parameters");
   }
 
   event_handler_t* event_handler = (event_handler_t*)context;
   if (!event_handler || !event_handler->is_paused) {
-    log_error("STATE_FTRACE_HOOKS: Callback requires a paused VM.");
-    return VMI_FAILURE;
+    return log_error_and_queue_response_task(
+        "ftrace_hooks_state", STATE_FTRACE_HOOKS, INVALID_ARGUMENTS,
+        "STATE_FTRACE_HOOKS: Callback requires a valid event handler context");
   }
 
   log_info("STATE_FTRACE_HOOKS: Executing STATE_FTRACE_HOOKS callback.");
+
+  // Create ftrace hooks state data structure
+  ftrace_hooks_state_data_t* hooks_data = ftrace_hooks_state_data_new();
+  if (!hooks_data) {
+    return log_error_and_queue_response_task(
+        "ftrace_hooks_state", STATE_FTRACE_HOOKS, MEMORY_ALLOCATION_FAILURE,
+        "STATE_FTRACE_HOOKS: Failed to allocate memory for ftrace hooks state "
+        "data");
+  }
 
   // Get kernel text bounds for validation
   addr_t kernel_start = 0, kernel_end = 0;
 
   if (get_kernel_text_section_range(vmi, &kernel_start, &kernel_end) !=
       VMI_SUCCESS) {
-    log_error("STATE_FTRACE_HOOKS: Failed to resolve kernel text boundaries");
-    return VMI_FAILURE;
+    ftrace_hooks_state_data_free(hooks_data);
+    return log_error_and_queue_response_task(
+        "ftrace_hooks_state", STATE_FTRACE_HOOKS, VMI_OP_FAILURE,
+        "STATE_FTRACE_HOOKS: Failed to resolve kernel text boundaries");
   }
 
   log_info("STATE_FTRACE_HOOKS: Kernel text section: [0x%" PRIx64
@@ -320,12 +371,27 @@ uint32_t state_ftrace_hooks_callback(vmi_instance_t vmi, void* context) {
 
   // Check global ftrace state
   int global_count = check_ftrace_global_state(vmi);
-  int syscall_count = check_commonly_hooked_syscalls(vmi);
+  int syscall_count = check_commonly_hooked_syscalls(vmi, hooks_data);
 
   int hook_detections_count =
-      walk_ftrace_ops_list(vmi, kernel_start, kernel_end);
+      walk_ftrace_ops_list(vmi, kernel_start, kernel_end, hooks_data);
 
   int total_count = global_count + syscall_count + hook_detections_count;
+
+  // Set summary information
+  uint32_t total_hooks = hooks_data->loaded_programs->len;
+  uint32_t suspicious_hooks = 0;
+  for (guint i = 0; i < hooks_data->loaded_programs->len; i++) {
+    ftrace_hook_info_t* hook =
+        &g_array_index(hooks_data->loaded_programs, ftrace_hook_info_t, i);
+    if (hook->is_suspicious) {
+      suspicious_hooks++;
+    }
+  }
+
+  ftrace_hooks_state_set_summary(hooks_data, total_hooks, suspicious_hooks,
+                                 global_count > 0, syscall_count);
+
   log_debug("STATE_FTRACE_HOOKS: Global ftrace issues: %d", global_count);
   log_debug("STATE_FTRACE_HOOKS: Syscall-related issues: %d", syscall_count);
   log_info("STATE_FTRACE_HOOKS: Active hooks detected: %d",
@@ -341,6 +407,11 @@ uint32_t state_ftrace_hooks_callback(vmi_instance_t vmi, void* context) {
     log_info("STATE_FTRACE_HOOKS: No ftrace-based hooks detected");
   }
 
+  // Queue success response
+  int result = log_success_and_queue_response_task(
+      "ftrace_hooks_state", STATE_FTRACE_HOOKS, hooks_data,
+      (void (*)(void*))ftrace_hooks_state_data_free);
+
   log_info("STATE_FTRACE_HOOKS callback completed.");
-  return VMI_SUCCESS;
+  return result;
 }

@@ -8,6 +8,8 @@
 #include <string.h>
 #include "event_handler.h"
 #include "offsets.h"
+#include "state_callbacks/responses/io_uring_artifacts_response.h"
+#include "utils.h"
 
 #include <libvmi/libvmi.h>
 
@@ -94,11 +96,13 @@ static inline bool is_power_of_two_u32(uint32_t value) {
  * @param task_struct_addr The address of the task_struct to inspect.
  * @param pid The process ID of the task_struct.
  * @param procname The process name of the task_struct.
+ * @param data The io_uring artifacts state data to populate.
  */
 static void inspect_io_uring_for_task(vmi_instance_t vmi,
                                       // NOLINTNEXTLINE
                                       addr_t task_struct_addr, vmi_pid_t pid,
-                                      const char* procname) {
+                                      const char* procname,
+                                      io_uring_artifacts_state_data_t* data) {
   addr_t io_uring_task = 0;
   if (vmi_read_addr_va_retry(vmi, task_struct_addr + LINUX_OFFSET_TASK_IO_URING,
                              &io_uring_task) != VMI_SUCCESS ||
@@ -161,32 +165,65 @@ static void inspect_io_uring_for_task(vmi_instance_t vmi,
 
   // Both rings are sized to powers of two (rounded up by kernel).
   //   - man7 (rounded to next power of two): https://man7.org/linux/man-pages/man2/io_uring_setup.2.html
-  if (!is_power_of_two_u32(sq_entries)) {
+  bool sq_power_of_two = is_power_of_two_u32(sq_entries);
+  bool cq_power_of_two = is_power_of_two_u32(cq_entries);
+
+  if (!sq_power_of_two) {
     log_debug("PID %u (%s): SQ entries (%u) not power-of-two.", pid,
               procname ? procname : "?", sq_entries);
   }
-  if (!is_power_of_two_u32(cq_entries)) {
+  if (!cq_power_of_two) {
     log_debug(
         "PID %u (%s): CQ entries (%u) not power-of-two; possibly created with "
         "CQSIZE (still rounded by kernel).",
         pid, procname ? procname : "?", cq_entries);
+  }
+
+  // Check if instance is suspicious
+  bool is_suspicious = false;
+  if (!geometry_sane(sq_entries, cq_entries)) {
+    is_suspicious = true;
+  }
+  // Additional suspicious patterns could be added here
+
+  // Add instance to data structure
+  if (data) {
+    io_uring_artifacts_state_add_instance(
+        data, pid, procname, (uint64_t)io_uring_task, (uint64_t)ctx,
+        (uint64_t)rings, sq_entries, cq_entries,
+        geometry_sane(sq_entries, cq_entries), sq_power_of_two, cq_power_of_two,
+        is_suspicious);
   }
 }
 
 uint32_t state_io_uring_artifacts_callback(vmi_instance_t vmi, void* context) {
   // Preconditions
   if (!vmi || !context) {
-    log_error(
+    return log_error_and_queue_response_task(
+        "io_uring_artifacts_state", STATE_IO_URING_ARTIFACTS, INVALID_ARGUMENTS,
         "STATE_IO_URING_ARTIFACTS: Invalid arguments to io_uring artifacts "
-        "state callback.");
-    return VMI_FAILURE;
+        "state callback");
   }
 
   event_handler_t* event_handler = (event_handler_t*)context;
   if (!event_handler || !event_handler->is_paused) {
-    log_error(
-        "STATE_IO_URING_ARTIFACTS: Callback requires a paused VM instance.");
-    return VMI_FAILURE;
+    return log_error_and_queue_response_task(
+        "io_uring_artifacts_state", STATE_IO_URING_ARTIFACTS, INVALID_ARGUMENTS,
+        "STATE_IO_URING_ARTIFACTS: Callback requires a valid event handler "
+        "context");
+  }
+
+  log_info("Executing STATE_IO_URING_ARTIFACTS callback.");
+
+  // Create io_uring artifacts state data structure
+  io_uring_artifacts_state_data_t* artifacts_data =
+      io_uring_artifacts_state_data_new();
+  if (!artifacts_data) {
+    return log_error_and_queue_response_task(
+        "io_uring_artifacts_state", STATE_IO_URING_ARTIFACTS,
+        MEMORY_ALLOCATION_FAILURE,
+        "STATE_IO_URING_ARTIFACTS: Failed to allocate memory for io_uring "
+        "artifacts state data");
   }
 
   addr_t list_head = 0, cur_list_entry = 0, next_list_entry = 0;
@@ -210,21 +247,26 @@ uint32_t state_io_uring_artifacts_callback(vmi_instance_t vmi, void* context) {
   if (vmi_get_offset(vmi, "linux_tasks", &tasks_offset) != VMI_SUCCESS ||
       vmi_get_offset(vmi, "linux_pid", &pid_offset) != VMI_SUCCESS ||
       vmi_get_offset(vmi, "linux_name", &name_offset) != VMI_SUCCESS) {
-    log_error(
+    io_uring_artifacts_state_data_free(artifacts_data);
+    return log_error_and_queue_response_task(
+        "io_uring_artifacts_state", STATE_IO_URING_ARTIFACTS, VMI_OP_FAILURE,
         "STATE_IO_URING_ARTIFACTS: Failed to retrieve required task_struct "
-        "offsets from profile.");
-    return VMI_FAILURE;
+        "offsets from profile");
   }
 
   if (vmi_translate_ksym2v(vmi, "init_task", &list_head) != VMI_SUCCESS) {
-    log_error("STATE_IO_URING_ARTIFACTS: Failed to resolve init_task.");
-    return VMI_FAILURE;
+    io_uring_artifacts_state_data_free(artifacts_data);
+    return log_error_and_queue_response_task(
+        "io_uring_artifacts_state", STATE_IO_URING_ARTIFACTS, VMI_OP_FAILURE,
+        "STATE_IO_URING_ARTIFACTS: Failed to resolve init_task");
   }
 
   list_head += tasks_offset;
   if (vmi_read_addr_va_retry(vmi, list_head, &next_list_entry) != VMI_SUCCESS) {
-    log_error("STATE_IO_URING_ARTIFACTS: Failed to read first task pointer.");
-    return VMI_FAILURE;
+    io_uring_artifacts_state_data_free(artifacts_data);
+    return log_error_and_queue_response_task(
+        "io_uring_artifacts_state", STATE_IO_URING_ARTIFACTS, VMI_OP_FAILURE,
+        "STATE_IO_URING_ARTIFACTS: Failed to read first task pointer");
   }
 
   cur_list_entry = list_head;
@@ -240,20 +282,20 @@ uint32_t state_io_uring_artifacts_callback(vmi_instance_t vmi, void* context) {
 
   do {
     if (++visited > visited_cap) {
-      log_error(
-          "STATE_IO_URING_ARTIFACTS: Aborting; task list walk exceeded cap.");
-      return VMI_FAILURE;
+      io_uring_artifacts_state_data_free(artifacts_data);
+      return log_error_and_queue_response_task(
+          "io_uring_artifacts_state", STATE_IO_URING_ARTIFACTS, VMI_OP_FAILURE,
+          "STATE_IO_URING_ARTIFACTS: Aborting; task list walk exceeded cap");
     }
 
     /* Read the next pointer up-front to make advancement unconditional and remove goto. */
     addr_t next_after = 0;
     if (vmi_read_addr_va_retry(vmi, cur_list_entry, &next_after) !=
         VMI_SUCCESS) {
-      log_error(
-          "STATE_IO_URING_ARTIFACTS: Failed to read next task pointer at "
-          "0x%" PRIx64,
-          (uint64_t)cur_list_entry);
-      return VMI_FAILURE;
+      io_uring_artifacts_state_data_free(artifacts_data);
+      return log_error_and_queue_response_task(
+          "io_uring_artifacts_state", STATE_IO_URING_ARTIFACTS, VMI_OP_FAILURE,
+          "STATE_IO_URING_ARTIFACTS: Failed to read next task pointer");
     }
 
     current_task = cur_list_entry - tasks_offset;
@@ -277,7 +319,7 @@ uint32_t state_io_uring_artifacts_callback(vmi_instance_t vmi, void* context) {
         iou_sqp_count++;
     }
 
-    inspect_io_uring_for_task(vmi, current_task, pid, procname);
+    inspect_io_uring_for_task(vmi, current_task, pid, procname, artifacts_data);
 
     if (procname) {
       g_free(procname);
@@ -288,6 +330,25 @@ uint32_t state_io_uring_artifacts_callback(vmi_instance_t vmi, void* context) {
     cur_list_entry = next_after;
 
   } while (cur_list_entry != list_head);
+
+  // Set worker thread information
+  io_uring_artifacts_state_set_worker_threads(artifacts_data, iou_worker_count,
+                                              iou_sqp_count);
+
+  // Set summary information
+  uint32_t total_instances = artifacts_data->io_uring_instances->len;
+  uint32_t suspicious_instances = 0;
+  for (guint i = 0; i < artifacts_data->io_uring_instances->len; i++) {
+    io_uring_instance_info_t* instance = &g_array_index(
+        artifacts_data->io_uring_instances, io_uring_instance_info_t, i);
+    if (instance->is_suspicious) {
+      suspicious_instances++;
+    }
+  }
+
+  io_uring_artifacts_state_set_summary(
+      artifacts_data, total_instances, suspicious_instances,
+      iou_worker_count + iou_sqp_count, visited);
 
   /* Expected geometry:
    * CQ often >= SQ, historically sometimes 2x; apps may request larger CQ via CQSIZE.
@@ -300,7 +361,18 @@ uint32_t state_io_uring_artifacts_callback(vmi_instance_t vmi, void* context) {
       "all tasks. Weak signals: iou-wrk=%" PRIu64 ", iou-sqp=%" PRIu64,
       iou_worker_count, iou_sqp_count);
 
-  log_info("STATE_IO_URING_ARTIFACTS callback completed.");
+  if (suspicious_instances > 0) {
+    log_warn(
+        "STATE_IO_URING_ARTIFACTS: Found %u suspicious io_uring instances.",
+        suspicious_instances);
+  } else {
+    log_info(
+        "STATE_IO_URING_ARTIFACTS: No suspicious io_uring instances detected");
+  }
 
-  return VMI_SUCCESS;
+  log_info("STATE_IO_URING_ARTIFACTS callback completed.");
+  // Queue success response
+  return log_success_and_queue_response_task(
+      "io_uring_artifacts_state", STATE_IO_URING_ARTIFACTS, artifacts_data,
+      (void (*)(void*))io_uring_artifacts_state_data_free);
 }
