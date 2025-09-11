@@ -109,6 +109,8 @@ static bool is_suspicious_port(uint16_t port) {
       31337,  ///< Back Orifice backdoor default port (LEET).
       0,      ///< Port 0 is invalid.
       65535,  ///< Highest port, invalid.
+      5900,   ///< VNC Rooty
+      8222,   ///< Enyelkm
       // TODO: Add more after checking out the EBPF rootkit samples.
       8000,  ///< Default web server (ebpfkit uses).
   };

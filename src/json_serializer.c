@@ -12,6 +12,7 @@
 #include "event_callbacks/responses/page_table_modification_response.h"
 #include "event_callbacks/responses/syscall_table_write_response.h"
 #include "event_handler.h"
+#include "state_callbacks/responses/dir_string_matching_response.h"
 #include "state_callbacks/responses/ebpf_activity_response.h"
 #include "state_callbacks/responses/ftrace_hooks_response.h"
 #include "state_callbacks/responses/idt_table_response.h"
@@ -645,6 +646,18 @@ cJSON* response_to_json(const struct response* response) {
             cJSON_AddStringToObject(
                 data_json, "note",
                 "Failed to convert eBPF activity data to JSON");
+          }
+          break;
+        }
+        case STATE_DIR_STRING_MATCHING: {
+          dir_string_matching_state_data_t* matching_data =
+              (dir_string_matching_state_data_t*)response->data;
+          cJSON* matching_data_json = dir_string_matching_state_data_to_json(matching_data);
+          if (matching_data_json) {
+            cJSON_AddItemToObject(data_json, "dir_string_matching", matching_data_json);
+          } else {
+            cJSON_AddStringToObject(data_json, "note",
+                                    "Failed to convert directory string matching data to JSON");
           }
           break;
         }
