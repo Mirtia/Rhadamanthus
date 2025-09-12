@@ -468,8 +468,9 @@ static uint32_t walk_tcp_hash_table(vmi_instance_t vmi,
     }
 
     if (chain_count >= 100) {
-      log_debug("Excessive socket chain in bucket %u: %d connections.", i,
-                chain_count);
+      // Too noisy log...
+      // log_debug("Excessive socket chain in bucket %u: %d connections.", i,
+      //           chain_count);
       ctx->to_be_reviewed++;
     }
   }
