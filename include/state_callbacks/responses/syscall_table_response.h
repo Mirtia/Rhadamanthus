@@ -39,7 +39,6 @@
  *   ],
  *   "summary": {
  *     "total_hooked_syscalls": 0,
- *     "hooked_percentage": 0.0
  *   }
  * }
  */

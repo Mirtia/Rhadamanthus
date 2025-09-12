@@ -149,12 +149,5 @@ cJSON* syscall_table_state_data_to_json(
   cJSON_AddNumberToObject(summary, "total_hooked_syscalls",
                           (double)data->total_hooked);
 
-  double hooked_percentage = 0.0;
-  if (data->total_syscalls > 0) {
-    hooked_percentage =
-        ((double)data->total_hooked / (double)data->total_syscalls) * 100.0;
-  }
-  cJSON_AddNumberToObject(summary, "hooked_percentage", hooked_percentage);
-
   return root;
 }

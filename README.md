@@ -134,25 +134,45 @@ The introspector generates structured JSON output following Google's response sc
 
 ```json
 {
-  "timestamp": "2025-01-15T10:30:45.123Z",
-  "status": "SUCCESS",
-  "metadata": {
-    "task_type": "STATE",
-    "subtype": "STATE_FTRACE_HOOKS"
-  },
-  "data": {
-    "hooks_detected": 2,
-    "hooks": [
-      {
-        "function_name": "sys_openat",
-        "original_address": "0xffffffff81234567",
-        "hooked_address": "0xffffffffc0001234",
-        "hook_type": "ftrace_hook",
-        "attachment_type": "syscall"
-      }
-    ]
-  }
+	"timestamp":	"2025-09-12T14:30:50.106260",
+	"status":	"SUCCESS",
+	"metadata":	{
+		"task_type":	"STATE",
+		"subtype":	"STATE_SYSCALL_TABLE"
+	},
+	"data":	{
+		"syscall_table":	{
+			"kernel_range":	{
+				"start":	"0xffffffff8ee00000",
+				"end":	"0xffffffff8fe02402"
+			},
+			"syscall_table":	{
+				"address":	"0xffffffff90000320",
+				"total_syscalls":	300
+			},
+			"syscalls":	[{
+					"index":	0,
+					"name":	"read",
+					"address":	"0xffffffff8f193190",
+					"is_hooked":	false
+				}, {
+					"index":	1,
+					"name":	"write",
+					"address":	"0xffffffff8f1932c0",
+					"is_hooked":	false
+				},...{
+					"index":	299,
+					"name":	"recvmmsg",
+					"address":	"0xffffffff8f8b5e90",
+					"is_hooked":	false
+				}],
+			"summary":	{
+				"total_hooked_syscalls":	0
+			}
+		}
+	}
 }
+
 ```
 
 ## License
