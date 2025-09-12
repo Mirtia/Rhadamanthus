@@ -1,3 +1,5 @@
+# This script is used to inspect the io_uring offsets. Similarly, this can be done for other symbols
+# that their offsets are then added to the offsets.h file to be used for introspection.
 #!/usr/bin/bash
 # Usage: ./inspect_uring.sh [vmlinux_path] [logfile_path]
 

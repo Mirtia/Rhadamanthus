@@ -11,7 +11,6 @@ A Virtual Machine Introspection (VMI) framework for detecting Linux rootkits and
 
 🤔 If I had to pitch this, I would say "An amateurish downgraded untested DRAKVUF that focuses in kernel-mode rootkit detection and has a response format I prefer".
 
-
 ## System
 
 The framework was built and run under the following system specifications:
@@ -22,8 +21,6 @@ The framework was built and run under the following system specifications:
 - **CPU**: Intel(R) Core(TM) i7-8665U (2) @ 2.11 GHz with Intel VT-x enabled
 - **DomU VMs OS**: Ubuntu 20.04.6 LTS (Focal Fossa)
 - **DomU VMs Kernel version**: 5.15.0-139-generic
-
-
 
 ## Architecture
 
@@ -184,12 +181,6 @@ The introspector generates structured JSON output following [Google's response s
 ## License
 
 This project is licensed under the GNU Lesser General Public License v2.1 - see the [LICENSE](LICENSE) file for details.
-
-## Acknowledgments
-
-- **LibVMI** - Virtual Machine Introspection library.
-- **Xen Project** - Hypervisor platform.
-- **DRAKVUF** - Virtualization based agentless black-box binary analysis system.
 
 ## Citation
 
