@@ -89,14 +89,14 @@ static int compute_text_sha256(vmi_instance_t vmi, const char* sym_start,
     return -1;
   }
 
-  for (addr_t a = k_start; a < k_end;) {
-    size_t to_read = PAGE_SIZE - (a & (PAGE_SIZE - 1));
-    if (a + to_read > k_end)
-      to_read = (size_t)(k_end - a);
+  for (addr_t address = k_start; address < k_end;) {
+    size_t to_read = PAGE_SIZE - (address & (PAGE_SIZE - 1));
+    if (address + to_read > k_end)
+      to_read = (size_t)(k_end - address);
 
     size_t bytes_read = 0;
-    if (VMI_SUCCESS == vmi_read_va(vmi, a, 0 /* kernel ASID */, to_read, buffer,
-                                   &bytes_read)) {
+    if (VMI_SUCCESS ==
+        vmi_read_va(vmi, address, 0, to_read, buffer, &bytes_read)) {
       if (bytes_read && EVP_DigestUpdate(ctx, buffer, bytes_read) != 1) {
         (void)fprintf(stderr, "EVP_DigestUpdate failed\n");
         free(buffer);
@@ -104,11 +104,10 @@ static int compute_text_sha256(vmi_instance_t vmi, const char* sym_start,
         return -1;
       }
     } else {
-      // Tolerate holes/guard pages; continue
       (void)fprintf(stderr, "Failed to read kernel memory at 0x%" PRIx64 "\n",
-                    a);
+                    address);
     }
-    a += to_read;
+    address += to_read;
   }
 
   unsigned hlen = 0;
@@ -177,7 +176,6 @@ int main(int argc, char** argv) {
     return 2;
   }
 
-  // Init LibVMI
   vmi_instance_t vmi = NULL;
   vmi_init_data_t* init_data = NULL;
   if (VMI_FAILURE == vmi_init_complete(&vmi, (void*)domain, VMI_INIT_DOMAINNAME,
@@ -188,10 +186,9 @@ int main(int argc, char** argv) {
     return 1;
   }
 
-  // Pause if requested (recommended for baseline capture)
   if (pause_vm) {
     if (VMI_FAILURE == vmi_pause_vm(vmi)) {
-      (void)fprintf(stderr, "Failed to pause VM; continuing unpaused\n");
+      (void)fprintf(stderr, "Failed to pause VM. Continuing unpaused...\n");
     }
   }
 
@@ -206,7 +203,6 @@ int main(int argc, char** argv) {
   if (return_value != 0)
     return 1;
 
-  // Print hex to stdout
   for (unsigned i = 0; i < hlen; ++i)
     printf("%02x", hash[i]);
   putchar('\n');

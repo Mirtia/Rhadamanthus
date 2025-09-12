@@ -24,7 +24,7 @@ features:
     # - id: STATE_EBPF_ARTIFACTS
     # - id: STATE_KALLSYMS_SYMBOLS
     # - id: STATE_IO_URING_ARTIFACTS
-  # event:
+  event:
     - id: EVENT_FTRACE_HOOK
   #   - id: EVENT_SYSCALL_TABLE_WRITE
   #   - id: EVENT_IDT_WRITE
@@ -33,7 +33,7 @@ features:
   #   - id: EVENT_MSR_WRITE
   #   - id: EVENT_CODE_SECTION_MODIFY
   #   - id: EVENT_KALLSYMS_TABLE_WRITE
-  # interrupt:
+  interrupt:
     - id: INTERRUPT_EBPF_PROBE
   #   - id: INTERRUPT_IO_URING_RING_WRITE
     - id: INTERRUPT_NETFILTER_HOOK_WRITE

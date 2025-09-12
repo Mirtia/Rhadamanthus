@@ -1,7 +1,6 @@
 #!/usr/bin/bash
 set -euo pipefail
 
-# setup-kernel-dbgsym.sh
 # Configure Ubuntu DDEBs and install kernel debug symbols for the running kernel.
 
 want_proposed=0
@@ -59,9 +58,8 @@ fi
 echo "Refreshing APT indices ..."
 apt-get update -y
 
-# Determine candidate package name(s).
 PKG1="linux-image-${KREL}-dbgsym"
-PKG2="linux-image-${KREL}-generic-dbgsym"   # Some series publish this name instead
+PKG2="linux-image-${KREL}-generic-dbgsym"
 
 echo "Checking for candidate debug symbol packages:"
 apt-cache policy "${PKG1}" "${PKG2}" || true

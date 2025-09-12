@@ -8,13 +8,8 @@ VMLINUX=${1:-$DEFAULT_VMLINUX}
 LOGFILE=${2:-$DEFAULT_LOGFILE}
 
 touch "$LOGFILE"
-
 {
-  echo "===== Inspecting $VMLINUX at $(date) ====="
-
-  echo
-  echo "[*] Checking file type for $VMLINUX"
-  file "$VMLINUX"
+  echo "Inspecting $VMLINUX at $(date)..."
 
   echo
   sudo pahole --hex -C io_ring_ctx,io_rings,io_kiocb,io_uring_task "$VMLINUX"
@@ -32,6 +27,6 @@ touch "$LOGFILE"
     -ex 'ptype /o struct io_kiocb' \
     -ex quit
 
-  echo "===== Done $(date) ====="
+  echo "Done $(date)..."
   echo
 } >>"$LOGFILE" 2>&1
