@@ -29,10 +29,11 @@ The framework was built and run under the following system specifications:
 
 The following figure shows the VMI-Introspector in relation to the whole Experimental Setup as described in the Thesis.
 
-- **Drakvuf**: Used to inject the modules and processes to the infected VM to mark the start of the infection phase and start the Cluless-Admin monitor. 
-- **Clueless-Admin**: A baseline in-guest monitoring toolkit for rootkit detection.
-- **Clueless-Attacker**: A list of actions that imitate attacker post-infection behavior.
-- **Discrepancy-Checker**: A simple JSON comparison implementation to observe discrepancies (wherever possible) between **in-guest** monitoring and **privileged VM** hypervisor based monitoring.
+- **[Rhadamanthus (VMI-Introspector)](https://github.com/Mirtia/Rhadamanthus)**: Performs live introspection to collect information about machine integrity and detect events associated with rootkit behavior.
+- **[Drakvuf](https://github.com/tklengyel/drakvuf)**: Used to inject the modules and processes to the infected VM to mark the start of the infection phase and start the Cluless-Admin monitor. 
+- **[Clueless-Admin](https://github.com/Mirtia/Clueless-Admin)**: A baseline in-guest monitoring toolkit for rootkit detection.
+- **[Clueless-Attacker](https://github.com/Mirtia/Clueless-Attacker)**: A list of actions that imitate attacker post-infection behavior.
+- **[Discrepancy-Checker](https://github.com/Mirtia/Discrepancy-Checker)**: A simple JSON comparison implementation to observe discrepancies (wherever possible) between **in-guest** monitoring and **privileged VM** hypervisor based monitoring.
 
 ![Architecture](docs/images/Architecture_Professional.drawio.png)
 

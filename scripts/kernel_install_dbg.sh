@@ -71,7 +71,7 @@ apt-cache policy "${PKG1}" "${PKG2}" || true
 echo "Checking for candidate kernel header package:"
 apt-cache policy "${HEADER_PKG}" || true
 
-# Try to install whichever debug symbol package exists.
+# Install debug symbols - try the main package first, then fall back to generic variant.
 installed_pkg=""
 if apt-cache policy "${PKG1}" | grep -q "Candidate:" && \
    ! apt-cache policy "${PKG1}" | grep -q "Candidate: (none)"; then
