@@ -136,7 +136,7 @@ features:
 
 ## Response Format
 
-The introspector generates structured JSON output following Google's response schema:
+The introspector generates structured JSON output following [Google's response schema](https://google.github.io/styleguide/jsoncstyleguide.xml). The following example is the result of `STATE_SYSCALL_TABLE` callback. The full list of results is emitted.
 
 ```json
 {
@@ -166,7 +166,7 @@ The introspector generates structured JSON output following Google's response sc
 					"name":	"write",
 					"address":	"0xffffffff8f1932c0",
 					"is_hooked":	false
-				},...{
+				}, {
 					"index":	299,
 					"name":	"recvmmsg",
 					"address":	"0xffffffff8f8b5e90",
