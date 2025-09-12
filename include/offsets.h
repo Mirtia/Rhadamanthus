@@ -109,12 +109,15 @@
 #define LINUX_FTRACE_OPS_FUNC_OFFSET 0x00
 #define LINUX_FTRACE_OPS_NEXT_OFFSET 0x08
 #define LINUX_FTRACE_OPS_FLAGS_OFFSET 0x10
-#define LINUX_FTRACE_OPS_PRIVATE_OFFSET 0x18
-#define LINUX_FTRACE_OPS_SAVED_FUNC_OFFSET 0x20
+// #define LINUX_FTRACE_OPS_PRIVATE_OFFSET 0x1
+// #define LINUX_FTRACE_OPS_SAVED_FUNC_OFFSET 0x2
+#define LINUX_FTRACE_OPS_LOCAL_HASH_OFFSET 0x28
 #define LINUX_FTRACE_OPS_FUNC_HASH_OFFSET 0x58
+#define LINUX_FTRACE_OPS_OLD_HASH_OFFSET 0x60
 #define LINUX_FTRACE_OPS_TRAMPOLINE_OFFSET 0x90
 #define LINUX_FTRACE_OPS_TRAMPOLINE_SIZE_OFFSET 0x98
 #define LINUX_FTRACE_OPS_LIST_OFFSET 0xA0
+#define LINUX_FTRACE_OPS_SIZE 0xB0
 
 #define LINUX_OFFSET_TASK_IO_URING 0xC08
 #define LINUX_OFFSET_IO_URING_TASK_LAST 0x20
@@ -137,6 +140,8 @@
 
 // TODO: These offsets have to be extracted using pahole and may be later used for the directory string matching state callback.
 
+// These are placeholders for future filesystem state callbacks, not used currently.
+/*
 // dentry structure offsets
 #define LINUX_OFF_DENTRY_D_NAME 0x00
 #define LINUX_OFF_DENTRY_D_INODE 0x00
@@ -152,5 +157,47 @@
 #define LINUX_OFF_INODE_I_UID 0x00
 #define LINUX_OFF_INODE_I_GID 0x00
 #define LINUX_OFF_INODE_I_MTIME 0x00
+*/
+
+// ftrace_ops structure offsets
+#define LINUX_FTRACE_OPS_FUNC_OFFSET 0x00
+#define LINUX_FTRACE_OPS_NEXT_OFFSET 0x08
+#define LINUX_FTRACE_OPS_FLAGS_OFFSET 0x10
+// Note: These ftrace offsets are not currently used by any files
+// #define LINUX_FTRACE_OPS_PRIVATE_OFFSET          0x18
+// #define LINUX_FTRACE_OPS_SAVED_FUNC_OFFSET       0x20
+#define LINUX_FTRACE_OPS_LOCAL_HASH_OFFSET 0x28
+#define LINUX_FTRACE_OPS_FUNC_HASH_OFFSET 0x58
+#define LINUX_FTRACE_OPS_OLD_HASH_OFFSET 0x60
+#define LINUX_FTRACE_OPS_TRAMPOLINE_OFFSET 0x90
+#define LINUX_FTRACE_OPS_TRAMPOLINE_SIZE_OFFSET 0x98
+#define LINUX_FTRACE_OPS_LIST_OFFSET 0xA0
+#define LINUX_FTRACE_OPS_SIZE 0xB0
+
+// ftrace_ops_hash structure offsets (embedded, 48 bytes)
+#define FTRACE_OPS_HASH_FILTER_OFF 0x00
+#define FTRACE_OPS_HASH_NOTRACE_OFF 0x18
+
+// ftrace_hash structure offsets (24 bytes)
+#define FTRACE_HASH_SIZE_BITS_OFF 0x00
+#define FTRACE_HASH_BUCKETS_OFF 0x08
+#define FTRACE_HASH_COUNT_OFF 0x10
+
+// ftrace_func_entry structure offsets (24 bytes)
+#define FTRACE_FUNC_ENTRY_IP_OFF 0x00
+#define FTRACE_FUNC_ENTRY_HLIST_NEXT 0x08
+#define FTRACE_FUNC_ENTRY_HLIST_PPREV 0x10
+#define FTRACE_FUNC_ENTRY_SIZE 0x18
+
+// ftrace_page structure offsets
+#define FTRACE_PAGE_NEXT_OFF 0x00
+#define FTRACE_PAGE_RECORDS_OFF 0x08
+#define FTRACE_PAGE_INDEX_OFF 0x10
+#define FTRACE_PAGE_ORDER_OFF 0x14
+#define FTRACE_PAGE_SIZE_OFF 0x18
+
+// dyn_ftrace structure offsets
+#define DYN_FTRACE_IP_OFF 0x00
+#define DYN_FTRACE_FLAGS_OFF 0x08
 
 #endif  // OFFSETS_H

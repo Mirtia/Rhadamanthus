@@ -1,0 +1,67 @@
+15:20:21 [36mDEBUG[0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/config_parser.c:212:[0m Parsed state task ID: STATE_FTRACE_HOOKS
+15:20:21 [36mDEBUG[0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/config_parser.c:216:[0m Added state task ID: 1
+15:20:21 [36mDEBUG[0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/config_parser.c:212:[0m Parsed state task ID: STATE_SYSCALL_TABLE
+15:20:21 [36mDEBUG[0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/config_parser.c:216:[0m Added state task ID: 3
+15:20:21 [32mINFO [0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/json_serializer.c:107:[0m Created JSON serializer
+15:20:21 [36mDEBUG[0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/json_serializer.c:144:[0m Set global JSON serializer
+15:20:21 [32mINFO [0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/event_handler.c:697:[0m No interrupt breakpoints registered
+15:20:21 [32mINFO [0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/event_handler.c:397:[0m Started event window thread to run for 10000 ms.
+15:20:21 [32mINFO [0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/event_handler.c:459:[0m Started json serialization thread.
+15:20:21 [32mINFO [0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/event_handler.c:343:[0m Pre-sampling state tasks before starting the event loop thread...
+15:20:21 [32mINFO [0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/event_handler.c:486:[0m Sampling state task: STATE_FTRACE_HOOKS
+15:20:21 [32mINFO [0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:853:[0m Executing STATE_FTRACE_HOOKS callback.
+15:20:22 [36mDEBUG[0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:722:[0m FTRACE_DETECTION: Attempting ftrace_pages enumeration at 0xffffffff92101df8
+15:20:22 [36mDEBUG[0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:274:[0m FTRACE_DETECTION: enumerate_dyn_ftrace_sites - starting at 0xffffffff92101df8
+15:20:22 [36mDEBUG[0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:294:[0m FTRACE_DETECTION: enumerate_dyn_ftrace_sites - page 0 invalid: records=0x0 size=1 index=2432952896
+15:20:22 [36mDEBUG[0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:330:[0m FTRACE_DETECTION: enumerate_dyn_ftrace_sites - completed, found 0 total sites
+15:20:22 [36mDEBUG[0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:727:[0m FTRACE_DETECTION: ftrace_pages method found 0 call sites
+15:20:22 [33mWARN [0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:735:[0m FTRACE_DETECTION: ftrace_pages method FAILED - no call sites found
+15:20:22 [36mDEBUG[0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:746:[0m FTRACE_DETECTION: Attempting __mcount_loc fallback method
+15:20:22 [36mDEBUG[0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:358:[0m FTRACE_DETECTION: enumerate_mcount_loc_sites - attempting to resolve __start_mcount_loc and __stop_mcount_loc
+15:20:22 [36mDEBUG[0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:372:[0m FTRACE_DETECTION: enumerate_mcount_loc_sites - resolved symbols: start=0xffffffff91270680 stop=0xffffffff912d2af8
+15:20:22 [36mDEBUG[0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:389:[0m FTRACE_DETECTION: enumerate_mcount_loc_sites - processing 50319 entries (size=402552, max=2000)
+15:20:22 [36mDEBUG[0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:412:[0m FTRACE_DETECTION: enumerate_mcount_loc_sites - completed, found 0 total sites
+15:20:22 [36mDEBUG[0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:749:[0m FTRACE_DETECTION: __mcount_loc method found 0 call sites
+15:20:22 [33mWARN [0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:757:[0m FTRACE_DETECTION: __mcount_loc method FAILED - no call sites found
+15:20:22 [36mDEBUG[0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:768:[0m FTRACE_DETECTION: Checking 0 target functions for rootkit matches
+15:20:22 [32mINFO [0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:783:[0m FTRACE_DETECTION: Target function matching found 0 rootkit matches
+15:20:22 [36mDEBUG[0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:788:[0m FTRACE_DETECTION: Starting direct memory scanning method
+15:20:22 [36mDEBUG[0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:526:[0m FTRACE_DETECTION: scan_for_direct_hooks - starting direct memory scan of known rootkit targets
+15:20:22 [36mDEBUG[0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:571:[0m FTRACE_DETECTION: scan_for_direct_hooks - found hook in tcp4_seq_show at 0xffffffff8f9bac60 -> 0xffffffffc079c000
+15:20:22 [36mDEBUG[0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:571:[0m FTRACE_DETECTION: scan_for_direct_hooks - found hook in tcp6_seq_show at 0xffffffff8fa6fea0 -> 0xffffffffc079e000
+15:20:22 [36mDEBUG[0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:571:[0m FTRACE_DETECTION: scan_for_direct_hooks - found hook in __x64_sys_getdents64 at 0xffffffff8f1ad800 -> 0xffffffffc07a0000
+15:20:22 [36mDEBUG[0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:571:[0m FTRACE_DETECTION: scan_for_direct_hooks - found hook in __x64_sys_getdents at 0xffffffff8f1ad6e0 -> 0xffffffffc07a2000
+15:20:22 [36mDEBUG[0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:571:[0m FTRACE_DETECTION: scan_for_direct_hooks - found hook in __x64_sys_kill at 0xffffffff8eed7210 -> 0xffffffffc07a4000
+15:20:22 [36mDEBUG[0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:584:[0m FTRACE_DETECTION: scan_for_direct_hooks - completed: checked 60 targets, 59 had addresses, found 5 hooks
+15:20:22 [32mINFO [0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:793:[0m FTRACE_DETECTION: Direct memory scanning method SUCCESS - found 5 hooks
+15:20:22 [36mDEBUG[0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:804:[0m FTRACE_DETECTION: Starting ftrace_ops_list analysis method
+15:20:22 [36mDEBUG[0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:616:[0m FTRACE_DETECTION: analyze_ftrace_operations - attempting to resolve ftrace_ops_list symbol
+15:20:22 [36mDEBUG[0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:628:[0m FTRACE_DETECTION: analyze_ftrace_operations - resolved ftrace_ops_list at 0xffffffff9103ea10
+15:20:22 [36mDEBUG[0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:673:[0m FTRACE_DETECTION: analyze_ftrace_operations - completed: checked 1 operations, found 6 suspicious callbacks
+15:20:22 [32mINFO [0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:810:[0m FTRACE_DETECTION: ftrace_ops_list analysis method SUCCESS - found 1 hooks
+15:20:22 [32mINFO [0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:824:[0m FTRACE_DETECTION: Detection summary:
+15:20:22 [32mINFO [0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:825:[0m FTRACE_DETECTION: - Total target functions found: 0
+15:20:22 [32mINFO [0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:827:[0m FTRACE_DETECTION: - Rootkit target matches: 0
+15:20:22 [32mINFO [0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:828:[0m FTRACE_DETECTION: - Direct scan hooks found: 5
+15:20:22 [32mINFO [0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:830:[0m FTRACE_DETECTION: - Ftrace ops hooks found: 1
+15:20:22 [32mINFO [0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:832:[0m FTRACE_DETECTION: - Total suspicious hooks: 6
+15:20:22 [32mINFO [0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:865:[0m STATE_FTRACE_HOOKS: Active hooks detected: 6
+15:20:22 [32mINFO [0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:866:[0m STATE_FTRACE_HOOKS: Total suspicious findings: 6
+15:20:22 [33mWARN [0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:869:[0m STATE_FTRACE_HOOKS: 6 active function hooks found!
+15:20:22 [32mINFO [0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/ftrace_hooks.c:873:[0m STATE_FTRACE_HOOKS callback completed.
+15:20:22 [32mINFO [0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/event_handler.c:486:[0m Sampling state task: STATE_SYSCALL_TABLE
+15:20:22 [32mINFO [0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/syscall_table.c:103:[0m Executing STATE_SYSCALL_TABLE callback.
+15:20:22 [32mINFO [0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/syscall_table.c:138:[0m STATE_SYSCALL_TABLE: Kernel text range: [0xffffffff8ee00000, 0xffffffff8fe02402]
+15:20:22 [36mDEBUG[0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/json_serializer.c:82:[0m Wrote JSON response to: ftrace_hooks_state_58570664730.json
+15:20:22 [32mINFO [0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/syscall_table.c:156:[0m STATE_SYSCALL_TABLE: sys_call_table address: 0xffffffff90000320
+15:20:22 [32mINFO [0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/syscall_table.c:193:[0m STATE_SYSCALL_TABLE: No hooked syscalls detected.
+15:20:22 [32mINFO [0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/state_callbacks/syscall_table.c:202:[0m STATE_SYSCALL_TABLE callback completed.
+15:20:22 [32mINFO [0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/event_handler.c:346:[0m Starting event loop thread with window size: 10000 ms
+15:20:22 [36mDEBUG[0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/json_serializer.c:82:[0m Wrote JSON response to: syscall_table_state_58570687225.json
+15:20:31 [32mINFO [0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/event_handler.c:377:[0m event_window: Signaled event loop to stop after 10000 ms.
+15:20:32 [32mINFO [0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/event_handler.c:357:[0m Event loop thread has finished processing events, exiting...
+15:20:32 [32mINFO [0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/event_handler.c:358:[0m Signaling JSON serialization thread to stop...
+15:20:32 [32mINFO [0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/event_handler.c:431:[0m JSON serialization stopping, processing remaining responses...
+15:20:32 [32mINFO [0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/event_handler.c:435:[0m JSON serialization finished, processed 0 remaining responses
+15:20:32 [32mINFO [0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/event_handler.c:440:[0m Final JSON stats - queued: 2, written: 2, errors: 0
+15:20:32 [36mDEBUG[0m [90m/home/nootkit/VMI-Linux-Rootkit-Feature-Collection/src/json_serializer.c:146:[0m Cleared global JSON serializer

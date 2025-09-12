@@ -136,6 +136,7 @@ event_handler_t* event_handler_initialize(vmi_instance_t vmi,
   event_handler->state_sampling_ms = state_sampling_ms;
   event_handler->vmi = vmi;
   event_handler->stop_signal = 0;
+  event_handler->stop_signal_json_serialization = 0;
   event_handler->is_paused = false;
   // Initialize with timestamp when the first task state sampling is performed.
   // 0 is a placeholder value, indicating that no state sampling has been performed yet.
@@ -354,6 +355,8 @@ static gpointer event_loop_thread(gpointer data) {
   }
   // Process any remaining events.
   log_info("Event loop thread has finished processing events, exiting...");
+  log_info("Signaling JSON serialization thread to stop...");
+  g_atomic_int_set(&event_handler->stop_signal_json_serialization, 1);
   return NULL;
 }
 
@@ -411,7 +414,7 @@ static gpointer json_serialization(gpointer data) {
   json_serializer_t* serializer = event_handler->serializer;
   uint64_t last_flush = g_get_monotonic_time() / 1000;
 
-  while (!g_atomic_int_get(&event_handler->stop_signal)) {
+  while (!g_atomic_int_get(&event_handler->stop_signal_json_serialization)) {
     int result = json_serializer_process_one(serializer);
 
     // Poll for 1ms

@@ -88,7 +88,9 @@ struct event_handler {
   json_serializer_t* serializer;  ///< The JSON serializer instance.
   volatile sig_atomic_t
       stop_signal;  ///< Signal to stop the event loop after the time window.
-  volatile bool is_paused;  ///< Flag to indicate if vm is paused.
+  volatile sig_atomic_t
+      stop_signal_json_serialization;  ///< Signal to stop the JSON serialization thread.
+  volatile bool is_paused;             ///< Flag to indicate if vm is paused.
 };
 
 /**
