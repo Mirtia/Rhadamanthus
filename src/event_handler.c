@@ -443,9 +443,9 @@ static gpointer json_serialization(gpointer data) {
   return NULL;
 }
 
-void event_handler_start_json_serilaziation(event_handler_t* event_handler) {
+void event_handler_start_json_serialization(event_handler_t* event_handler) {
   if (!event_handler) {
-    log_error("event_handler_start_json_serilaziation: NULL handler.");
+    log_error("event_handler_start_json_serialization: NULL handler.");
     return;
   }
 
@@ -454,7 +454,7 @@ void event_handler_start_json_serilaziation(event_handler_t* event_handler) {
       g_thread_new("json_serilaziation", json_serialization, event_handler);
   if (!event_handler->json_serialization_thread) {
     log_error(
-        "event_handler_start_json_serilaziation: Failed to create thread.");
+        "event_handler_start_json_serialization: Failed to create thread.");
   } else {
     log_info("Started json serialization thread.");
   }

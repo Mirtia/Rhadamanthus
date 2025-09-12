@@ -254,7 +254,7 @@ static gpointer event_window(gpointer data);
  *
  * @param event_handler The event_handler instance.
  */
-void event_handler_start_json_serilaziation(event_handler_t* event_handler);
+void event_handler_start_json_serialization(event_handler_t* event_handler);
 
 /**
  * @brief The function that calls all state functors.
