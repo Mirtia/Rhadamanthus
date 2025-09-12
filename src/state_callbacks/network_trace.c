@@ -244,7 +244,7 @@ static bool is_suspicious_ip(uint32_t ip_addr) {
 
   // Pass network order to ipv4_is_public (it expects ip_be)
   if (ipv4_is_public(htonl(ip_addr))) {
-    log_debug("Public IP detected: %u.%u.%u.%u", octets[0], octets[1],
+    log_debug("Public IP detected: %u.%u.%u.%u.", octets[0], octets[1],
               octets[2], octets[3]);
     return true;
   }
@@ -286,7 +286,7 @@ static uint32_t walk_tcp_hash_table(vmi_instance_t vmi,
   // Get tcp_hashinfo global symbol
   if (vmi_translate_ksym2v(vmi, "tcp_hashinfo", &tcp_hashinfo_addr) !=
       VMI_SUCCESS) {
-    log_error("Failed to resolve tcp_hashinfo global symbol");
+    log_error("Failed to resolve tcp_hashinfo global symbol.");
     return VMI_FAILURE;
   }
 
@@ -297,11 +297,11 @@ static uint32_t walk_tcp_hash_table(vmi_instance_t vmi,
       vmi_read_32_va(vmi,
                      tcp_hashinfo_addr + LINUX_INET_HASHINFO_EHASH_MASK_OFFSET,
                      0, &ehash_mask) != VMI_SUCCESS) {
-    log_error("Failed to read TCP established hash table info");
+    log_error("Failed to read TCP established hash table info.");
     return VMI_FAILURE;
   }
 
-  log_debug("TCP ehash=0x%" PRIx64 " mask=0x%x", ehash, ehash_mask);
+  log_debug("TCP ehash=0x%" PRIx64 " mask=0x%x.", ehash, ehash_mask);
 
   // inet_ehash_bucket layout (x86_64): spinlock (8 bytes) + hlist_nulls_head (first pointer @ +8)
   const addr_t ehash_bucket_stride = 16;  // sizeof(struct inet_ehash_bucket)
@@ -411,7 +411,7 @@ static uint32_t walk_tcp_hash_table(vmi_instance_t vmi,
         char laddr_str[INET_ADDRSTRLEN], raddr_str[INET_ADDRSTRLEN];
         inet_ntop(AF_INET, &laddr, laddr_str, sizeof(laddr_str));
         inet_ntop(AF_INET, &raddr, raddr_str, sizeof(raddr_str));
-        log_debug("TCP connection: %s:%u -> %s:%u state=%s", laddr_str,
+        log_debug("TCP connection: %s:%u -> %s:%u state=%s.", laddr_str,
                   conn.local_port, raddr_str, conn.remote_port,
                   tcp_state_to_string((tcp_state_t)conn.state));
 
@@ -422,7 +422,7 @@ static uint32_t walk_tcp_hash_table(vmi_instance_t vmi,
             is_suspicious_port(conn.remote_port)) {
           inet_ntop(AF_INET, &laddr, laddr_str, sizeof(laddr_str));
           inet_ntop(AF_INET, &raddr, raddr_str, sizeof(raddr_str));
-          log_debug("Suspicious Port: %s:%u -> %s:%u", laddr_str,
+          log_debug("Suspicious Port: %s:%u -> %s:%u.", laddr_str,
                     conn.local_port, raddr_str, conn.remote_port);
           suspicious = true;
         }
@@ -431,7 +431,7 @@ static uint32_t walk_tcp_hash_table(vmi_instance_t vmi,
         if (ipv4_is_public(saddr_be) || ipv4_is_public(daddr_be)) {
           inet_ntop(AF_INET, &laddr, laddr_str, sizeof(laddr_str));
           inet_ntop(AF_INET, &raddr, raddr_str, sizeof(raddr_str));
-          log_debug("Suspicious IP (public): %s:%u -> %s:%u", laddr_str,
+          log_debug("Suspicious IP (public): %s:%u -> %s:%u.", laddr_str,
                     conn.local_port, raddr_str, conn.remote_port);
           suspicious = true;
         }
@@ -457,7 +457,7 @@ static uint32_t walk_tcp_hash_table(vmi_instance_t vmi,
 
       // Loop detection
       if (next_ptr == node_addr || next_ptr == prev_node_addr) {
-        log_debug("Loop detected in bucket %u", i);
+        log_debug("Loop detected in bucket %u.", i);
         break;
       }
 
@@ -468,13 +468,13 @@ static uint32_t walk_tcp_hash_table(vmi_instance_t vmi,
     }
 
     if (chain_count >= 100) {
-      log_debug("Excessive socket chain in bucket %u: %d connections", i,
+      log_debug("Excessive socket chain in bucket %u: %d connections.", i,
                 chain_count);
       ctx->to_be_reviewed++;
     }
   }
 
-  log_debug("Completed TCP hash table walk, found %u connections",
+  log_debug("Completed TCP hash table walk, found %u connections.",
             ctx->kernel_connections->len);
 
   return VMI_SUCCESS;
@@ -492,7 +492,7 @@ static uint32_t check_netfilter_hooks(vmi_instance_t vmi,
   addr_t init_net_addr = 0;
 
   if (vmi_translate_ksym2v(vmi, "init_net", &init_net_addr) != VMI_SUCCESS) {
-    log_error("Failed to resolve init_net symbol");
+    log_error("Failed to resolve init_net symbol.");
     return VMI_FAILURE;
   }
 

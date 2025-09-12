@@ -32,8 +32,8 @@ static inline unsigned long get_offset_from_config(vmi_instance_t vmi,
                                                    const char* key) {
   unsigned long offset = 0;
   vmi_get_offset(vmi, key, &offset) == VMI_SUCCESS
-      ? log_debug("STATE_EBPF_ARTIFACTS: offset %s = 0x%lx", key, offset)
-      : log_debug("STATE_EBPF_ARTIFACTS: offset %s not found", key);
+      ? log_debug("STATE_EBPF_ARTIFACTS: offset %s = 0x%lx.", key, offset)
+      : log_debug("STATE_EBPF_ARTIFACTS: offset %s not found.", key);
   return offset;
 }
 
@@ -87,7 +87,7 @@ static uint64_t xa_dfs_count_collect(vmi_instance_t vmi, addr_t node_va,
   uint8_t count_field = 0;
   if (vmi_read_8_va(vmi, node_va + LINUX_OFF_XA_NODE_COUNT, 0, &count_field) !=
       VMI_SUCCESS) {
-    log_warn("XArray: cannot read count field at 0x%lx",
+    log_warn("XArray: cannot read count field at 0x%lx.",
              (unsigned long)(node_va + LINUX_OFF_XA_NODE_COUNT));
     return 0;
   }
@@ -144,7 +144,7 @@ static uint64_t idr_count_collect(vmi_instance_t vmi, addr_t idr_va,
   if (vmi_read_addr_va(vmi, xarray_va + LINUX_OFF_XARRAY_XA_HEAD, 0,
                        &xa_head) != VMI_SUCCESS ||
       !xa_head) {
-    log_debug("XArray: cannot read head at 0x%lx",
+    log_debug("XArray: cannot read head at 0x%lx.",
               (unsigned long)(xarray_va + LINUX_OFF_XARRAY_XA_HEAD));
     return 0;
   }
@@ -189,7 +189,7 @@ static void report_idr(vmi_instance_t vmi, const char* label, const char* sym,
   if (collect && len) {
     uint32_t dump = len < 10 ? len : 10;
     for (uint32_t i = 0; i < dump; i++) {
-      log_debug("%s[%u] = 0x%lx", label, i, (unsigned long)buf[i]);
+      log_debug("%s[%u] = 0x%lx.", label, i, (unsigned long)buf[i]);
     }
   }
 }
@@ -218,7 +218,7 @@ static int maybe_print_bpf_file(vmi_instance_t vmi, int32_t tgid,
   if (s->map_fops && fops == s->map_fops) {
     uint32_t id = 0;
     vmi_read_32_va(vmi, priv + LINUX_BPF_MAP_ID_OFFSET, 0, &id);
-    log_info("[PID %d] %-8s FD->BPF-MAP : file=0x%lx map=0x%lx id=%u",
+    log_info("[PID %d] %-8s FD->BPF-MAP: file=0x%lx map=0x%lx id=%u.",
              (int)tgid, comm, (unsigned long)file_va, (unsigned long)priv, id);
 
     if (data) {
@@ -261,7 +261,7 @@ static int maybe_print_bpf_file(vmi_instance_t vmi, int32_t tgid,
   if (s->link_fops && fops == s->link_fops) {
     uint32_t id = 0;
     vmi_read_32_va(vmi, priv + LINUX_OFF_BPF_LINK_ID, 0, &id);
-    log_info("[PID %d] %-8s FD->BPF-LINK: file=0x%lx link=0x%lx id=%u",
+    log_info("[PID %d] %-8s FD->BPF-LINK: file=0x%lx link=0x%lx id=%u.",
              (int)tgid, comm, (unsigned long)file_va, (unsigned long)priv, id);
 
     if (data) {
@@ -288,20 +288,20 @@ static void scan_task_bpf_fds(vmi_instance_t vmi,
 
   if (vmi_read_32_va(vmi, task_va + config_offsets->pid_offset, 0,
                      (uint32_t*)&pid) != VMI_SUCCESS) {
-    log_debug("STATE_EBPF_ARTIFACTS: cannot read pid at 0x%lx",
+    log_debug("STATE_EBPF_ARTIFACTS: cannot read pid at 0x%lx.",
               (unsigned long)(task_va + config_offsets->pid_offset));
     return;
   }
   if (vmi_read_32_va(vmi, task_va + LINUX_OFF_TASK_TGID, 0, (uint32_t*)&tgid) !=
       VMI_SUCCESS) {
-    log_debug("STATE_EBPF_ARTIFACTS: cannot read tgid at 0x%lx",
+    log_debug("STATE_EBPF_ARTIFACTS: cannot read tgid at 0x%lx.",
               (unsigned long)(task_va + LINUX_OFF_TASK_TGID));
     return;
   }
 
   if (vmi_read_va(vmi, task_va + config_offsets->comm_offset, 0, sizeof(comm),
                   comm, NULL) != VMI_SUCCESS) {
-    log_debug("STATE_EBPF_ARTIFACTS: cannot read comm at 0x%lx",
+    log_debug("STATE_EBPF_ARTIFACTS: cannot read comm at 0x%lx.",
               (unsigned long)(task_va + config_offsets->comm_offset));
     return;
   }

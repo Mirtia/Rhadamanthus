@@ -30,7 +30,7 @@ const char* state_task_id_to_str(state_task_id_t task_id) {
     case STATE_KALLSYMS_SYMBOLS:
       return "STATE_KALLSYMS_SYMBOLS";
     default:
-      log_error("Unknown state task with code: %d", task_id);
+      log_error("Unknown state task with code: %d.", task_id);
       return NULL;
   }
 }
@@ -54,7 +54,7 @@ const char* event_task_id_to_str(event_task_id_t task_id) {
     case EVENT_KALLSYMS_TABLE_WRITE:
       return "EVENT_KALLSYMS_TABLE_WRITE";
     default:
-      log_error("Unknown event task with code: %d", task_id);
+      log_error("Unknown event task with code: %d.", task_id);
       return NULL;
   }
 }
@@ -68,7 +68,7 @@ const char* interrupt_task_id_to_str(interrupt_task_id_t task_id) {
     case INTERRUPT_NETFILTER_HOOK_WRITE:
       return "INTERRUPT_NETFILTER_HOOK_WRITE";
     default:
-      log_error("Unknown interrupt task with code: %d", task_id);
+      log_error("Unknown interrupt task with code: %d.", task_id);
       return NULL;
   }
 }
@@ -83,7 +83,7 @@ int state_task_id_from_str(const char* str) {
     if (strcmp(str, state_task_id_to_str(i)) == 0)
       return i;
   }
-  log_error("Unknown state task ID string: %s", str);
+  log_error("Unknown state task ID string: %s.", str);
   return -1;
 }
 
@@ -97,7 +97,7 @@ int event_task_id_from_str(const char* str) {
     if (strcmp(str, event_task_id_to_str(i)) == 0)
       return i;
   }
-  log_error("Unknown event task ID string: %s", str);
+  log_error("Unknown event task ID string: %s.", str);
   return -1;
 }
 
@@ -111,7 +111,7 @@ int interrupt_task_id_from_str(const char* str) {
     if (strcmp(str, interrupt_task_id_to_str(i)) == 0)
       return i;
   }
-  log_error("Unknown interrupt task ID string: %s", str);
+  log_error("Unknown interrupt task ID string: %s.", str);
   return -1;
 }
 
@@ -150,7 +150,7 @@ event_handler_t* event_handler_initialize(vmi_instance_t vmi,
 
   event_handler->interrupt_context = interrupt_context_init(INITIAL_CAPACITY);
   if (!event_handler->interrupt_context) {
-    log_error("Failed to initialize interrupt context");
+    log_error("Failed to initialize interrupt context.");
     g_free(event_handler);
     return NULL;
   }
@@ -160,7 +160,7 @@ event_handler_t* event_handler_initialize(vmi_instance_t vmi,
   event_handler->serializer = json_serializer_new();
   json_serializer_set_global(event_handler->serializer);
   if (!event_handler->serializer) {
-    log_error("Failed to create JSON serializer");
+    log_error("Failed to create JSON serializer.");
     g_free(event_handler);
     return NULL;
   }
@@ -195,7 +195,7 @@ void event_handler_free(event_handler_t* event_handler) {
 
         if (event_handler->vmi &&
             vmi_clear_event(event_handler->vmi, event, NULL) == VMI_FAILURE) {
-          log_error("Failed to unregister event (task ID: %d, idx: %u)",
+          log_error("Failed to unregister event (task ID: %d, idx: %u).",
                     task->id, j);
         }
         g_free(event);
@@ -250,7 +250,7 @@ void event_handler_register_state_task(event_handler_t* event_handler,
   }
 
   if (task_id >= STATE_TASK_ID_MAX) {
-    log_error("Invalid state task ID: %d", task_id);
+    log_error("Invalid state task ID: %d.", task_id);
     return;
   }
 
@@ -272,7 +272,7 @@ void event_handler_register_event_task(event_handler_t* event_handler,
   }
 
   if (task_id >= EVENT_TASK_ID_MAX || task_id < 0) {
-    log_error("Invalid event task ID: %d", task_id);
+    log_error("Invalid event task ID: %d.", task_id);
     return;
   }
 
@@ -297,7 +297,7 @@ void event_handler_register_event_task(event_handler_t* event_handler,
     vmi_event_t* event = g_ptr_array_index(events, i);
     if (event) {
       if (vmi_register_event(event_handler->vmi, event) == VMI_FAILURE) {
-        log_error("Failed to register event for task ID: %d", task_id);
+        log_error("Failed to register event for task ID: %d.", task_id);
       }
     }
   }
@@ -340,10 +340,10 @@ static gpointer event_loop_thread(gpointer data) {
   }
 
   event_handler_t* event_handler = (event_handler_t*)data;
-  log_info("Pre-sampling state tasks before starting the event loop thread...");
+  log_info("Pre-sampling state tasks before starting the event loop thread.");
   sample_state_tasks_all(event_handler);
 
-  log_info("Starting event loop thread with window size: %u ms",
+  log_info("Starting event loop thread with window size: %u ms.",
            event_handler->window_ms);
   // LibVMI processes one event at a time, listen to total of time window_ms.
   // The callback will be triggered, which will enqueue the item.
@@ -354,8 +354,8 @@ static gpointer event_loop_thread(gpointer data) {
     }
   }
   // Process any remaining events.
-  log_info("Event loop thread has finished processing events, exiting...");
-  log_info("Signaling JSON serialization thread to stop...");
+  log_info("Event loop thread has finished processing events, exiting.");
+  log_info("Signaling JSON serialization thread to stop.");
   g_atomic_int_set(&event_handler->stop_signal_json_serialization, 1);
   return NULL;
 }
@@ -407,7 +407,7 @@ static gpointer json_serialization(gpointer data) {
 
   event_handler_t* event_handler = (event_handler_t*)data;
   if (!event_handler || !event_handler->serializer) {
-    log_error("json_serialization: invalid event_handler or serializer");
+    log_error("json_serialization: invalid event_handler or serializer.");
     return NULL;
   }
 
@@ -428,16 +428,16 @@ static gpointer json_serialization(gpointer data) {
     }
   }
 
-  log_info("JSON serialization stopping, processing remaining responses...");
+  log_info("JSON serialization stopping, processing remaining responses.");
 
   int remaining = json_serializer_drain_queue(serializer);
 
-  log_info("JSON serialization finished, processed %d remaining responses",
+  log_info("JSON serialization finished, processed %d remaining responses.",
            remaining);
 
   uint64_t queued, written, errors;
   json_serializer_get_stats(serializer, &queued, &written, &errors);
-  log_info("Final JSON stats - queued: %lu, written: %lu, errors: %lu", queued,
+  log_info("Final JSON stats: queued: %lu, written: %lu, errors: %lu.", queued,
            written, errors);
 
   return NULL;
@@ -483,7 +483,7 @@ void sample_state_tasks(event_handler_t* event_handler) {
   for (int i = 0; i < STATE_TASK_ID_MAX; ++i) {
     state_task_t* task = event_handler->state_tasks[i];
     if (task && task->functor) {
-      log_info("Sampling state task: %s", state_task_id_to_str(task->id));
+      log_info("Sampling state task: %s.", state_task_id_to_str(task->id));
       task->functor(event_handler->vmi, event_handler);
     }
   }
@@ -529,7 +529,7 @@ static void* create_interrupt_task_context(interrupt_task_id_t task_id,
       return ctx;
     }
     default:
-      log_error("Unknown interrupt task type: %d", task_id);
+      log_error("Unknown interrupt task type: %d.", task_id);
       return NULL;
   }
 }
@@ -550,7 +550,7 @@ breakpoint_type_t interrupt_task_to_breakpoint_type(
     case INTERRUPT_NETFILTER_HOOK_WRITE:
       return BP_TYPE_NETFILTER_HOOK;
     default:
-      log_error("Invalid interrupt task ID: %d", task_id);
+      log_error("Invalid interrupt task ID: %d.", task_id);
       return BP_TYPE_MAX;
   }
 }
@@ -578,7 +578,8 @@ static int register_ebpf_breakpoints(event_handler_t* event_handler) {
     void* ctx =
         create_interrupt_task_context(INTERRUPT_EBPF_PROBE, ebpf_symbols[i]);
     if (!ctx) {
-      log_warn("Failed to create context for eBPF symbol: %s", ebpf_symbols[i]);
+      log_warn("Failed to create context for eBPF symbol: %s.",
+               ebpf_symbols[i]);
       continue;
     }
 
@@ -586,9 +587,9 @@ static int register_ebpf_breakpoints(event_handler_t* event_handler) {
                                          event_handler->vmi, ebpf_symbols[i],
                                          bp_type, ctx) == 0) {
       registered++;
-      log_info("Registered eBPF breakpoint: %s", ebpf_symbols[i]);
+      log_info("Registered eBPF breakpoint: %s.", ebpf_symbols[i]);
     } else {
-      log_debug("eBPF symbol not found: %s", ebpf_symbols[i]);
+      log_debug("eBPF symbol not found: %s.", ebpf_symbols[i]);
       g_free(ctx);
     }
   }
@@ -609,25 +610,25 @@ static int register_single_breakpoint(event_handler_t* event_handler,
                                       const char* symbol_name) {
   breakpoint_type_t bp_type = interrupt_task_to_breakpoint_type(task_id);
   if (bp_type < 0 || bp_type >= BP_TYPE_MAX) {
-    log_error("Invalid breakpoint type for task ID: %d", task_id);
+    log_error("Invalid breakpoint type for task ID: %d.", task_id);
     return -1;
   }
 
   void* ctx = create_interrupt_task_context(task_id, symbol_name);
   if (!ctx) {
-    log_error("Failed to create context for interrupt task: %d", task_id);
+    log_error("Failed to create context for interrupt task: %d.", task_id);
     return -1;
   }
 
   if (interrupt_context_add_breakpoint(event_handler->interrupt_context,
                                        event_handler->vmi, symbol_name, bp_type,
                                        ctx) != 0) {
-    log_warn("Failed to register breakpoint for %s", symbol_name);
+    log_warn("Failed to register breakpoint for %s.", symbol_name);
     g_free(ctx);
     return -1;
   }
 
-  log_info("Registered breakpoint: %s", symbol_name);
+  log_info("Registered breakpoint: %s.", symbol_name);
   return 0;
 }
 
@@ -635,22 +636,22 @@ int event_handler_register_interrupt_task(event_handler_t* event_handler,
                                           interrupt_task_id_t task_id) {
   // Preconditions
   if (!event_handler) {
-    log_error("Invalid event handler");
+    log_error("Invalid event handler.");
     return -1;
   }
 
   if (!event_handler->interrupt_context) {
-    log_error("Interrupt context not initialized");
+    log_error("Interrupt context not initialized.");
     return -1;
   }
 
   if (task_id < 0 || task_id >= INTERRUPT_TASK_ID_MAX) {
-    log_error("Invalid interrupt task ID: %d", task_id);
+    log_error("Invalid interrupt task ID: %d.", task_id);
     return -1;
   }
 
   if (event_handler->interrupt_tasks[task_id]) {
-    log_warn("Interrupt task %s already registered",
+    log_warn("Interrupt task %s already registered.",
              interrupt_task_id_to_str(task_id));
     return 0;
   }
@@ -660,7 +661,7 @@ int event_handler_register_interrupt_task(event_handler_t* event_handler,
     case INTERRUPT_EBPF_PROBE:
       result = register_ebpf_breakpoints(event_handler);
       if (result > 0) {
-        log_info("Registered %d eBPF breakpoints", result);
+        log_info("Registered %d eBPF breakpoints.", result);
         result = 0;  // Convert count to success/failure
       }
       break;
@@ -673,17 +674,17 @@ int event_handler_register_interrupt_task(event_handler_t* event_handler,
                                           "nf_register_net_hook");
       break;
     default:
-      log_error("Unknown interrupt task ID: %d", task_id);
+      log_error("Unknown interrupt task ID: %d.", task_id);
       return -1;
   }
 
   if (result == 0) {
     event_handler->interrupt_tasks[task_id] = true;
-    log_info("Successfully registered interrupt task: %s",
+    log_info("Successfully registered interrupt task: %s.",
              interrupt_task_id_to_str(task_id));
     return 0;
   }
-  log_warn("Failed to register interrupt task: %s",
+  log_warn("Failed to register interrupt task: %s.",
            interrupt_task_id_to_str(task_id));
   return -1;
 }
@@ -694,7 +695,7 @@ int event_handler_register_global_interrupt(event_handler_t* event_handler) {
   }
 
   if (event_handler->interrupt_context->count == 0) {
-    log_info("No interrupt breakpoints registered");
+    log_info("No interrupt breakpoints registered.");
     return 0;
   }
 
@@ -702,7 +703,7 @@ int event_handler_register_global_interrupt(event_handler_t* event_handler) {
   // only have one interrupt (INT3) event registered at a time.
   vmi_event_t* global_int3_event = g_malloc0(sizeof(vmi_event_t));
   if (!global_int3_event) {
-    log_error("Failed to allocate global INT3 event");
+    log_error("Failed to allocate global INT3 event.");
     return -1;
   }
 
@@ -716,12 +717,12 @@ int event_handler_register_global_interrupt(event_handler_t* event_handler) {
 
   if (vmi_register_event(event_handler->vmi, global_int3_event) !=
       VMI_SUCCESS) {
-    log_error("Failed to register global INT3 event");
+    log_error("Failed to register global INT3 event.");
     g_free(global_int3_event);
     return -1;
   }
 
-  log_info("Registered global INT3 handler for %zu breakpoints",
+  log_info("Registered global INT3 handler for %zu breakpoints.",
            event_handler->interrupt_context->count);
 
   // Save its reference for book-keeping purposes.
@@ -732,7 +733,7 @@ int event_handler_register_global_interrupt(event_handler_t* event_handler) {
 bool event_handler_is_interrupt_task_registered(event_handler_t* event_handler,
                                                 interrupt_task_id_t task_id) {
   if (!event_handler || task_id < 0 || task_id >= INTERRUPT_TASK_ID_MAX) {
-    log_error("Invalid event handler or interrupt task ID");
+    log_error("Invalid event handler or interrupt task ID.");
     return false;
   }
 
@@ -743,17 +744,17 @@ int event_handler_unregister_interrupt_task(event_handler_t* event_handler,
                                             interrupt_task_id_t task_id) {
   // Preconditions
   if (!event_handler || !event_handler->interrupt_context) {
-    log_error("Invalid event handler or interrupt context");
+    log_error("Invalid event handler or interrupt context.");
     return -1;
   }
 
   if (task_id < 0 || task_id >= INTERRUPT_TASK_ID_MAX) {
-    log_error("Invalid interrupt task ID: %d", task_id);
+    log_error("Invalid interrupt task ID: %d.", task_id);
     return -1;
   }
 
   if (!event_handler->interrupt_tasks[task_id]) {
-    log_debug("Interrupt task %s not registered",
+    log_debug("Interrupt task %s not registered.",
               interrupt_task_id_to_str(task_id));
     return 0;
   }
@@ -775,7 +776,7 @@ int event_handler_unregister_interrupt_task(event_handler_t* event_handler,
   }
 
   event_handler->interrupt_tasks[task_id] = false;
-  log_info("Unregistered interrupt task: %s",
+  log_info("Unregistered interrupt task: %s.",
            interrupt_task_id_to_str(task_id));
 
   return 0;

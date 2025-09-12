@@ -107,7 +107,7 @@ static void inspect_io_uring_for_task(vmi_instance_t vmi,
   if (vmi_read_addr_va_retry(vmi, task_struct_addr + LINUX_OFFSET_TASK_IO_URING,
                              &io_uring_task) != VMI_SUCCESS ||
       !io_uring_task) {
-    log_debug("PID %u (%s): no io_uring (NULL)", pid,
+    log_debug("PID %u (%s): no io_uring (NULL).", pid,
               procname ? procname : "?");
     return;
   }
@@ -120,7 +120,8 @@ static void inspect_io_uring_for_task(vmi_instance_t vmi,
                              io_uring_task + LINUX_OFFSET_IO_URING_TASK_LAST,
                              &ctx) != VMI_SUCCESS ||
       !ctx) {
-    log_debug("PID %u (%s): io_uring_task=0x%" PRIx64 " but 'last' ctx is NULL",
+    log_debug("PID %u (%s): io_uring_task=0x%" PRIx64
+              " but 'last' ctx is NULL.",
               pid, procname ? procname : "?", (uint64_t)io_uring_task);
     return;
   }
@@ -129,7 +130,7 @@ static void inspect_io_uring_for_task(vmi_instance_t vmi,
   if (vmi_read_addr_va_retry(vmi, ctx + LINUX_OFFSET_IO_RING_CTX_RINGS,
                              &rings) != VMI_SUCCESS ||
       !rings) {
-    log_debug("PID %u (%s): ctx=0x%" PRIx64 " has no rings (NULL)", pid,
+    log_debug("PID %u (%s): ctx=0x%" PRIx64 " has no rings (NULL).", pid,
               procname ? procname : "?", (uint64_t)ctx);
     return;
   }

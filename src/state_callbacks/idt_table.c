@@ -76,7 +76,7 @@ static bool parse_uint8_dec(const char* str, uint8_t* out_value,
  */
 
 static GPtrArray* load_interrupt_index_table(const char* path) {
-  log_info("Loading interrupt index table from: %s", path ? path : "(null)");
+  log_info("Loading interrupt index table from: %s.", path ? path : "(null)");
 
   GPtrArray* table = g_ptr_array_new_with_free_func(g_free);
   g_ptr_array_set_size(table, 256);
@@ -259,7 +259,7 @@ static int check_idt_for_vcpu(vmi_instance_t vmi,
               : read_idt_entry_addr_ia32(vmi, idt_base, vec, &handler);
 
     if (!result) {
-      log_debug("Failed to read IDT entry %u at 0x%" PRIx64 " (vCPU %u)", vec,
+      log_debug("Failed to read IDT entry %u at 0x%" PRIx64 " (vCPU %u).", vec,
                 (uint64_t)(idt_base + (addr_t)vec * gate_size), vcpu_id);
       continue;
     }
@@ -336,7 +336,8 @@ uint32_t state_idt_table_callback(vmi_instance_t vmi, void* context) {
   idt_table_state_set_kernel_range(idt_data, kernel_start_addr,
                                    kernel_end_addr);
 
-  log_info("STATE_IDT_TABLE: Kernel text range: [0x%" PRIx64 ", 0x%" PRIx64 "]",
+  log_info("STATE_IDT_TABLE: Kernel text range: [0x%" PRIx64 ", 0x%" PRIx64
+           "].",
            (uint64_t)kernel_start_addr, (uint64_t)kernel_end_addr);
 
   // Get number of vCPUs

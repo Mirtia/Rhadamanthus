@@ -67,19 +67,19 @@ event_handler_t* event_handler_initialize_from_config(const char* config_path) {
   for (GList* it = config.event_tasks; it != NULL; it = it->next) {
     event_task_id_t task_id = GPOINTER_TO_INT(it->data);
     if (register_event_task_by_id(event_handler, task_id) < 0) {
-      log_error("Parser failed to register event task ID: %d", task_id);
+      log_error("Parser failed to register event task ID: %d.", task_id);
     }
   }
 
   for (GList* it = config.interrupt_tasks; it != NULL; it = it->next) {
     interrupt_task_id_t task_id = GPOINTER_TO_INT(it->data);
     if (event_handler_register_interrupt_task(event_handler, task_id) < 0) {
-      log_error("Parser failed to register interrupt task ID: %d", task_id);
+      log_error("Parser failed to register interrupt task ID: %d.", task_id);
     }
   }
 
   if (event_handler_register_global_interrupt(event_handler) != 0) {
-    log_error("Failed to register global interrupt handler");
+    log_error("Failed to register global interrupt handler.");
   }
 
   config_free(&config);
@@ -99,7 +99,7 @@ int parse_yaml_config(const char* path, config_t* config) {
 
   FILE* file = fopen(path, "r");
   if (!file) {
-    log_error("Could not open config file: %s", path);
+    log_error("Could not open config file: %s.", path);
     return EXIT_FAILURE;
   }
 
@@ -209,32 +209,32 @@ int parse_yaml_config(const char* path, config_t* config) {
           } else {
             if (context == STATE_TASK) {
               int task_id = state_task_id_from_str(val);
-              log_debug("Parsed state task ID: %s", val);
+              log_debug("Parsed state task ID: %s.", val);
               if (task_id >= 0) {
                 config->state_tasks = g_list_append(config->state_tasks,
                                                     GINT_TO_POINTER(task_id));
-                log_debug("Added state task ID: %d", task_id);
+                log_debug("Added state task ID: %d.", task_id);
               } else {
-                log_warn("Unknown state task ID string: %s", val);
+                log_warn("Unknown state task ID string: %s.", val);
               }
             } else if (context == EVENT_TASK) {
               int task_id = event_task_id_from_str(val);
-              log_debug("Parsed event task ID: %s", val);
+              log_debug("Parsed event task ID: %s.", val);
               if (task_id >= 0 && task_id < EVENT_TASK_ID_MAX) {
                 config->event_tasks = g_list_append(config->event_tasks,
                                                     (GINT_TO_POINTER(task_id)));
-                log_debug("Added event task ID: %d", task_id);
+                log_debug("Added event task ID: %d.", task_id);
               } else {
-                log_warn("Unknown event task ID string: %s", val);
+                log_warn("Unknown event task ID string: %s.", val);
               }
             } else if (context == INTERRUPT_TASK) {
               int task_id = interrupt_task_id_from_str(val);
-              log_debug("Parsed interrupt task ID: %s", val);
+              log_debug("Parsed interrupt task ID: %s.", val);
               if (task_id >= 0 && task_id < INTERRUPT_TASK_ID_MAX) {
                 config->interrupt_tasks = g_list_append(
                     config->interrupt_tasks, (GINT_TO_POINTER(task_id)));
               } else {
-                log_warn("Unknown interrupt task ID string: %s", val);
+                log_warn("Unknown interrupt task ID string: %s.", val);
               }
             }
           }
