@@ -14,11 +14,16 @@ A Virtual Machine Introspection (VMI) framework for detecting Linux rootkits and
 
 ## System
 
-The framework was built and run under the following system requirements:
+The framework was built and run under the following system specifications:
 
-- OS: Debian GNU/Linux 12 (bookworm) x86_64
-- Xen: xen-hypervisor-4.20.0-debian-bookworm-amd64
-- Drakvuf build: drakvuf-bundle-1.1-0fa2fd6-debian-bookworm
+- **Hypervisor OS**: Debian GNU/Linux 12 (bookworm) x86_64
+- **Xen**: xen-hypervisor-4.20.0-debian-bookworm-amd64
+- **Drakvuf build**: drakvuf-bundle-1.1-0fa2fd6-debian-bookworm
+- **CPU**: Intel(R) Core(TM) i7-8665U (2) @ 2.11 GHz with Intel VT-x enabled
+- **DomU VMs OS**: Ubuntu 20.04.6 LTS (Focal Fossa)
+- **DomU VMs Kernel version**: 5.15.0-139-generic
+
+
 
 ## Architecture
 
@@ -121,7 +126,7 @@ features:
 - `EVENT_PAGE_TABLE_MODIFICATION` - Page table modification detection (`src/event_callbacks/page_table_modification.c`)
 - `EVENT_KALLSYMS_TABLE_WRITE` - Kernel symbol table modification (`src/event_callbacks/kallsyms_table_write.c`)
 - `EVENT_NETFILTER_HOOK_WRITE` - Netfilter hook modification (`src/event_callbacks/netfilter_hook_write.c`)
-- `EVENT_IO_URING_RING_WRITE` - io_uring __x64_sys_io_uring_enter (`src/event_callbacks/io_uring_ring_write.c`)
+- `EVENT_IO_URING_RING_WRITE` - io_uring `__x64_sys_io_uring_enter` (`src/event_callbacks/io_uring_ring_write.c`)
 
 #### Interrupt Tasks
 - `INTERRUPT_EBPF_PROBE` - eBPF probe breakpoint monitoring (`src/event_callbacks/ebpf_probe.c`)
