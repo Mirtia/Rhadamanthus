@@ -26,7 +26,6 @@ Drakvuf build: drakvuf-bundle-1.1-0fa2fd6-debian-bookworm
 
 The project follows a modular, event-driven architecture with three main detection paradigms.
 
-
 ### Core Components
 
 ```
@@ -166,17 +165,17 @@ The introspector generates structured JSON output following Google's response sc
 }
 ```
 
-## 📄 License
+## License
 
 This project is licensed under the GNU Lesser General Public License v2.1 - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
+## Acknowledgments
 
 - **LibVMI** - Virtual Machine Introspection library.
 - **Xen Project** - Hypervisor platform.
 - **DRAKVUF** - Virtualization based agentless black-box binary analysis system.
 
-## 📚 Citation
+## Citation
 
 If you use this project in your research, please cite it as:
 
