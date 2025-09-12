@@ -5,41 +5,31 @@
 
 > Warning: This project is the outcome of an MSc Thesis while being extremely burnout. There may be mistakes, there may be things that are built on wrong assumptions! I still plan to continue working on this project after my submission...
 
-A Virtual Machine Introspection (VMI) framework for detecting Linux rootkits and malicious kernel modifications using LibVMI. This project is designed to help with collecting information about potential rootkit indicators on a running virtual machine (Dom0) using a privileged virtual machine (DomU). It can be used as a base later on, to develop a machine learning approach for linux kernel-mode rootkit detection.
+## Overview
+
+A Virtual Machine Introspection (VMI) framework for detecting Linux rootkits and malicious kernel modifications using  [LibVMI](https://libvmi.com/). This project is designed to help with collecting information about potential rootkit indicators on a running virtual machine (Dom0) using a privileged virtual machine (DomU). It can be used as a base later on, to develop a machine learning approach for linux kernel-mode rootkit detection.
 
 🤔 If I had to pitch this, I would say "An amateurish downgraded untested DRAKVUF that focuses in kernel-mode rootkit detection and has a response format I prefer".
 
-## Overview
-
-The VMI Linux Rootkit Feature Collection uses [LibVMI](https://libvmi.com/) for detection.
 
 ## System
 
 The framework was built and run under the following system requirements:
-```sh
-OS: Debian GNU/Linux 12 (bookworm) x86_64
-Xen: xen-hypervisor-4.20.0-debian-bookworm-amd64
-Drakvuf build: drakvuf-bundle-1.1-0fa2fd6-debian-bookworm
-```
+
+- OS: Debian GNU/Linux 12 (bookworm) x86_64
+- Xen: xen-hypervisor-4.20.0-debian-bookworm-amd64
+- Drakvuf build: drakvuf-bundle-1.1-0fa2fd6-debian-bookworm
 
 ## Architecture
 
-The project follows a modular, event-driven architecture with three main detection paradigms.
+The following figure shows the VMI-Introspector in relation to the whole Experimental Setup as described in the Thesis.
 
-### Core Components
+- **Drakvuf**: Used to inject the modules and processes to the infected VM to mark the start of the infection phase and start the Cluless-Admin monitor. 
+- **Clueless-Admin**: A baseline in-guest monitoring toolkit for rootkit detection.
+- **Clueless-Attacker**: A list of actions that imitate attacker post-infection behavior.
+- **Discrepancy-Checker**: A simple JSON comparison implementation to observe discrepancies (wherever possible) between **in-guest** monitoring and **privileged VM** hypervisor based monitoring.
 
-```
-├── src/
-│   ├── event_handler.c          # Main event loop and task coordination
-│   ├── config_parser.c          # YAML configuration parsing
-│   ├── json_serializer.c        # Structured output generation
-│   ├── state_callbacks/         # State-based detection modules
-│   ├── event_callbacks/         # Event-based detection modules
-│   └── utils.c                  # Common utilities and error handling
-├── include/                     # Header files and API definitions
-├── tests/                       # Unit tests and proof-of-concepts
-└── config/                      # Configuration templates
-```
+![Architecture](docs/images/Architecture_Professional.drawio.png)
 
 ## Quick Start
 
@@ -68,13 +58,13 @@ The project follows a modular, event-driven architecture with three main detecti
 
 4. **Create configuration file**
    ```bash
-   cp config/settings_schema.yaml my_config.yaml
-   # Edit my_config.yaml with your VM domain name
+   cp config/settings_schema.yaml custom_config.yaml
+   # Edit custom_config.yaml with your VM domain name
    ```
 
 5. **Run the introspector**
    ```bash
-   ./build/introspector -c my_config.yaml
+   ./build/introspector -c custom_config.yaml
    ```
 
 ## Configuration
