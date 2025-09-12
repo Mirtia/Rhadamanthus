@@ -11,27 +11,62 @@
 #define MAX_BACKTRACK_BYTES 128
 #define MAX_FTRACE_PAGES 64
 #define MAX_MCOUNT_ENTRIES 2000
-#define ROOTKIT_MODULE_START 0xffffffffc0000000
-#define ROOTKIT_MODULE_END 0xffffffffc0ffffff
 
+#define MODULE_START 0xffffffffc0000000
+#define MODULE_END 0xffffffffc0ffffff
+
+/**
+ * @brief Rootkit target structure
+ * 
+ * @param symbol_name The name of the rootkit target function.
+ * @param addr_ptr Pointer to the resolved address of the rootkit target function.
+ */
 typedef struct {
-  const char* symbol_name;
-  addr_t* addr_ptr;
+  const char* symbol_name;  ///< The name of the rootkit target function.
+  addr_t*
+      addr_ptr;  ///< Pointer to the resolved address of the rootkit target function.
 } rootkit_target_t;
 
 /**
- * @brief Check if an address is in the kernel virtual address space
+ * @brief Check if an address is canonical (valid for x86-64)
  * 
- * @details On x86-64 Linux, the kernel is mapped in the canonical high half (upper 2^47
- * addresses). KASLR randomizes the base address within this range, but the MSB
- * always remains 1 due to canonical addressing requirements.
- * See: https://www.kernel.org/doc/Documentation/x86/x86_64/mm.txt
+ * @details Implements proper canonicality check for x86-64 addresses. For 48-bit canonical
+ * addresses, bits 63:47 must all be the same (either all 0s or all 1s). For 57-bit canonical
+ * addresses (LA57), bits 63:56 must all equal bit 56. This is more robust than checking
+ * only the MSB and properly handles both user and kernel address spaces.
+ * 
+ * References:
+ * - Intel 64 and IA-32 Architectures Software Developer's Manual, Volume 3A
+ * - https://cdrdv2-public.intel.com/671442/5-level-paging-white-paper.pdf
  *
  * @param virtual_addr The virtual address to check
- * @return true if the address is in kernel space, false otherwise
+ * @return true if the address is canonical, false otherwise
+ */
+static inline bool is_canonical_x86_64(addr_t virtual_addr) {
+  // For 48-bit canonical: bits 63:47 must all be the same
+  // For 57-bit canonical: bits 63:56 must all equal bit 56
+  // This check works for both cases
+  addr_t sign_bits = virtual_addr >> 47;
+  return (sign_bits == 0) ||
+         (sign_bits == 0x1FFFF);  // All 0s or all 1s in upper bits
+}
+
+/**
+ * @brief Check if an address is in kernel virtual address space
+ * 
+ * @details Determines if an address is in kernel space by checking canonicality and
+ * then verifying it's in the upper canonical half. This is more robust than the
+ * previous single-bit check and properly handles 5-level paging.
+ * 
+ * @param virtual_addr The virtual address to check
+ * @return true if the address is canonical and in kernel space, false otherwise
  */
 static inline bool is_kernel_va_x86_64(addr_t virtual_addr) {
-  return (virtual_addr >> 63) == 1ULL;
+  if (!is_canonical_x86_64(virtual_addr)) {
+    return false;
+  }
+  // Kernel space is the upper canonical half (bit 47 set)
+  return (virtual_addr >> 47) == 1;
 }
 
 /**
@@ -41,10 +76,10 @@ static inline bool is_kernel_va_x86_64(addr_t virtual_addr) {
  * Also performs a heuristic check for module text sections which typically
  * reside in the kernel high half address space.
  * 
- * @param virtual_addr The virtual address to check
- * @param ktext_start Start of kernel text section
- * @param ktext_end End of kernel text section
- * @return true if the address is likely in kernel text, false otherwise
+ * @param virtual_addr The virtual address to check.
+ * @param ktext_start Start of kernel text section.
+ * @param ktext_end End of kernel text section.
+ * @return true if the address is likely in kernel text, false otherwise.
  */
 static inline bool is_probably_kernel_text(addr_t virtual_addr,
                                            addr_t ktext_start,
@@ -55,20 +90,36 @@ static inline bool is_probably_kernel_text(addr_t virtual_addr,
 }
 
 /**
- * @brief Classify the state of an ftrace call site by examining bytes
+ * @brief UNUSED: Classify the state of an ftrace call site by examining bytes
  * 
- * @details Examines the first 5 bytes at the given address to determine if it's an active
- * ftrace call site (0xE8 CALL instruction) or a disabled site (5-byte NOP).
- * When ftrace is enabled, the compiler-inserted __fentry__ call sites are patched
- * with CALL instructions. When disabled, they're replaced with 5-byte NOPs.
- * The specific NOP pattern 0F 1F 44 00 00 is the standard 5-byte NOP on x86-64.
- * See: https://www.brendangregg.com/blog/2019-10-15/kernelrecipes-kernel-ftrace-internals.html
- * See: https://www.kernel.org/doc/Documentation/trace/ftrace.txt
+ * @details This function was created to provide comprehensive ftrace site analysis,
+ * distinguishing between active ftrace hooks (0xE8 CALL instructions) and disabled
+ * sites (5-byte NOPs). However, it's not used because the current detection strategy
+ * only needs to identify suspicious CALL instructions that redirect to rootkit modules.
+ * 
+ * Why it was created:
+ * - Originally intended for detailed ftrace site classification and debugging
+ * - Would help distinguish between enabled/disabled ftrace instrumentation
+ * - Useful for understanding ftrace state transitions and hook lifecycle
+ * 
+ * Why it's unused:
+ * - Current detection only cares about active hooks (0xE8) pointing to malicious addresses
+ * - The inline logic in scan_for_direct_hooks() is more targeted and efficient
+ * - Classification of "NOP5" vs "other" doesn't provide actionable intelligence for rootkit detection
+ * 
+ * Technical background:
+ * When ftrace is enabled, compiler-inserted __fentry__ call sites are patched with CALL instructions.
+ * When disabled, they're replaced with 5-byte NOPs. The specific NOP pattern 0F 1F 44 00 00 is the
+ * standard 5-byte NOP on x86-64.
+ * 
+ * References:
+ * - https://www.brendangregg.com/blog/2019-10-15/kernelrecipes-kernel-ftrace-internals.html
  *
  * @param vmi LibVMI instance
  * @param address The address to examine
  * @return String describing the site state: "CALL(__fentry__)", "NOP5", "other", or "unreadable"
  */
+/*
 static const char* classify_fentry_site(vmi_instance_t vmi, addr_t address) {
   uint8_t bytes[5] = {0};
   if (vmi_read_8_va(vmi, address + 0, 0, &bytes[0]) != VMI_SUCCESS)
@@ -88,6 +139,7 @@ static const char* classify_fentry_site(vmi_instance_t vmi, addr_t address) {
 
   return "other";
 }
+*/
 
 /**
  * @brief Resolve an address to its enclosing function symbol with offset
@@ -240,95 +292,95 @@ static char* check_rootkit_target_match(vmi_instance_t vmi,
   return NULL;
 }
 
-/**
- * @brief Enumerate call-site IPs from dyn_ftrace records via ftrace_pages
- * 
- * @details This is the authoritative runtime source for ftrace call sites. Walks the
- * ftrace_pages linked list to enumerate all dyn_ftrace records and collect
- * their call site addresses. The ftrace_pages structure contains a linked list of pages, each containing
- * an array of dyn_ftrace records. Each record contains the call site IP and
- * flags indicating the current state of the ftrace instrumentation.
- * 
- * @see include/linux/ftrace.h for struct ftrace_page and dyn_ftrace definitions
- * @param vmi LibVMI instance
- * @param ftrace_pages_addr Address of ftrace_pages_start
- * @param target_functions GSList to collect target function addresses
- * @return Number of call sites found
- */
-static size_t enumerate_dyn_ftrace_sites(vmi_instance_t vmi,
-                                         addr_t ftrace_pages_addr,
-                                         GSList** target_functions) {
-  size_t total_sites = 0;
+// /**
+//  * @brief Enumerate call-site IPs from dyn_ftrace records via ftrace_pages
+//  *
+//  * @details This is the authoritative runtime source for ftrace call sites. Walks the
+//  * ftrace_pages linked list to enumerate all dyn_ftrace records and collect
+//  * their call site addresses. The ftrace_pages structure contains a linked list of pages, each containing
+//  * an array of dyn_ftrace records. Each record contains the call site IP and
+//  * flags indicating the current state of the ftrace instrumentation.
+//  *
+//  * @see include/linux/ftrace.h for struct ftrace_page and dyn_ftrace definitions
+//  * @param vmi LibVMI instance
+//  * @param ftrace_pages_addr Address of ftrace_pages_start
+//  * @param target_functions GSList to collect target function addresses
+//  * @return Number of call sites found
+//  */
+// static size_t enumerate_dyn_ftrace_sites(vmi_instance_t vmi,
+//                                          addr_t ftrace_pages_addr,
+//                                          GSList** target_functions) {
+//   size_t total_sites = 0;
 
-  if (!ftrace_pages_addr) {
-    log_debug(
-        "FTRACE_DETECTION: enumerate_dyn_ftrace_sites - ftrace_pages_addr is "
-        "NULL");
-    return 0;
-  }
+//   if (!ftrace_pages_addr) {
+//     log_debug(
+//         "FTRACE_DETECTION: enumerate_dyn_ftrace_sites - ftrace_pages_addr is "
+//         "NULL");
+//     return 0;
+//   }
 
-  log_debug(
-      "FTRACE_DETECTION: enumerate_dyn_ftrace_sites - starting at 0x%" PRIx64,
-      (uint64_t)ftrace_pages_addr);
+//   log_debug(
+//       "FTRACE_DETECTION: enumerate_dyn_ftrace_sites - starting at 0x%" PRIx64,
+//       (uint64_t)ftrace_pages_addr);
 
-  addr_t current_page = ftrace_pages_addr;
-  for (int page_count = 0; current_page && page_count < MAX_FTRACE_PAGES;
-       page_count++) {
-    addr_t next_page = 0;
-    addr_t records = 0;
-    uint32_t index = 0;
-    uint32_t order = 0;
-    uint32_t size = 0;
+//   addr_t current_page = ftrace_pages_addr;
+//   for (int page_count = 0; current_page && page_count < MAX_FTRACE_PAGES;
+//        page_count++) {
+//     addr_t next_page = 0;
+//     addr_t records = 0;
+//     uint32_t index = 0;
+//     uint32_t order = 0;
+//     uint32_t size = 0;
 
-    vmi_read_addr_va(vmi, current_page + FTRACE_PAGE_NEXT_OFF, 0, &next_page);
-    vmi_read_addr_va(vmi, current_page + FTRACE_PAGE_RECORDS_OFF, 0, &records);
-    vmi_read_32_va(vmi, current_page + FTRACE_PAGE_INDEX_OFF, 0, &index);
-    vmi_read_32_va(vmi, current_page + FTRACE_PAGE_ORDER_OFF, 0, &order);
-    vmi_read_32_va(vmi, current_page + FTRACE_PAGE_SIZE_OFF, 0, &size);
+//     vmi_read_addr_va(vmi, current_page + FTRACE_PAGE_NEXT_OFF, 0, &next_page);
+//     vmi_read_addr_va(vmi, current_page + FTRACE_PAGE_RECORDS_OFF, 0, &records);
+//     vmi_read_32_va(vmi, current_page + FTRACE_PAGE_INDEX_OFF, 0, &index);
+//     vmi_read_32_va(vmi, current_page + FTRACE_PAGE_ORDER_OFF, 0, &order);
+//     vmi_read_32_va(vmi, current_page + FTRACE_PAGE_SIZE_OFF, 0, &size);
 
-    if (!records || !size || index > size || size > 8192) {
-      log_debug(
-          "FTRACE_DETECTION: enumerate_dyn_ftrace_sites - page %d invalid: "
-          "records=0x%" PRIx64 " size=%u index=%u",
-          page_count, (uint64_t)records, size, index);
-      break;
-    }
+//     if (!records || !size || index > size || size > 8192) {
+//       log_debug(
+//           "FTRACE_DETECTION: enumerate_dyn_ftrace_sites - page %d invalid: "
+//           "records=0x%" PRIx64 " size=%u index=%u",
+//           page_count, (uint64_t)records, size, index);
+//       break;
+//     }
 
-    log_debug(
-        "FTRACE_DETECTION: enumerate_dyn_ftrace_sites - processing page %d: "
-        "records=0x%" PRIx64 " size=%u",
-        page_count, (uint64_t)records, size);
-    const size_t rec_stride = 0x10;
-    for (uint32_t i = 0; i < size && i < 1024; i++) {
-      addr_t rec = records + i * rec_stride;
-      addr_t call_site_ip = 0;
-      uint64_t flags = 0;
+//     log_debug(
+//         "FTRACE_DETECTION: enumerate_dyn_ftrace_sites - processing page %d: "
+//         "records=0x%" PRIx64 " size=%u",
+//         page_count, (uint64_t)records, size);
+//     const size_t rec_stride = 0x10;
+//     for (uint32_t i = 0; i < size && i < 1024; i++) {
+//       addr_t rec = records + i * rec_stride;
+//       addr_t call_site_ip = 0;
+//       uint64_t flags = 0;
 
-      if (vmi_read_addr_va(vmi, rec + DYN_FTRACE_IP_OFF, 0, &call_site_ip) !=
-              VMI_SUCCESS ||
-          vmi_read_64_va(vmi, rec + DYN_FTRACE_FLAGS_OFF, 0, &flags) !=
-              VMI_SUCCESS) {
-        continue;
-      }
+//       if (vmi_read_addr_va(vmi, rec + DYN_FTRACE_IP_OFF, 0, &call_site_ip) !=
+//               VMI_SUCCESS ||
+//           vmi_read_64_va(vmi, rec + DYN_FTRACE_FLAGS_OFF, 0, &flags) !=
+//               VMI_SUCCESS) {
+//         continue;
+//       }
 
-      if (!call_site_ip || !is_kernel_va_x86_64(call_site_ip)) {
-        continue;
-      }
+//       if (!call_site_ip || !is_kernel_va_x86_64(call_site_ip)) {
+//         continue;
+//       }
 
-      *target_functions =
-          g_slist_prepend(*target_functions, GSIZE_TO_POINTER(call_site_ip));
-      total_sites++;
-    }
+//       *target_functions =
+//           g_slist_prepend(*target_functions, GSIZE_TO_POINTER(call_site_ip));
+//       total_sites++;
+//     }
 
-    current_page = next_page;
-  }
+//     current_page = next_page;
+//   }
 
-  log_debug(
-      "FTRACE_DETECTION: enumerate_dyn_ftrace_sites - completed, found %zu "
-      "total sites",
-      total_sites);
-  return total_sites;
-}
+//   log_debug(
+//       "FTRACE_DETECTION: enumerate_dyn_ftrace_sites - completed, found %zu "
+//       "total sites",
+//       total_sites);
+//   return total_sites;
+// }
 
 /**
  * @brief Enumerate call-site IPs from __mcount_loc table (fallback)
@@ -338,78 +390,79 @@ static size_t enumerate_dyn_ftrace_sites(vmi_instance_t vmi,
  * The __mcount_loc section contains virtual addresses of all __fentry__ call
  * sites inserted by the compiler. This table is created at build time and
  * may be removed or corrupted by rootkits to hide their hooks.
+ * TODO: Missing call site interpretation.
  * 
  * @see https://www.kernel.org/doc/Documentation/trace/ftrace.txt
  * @param vmi LibVMI instance
  * @param target_functions GSList to collect target function addresses
  * @return Number of call sites found
  */
-static size_t enumerate_mcount_loc_sites(vmi_instance_t vmi,
-                                         GSList** target_functions) {
-  size_t total_sites = 0;
-  addr_t start_mcount_loc = 0;
-  addr_t stop_mcount_loc = 0;
+// static size_t enumerate_mcount_loc_sites(vmi_instance_t vmi,
+//                                          GSList** target_functions) {
+//   size_t total_sites = 0;
+//   addr_t start_mcount_loc = 0;
+//   addr_t stop_mcount_loc = 0;
 
-  log_debug(
-      "FTRACE_DETECTION: enumerate_mcount_loc_sites - attempting to resolve "
-      "__start_mcount_loc and __stop_mcount_loc");
+//   log_debug(
+//       "FTRACE_DETECTION: enumerate_mcount_loc_sites - attempting to resolve "
+//       "__start_mcount_loc and __stop_mcount_loc");
 
-  if (vmi_translate_ksym2v(vmi, "__start_mcount_loc", &start_mcount_loc) !=
-          VMI_SUCCESS ||
-      vmi_translate_ksym2v(vmi, "__stop_mcount_loc", &stop_mcount_loc) !=
-          VMI_SUCCESS) {
-    log_debug(
-        "FTRACE_DETECTION: enumerate_mcount_loc_sites - FAILED to resolve "
-        "__start_mcount_loc or __stop_mcount_loc symbols");
-    return 0;
-  }
+//   if (vmi_translate_ksym2v(vmi, "__start_mcount_loc", &start_mcount_loc) !=
+//           VMI_SUCCESS ||
+//       vmi_translate_ksym2v(vmi, "__stop_mcount_loc", &stop_mcount_loc) !=
+//           VMI_SUCCESS) {
+//     log_debug(
+//         "FTRACE_DETECTION: enumerate_mcount_loc_sites - FAILED to resolve "
+//         "__start_mcount_loc or __stop_mcount_loc symbols");
+//     return 0;
+//   }
 
-  log_debug(
-      "FTRACE_DETECTION: enumerate_mcount_loc_sites - resolved symbols: "
-      "start=0x%" PRIx64 " stop=0x%" PRIx64,
-      (uint64_t)start_mcount_loc, (uint64_t)stop_mcount_loc);
+//   log_debug(
+//       "FTRACE_DETECTION: enumerate_mcount_loc_sites - resolved symbols: "
+//       "start=0x%" PRIx64 " stop=0x%" PRIx64,
+//       (uint64_t)start_mcount_loc, (uint64_t)stop_mcount_loc);
 
-  if (stop_mcount_loc <= start_mcount_loc) {
-    log_debug(
-        "FTRACE_DETECTION: enumerate_mcount_loc_sites - invalid range: stop <= "
-        "start");
-    return 0;
-  }
+//   if (stop_mcount_loc <= start_mcount_loc) {
+//     log_debug(
+//         "FTRACE_DETECTION: enumerate_mcount_loc_sites - invalid range: stop <= "
+//         "start");
+//     return 0;
+//   }
 
-  size_t mcount_loc_size = stop_mcount_loc - start_mcount_loc;
-  size_t num_entries = mcount_loc_size / sizeof(addr_t);
-  size_t max_entries =
-      (num_entries < MAX_MCOUNT_ENTRIES) ? num_entries : MAX_MCOUNT_ENTRIES;
+//   size_t mcount_loc_size = stop_mcount_loc - start_mcount_loc;
+//   size_t num_entries = mcount_loc_size / sizeof(addr_t);
+//   size_t max_entries =
+//       (num_entries < MAX_MCOUNT_ENTRIES) ? num_entries : MAX_MCOUNT_ENTRIES;
 
-  log_debug(
-      "FTRACE_DETECTION: enumerate_mcount_loc_sites - processing %zu entries "
-      "(size=%zu, max=%zu)",
-      num_entries, mcount_loc_size, max_entries);
+//   log_debug(
+//       "FTRACE_DETECTION: enumerate_mcount_loc_sites - processing %zu entries "
+//       "(size=%zu, max=%zu)",
+//       num_entries, mcount_loc_size, max_entries);
 
-  for (size_t i = 0; i < max_entries; i++) {
-    addr_t entry_addr = start_mcount_loc + (i * sizeof(addr_t));
-    addr_t call_site_addr = 0;
+//   for (size_t i = 0; i < max_entries; i++) {
+//     addr_t entry_addr = start_mcount_loc + (i * sizeof(addr_t));
+//     addr_t call_site_addr = 0;
 
-    if (vmi_read_addr_va(vmi, entry_addr, 0, &call_site_addr) != VMI_SUCCESS ||
-        call_site_addr == 0) {
-      continue;
-    }
+//     if (vmi_read_addr_va(vmi, entry_addr, 0, &call_site_addr) != VMI_SUCCESS ||
+//         call_site_addr == 0) {
+//       continue;
+//     }
 
-    if (!is_kernel_va_x86_64(call_site_addr)) {
-      continue;
-    }
+//     if (!is_kernel_va_x86_64(call_site_addr)) {
+//       continue;
+//     }
 
-    *target_functions =
-        g_slist_prepend(*target_functions, GSIZE_TO_POINTER(call_site_addr));
-    total_sites++;
-  }
+//     *target_functions =
+//         g_slist_prepend(*target_functions, GSIZE_TO_POINTER(call_site_addr));
+//     total_sites++;
+//   }
 
-  log_debug(
-      "FTRACE_DETECTION: enumerate_mcount_loc_sites - completed, found %zu "
-      "total sites",
-      total_sites);
-  return total_sites;
-}
+//   log_debug(
+//       "FTRACE_DETECTION: enumerate_mcount_loc_sites - completed, found %zu "
+//       "total sites",
+//       total_sites);
+//   return total_sites;
+// }
 
 /**
  * @brief Resolve known rootkit target function addresses.
@@ -532,14 +585,13 @@ static void scan_for_direct_hooks(vmi_instance_t vmi,
            check_addr++) {
         uint8_t byte1 = 0;
         if (vmi_read_8_va(vmi, check_addr, 0, &byte1) == VMI_SUCCESS &&
-            byte1 == 0xE8) {
-          uint32_t call_offset = 0;
-          if (vmi_read_32_va(vmi, check_addr + 1, 0, &call_offset) ==
+            (byte1 == 0xE8 || byte1 == 0xE9)) {  // CALL or JMP
+          int32_t call_offset = 0;
+          if (vmi_read_32_va(vmi, check_addr + 1, 0, (uint32_t*)&call_offset) ==
               VMI_SUCCESS) {
-            addr_t call_target = check_addr + 5 + call_offset;
+            addr_t call_target = check_addr + 5 + (int64_t)call_offset;
 
-            if (call_target >= ROOTKIT_MODULE_START &&
-                call_target <= ROOTKIT_MODULE_END) {
+            if (call_target >= MODULE_START && call_target <= MODULE_END) {
 
               // Determine attachment type and hook type
               bool is_syscall = (strstr(known_rootkit_targets[j].symbol_name,
@@ -712,7 +764,8 @@ static ftrace_hooks_state_data_t* detect_ftrace_hooks(vmi_instance_t vmi) {
 
   // TODO: INVESTIGATE - ftrace_pages method is not working
   // Issue: Data structure appears corrupted (records=0x0, invalid index values)
-  // This method consistently fails to find valid call sites
+  // This may be due to kernel version differences or configuration changes
+  // rather than rootkit corruption
   /*
   addr_t ftrace_pages_start = 0;
   if (vmi_translate_ksym2v(vmi, "ftrace_pages_start", &ftrace_pages_start) ==
@@ -741,8 +794,9 @@ static ftrace_hooks_state_data_t* detect_ftrace_hooks(vmi_instance_t vmi) {
   */
 
   // TODO: INVESTIGATE - __mcount_loc method is not working
-  // Issue: Finds 50,319+ entries but 0 valid call sites (likely corrupted by rootkit)
-  // This method consistently fails to find valid call sites
+  // Issue: Finds 50,319+ entries but 0 valid call sites
+  // This may be due to kernel configuration (CONFIG_FTRACE_MCOUNT_RECORD, CONFIG_DYNAMIC_FTRACE)
+  // or build-time optimizations rather than rootkit corruption
   /*
   if (g_slist_length(target_functions) == 0) {
     log_debug("FTRACE_DETECTION: Attempting __mcount_loc fallback method");
