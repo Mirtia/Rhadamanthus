@@ -40,8 +40,8 @@ The following figure shows the VMI-Introspector in relation to the whole Experim
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/Mirtia/VMI-Linux-Rootkit-Feature-Collection.git
-   cd VMI-Linux-Rootkit-Feature-Collection
+   git clone https://github.com/Mirtia/Rhadamanthus.git
+   cd Rhadamanthus
    ```
 
 2. **Install dependencies**
@@ -101,35 +101,39 @@ features:
 
 ### Available Detection Features
 
-#### State Tasks
-- `STATE_FTRACE_HOOKS` - Detects ftrace-based function hooks (`src/state_callbacks/ftrace_hooks.c`)
-- `STATE_SYSCALL_TABLE` - Monitors syscall table integrity (`src/state_callbacks/syscall_table.c`)
-- `STATE_IDT_TABLE` - Verifies Interrupt Descriptor Table (`src/state_callbacks/idt_table.c`)
-- `STATE_KERNEL_MODULE_LIST` - Analyzes loaded kernel modules (`src/state_callbacks/kernel_module_list.c`)
-- `STATE_NETWORK_TRACE` - Monitors network connections and hooks (`src/state_callbacks/network_trace.c`)
-- `STATE_EBPF_ARTIFACTS` - Detects eBPF programs and maps (`src/state_callbacks/ebpf_activity.c`)
-- `STATE_IO_URING_ARTIFACTS` - Monitors io_uring structures (`src/state_callbacks/io_uring_artifacts.c`)
-- `STATE_MSR_REGISTERS` - Monitors Model Specific Registers (`src/state_callbacks/msr_registers.c`)
-- `STATE_PROCESS_LIST` - Analyzes running processes (`src/state_callbacks/process_list.c`)
-- `STATE_KALLSYMS_SYMBOLS` - Monitors kernel symbol table (`src/state_callbacks/kallsyms_symbols.c`)
-- `STATE_DIR_STRING_MATCHING` - String matching in directories (`src/state_callbacks/dir_string_matching.c`) (NOT IMPLEMENTED)
+#### 🔍 State Tasks (Periodic Analysis)
+| Feature | Description | Implementation |
+|---------|-------------|----------------|
+| `STATE_FTRACE_HOOKS` | Detects ftrace-based function hooks | [`src/state_callbacks/ftrace_hooks.c`](src/state_callbacks/ftrace_hooks.c) |
+| `STATE_SYSCALL_TABLE` | Monitors syscall table integrity | [`src/state_callbacks/syscall_table.c`](src/state_callbacks/syscall_table.c) |
+| `STATE_IDT_TABLE` | Monitors Interrupt Descriptor Table integrity | [`src/state_callbacks/idt_table.c`](src/state_callbacks/idt_table.c) |
+| `STATE_KERNEL_MODULE_LIST` | Analyzes loaded kernel modules | [`src/state_callbacks/kernel_module_list.c`](src/state_callbacks/kernel_module_list.c) |
+| `STATE_NETWORK_TRACE` | Monitors network connections and hooks | [`src/state_callbacks/network_trace.c`](src/state_callbacks/network_trace.c) |
+| `STATE_EBPF_ARTIFACTS` | Detects eBPF programs and maps | [`src/state_callbacks/ebpf_activity.c`](src/state_callbacks/ebpf_activity.c) |
+| `STATE_IO_URING_ARTIFACTS` | Monitors io_uring structures | [`src/state_callbacks/io_uring_artifacts.c`](src/state_callbacks/io_uring_artifacts.c) |
+| `STATE_MSR_REGISTERS` | Monitors Model Specific Registers | [`src/state_callbacks/msr_registers.c`](src/state_callbacks/msr_registers.c) |
+| `STATE_PROCESS_LIST` | Analyzes running processes | [`src/state_callbacks/process_list.c`](src/state_callbacks/process_list.c) |
+| `STATE_KALLSYMS_SYMBOLS` | Monitors kernel symbol table | [`src/state_callbacks/kallsyms_symbols.c`](src/state_callbacks/kallsyms_symbols.c) |
+| `STATE_DIR_STRING_MATCHING` | String matching in directories (NOT IMPLEMENTED) | [`src/state_callbacks/dir_string_matching.c`](src/state_callbacks/dir_string_matching.c)|
 
-#### Event Tasks
-- `EVENT_FTRACE_HOOK` - Real-time ftrace hook detection (`src/event_callbacks/ftrace_hook.c`)
-- `EVENT_SYSCALL_TABLE_WRITE` - Syscall table modification events (`src/event_callbacks/syscall_table_write.c`)
-- `EVENT_IDT_WRITE` - IDT modification detection (`src/event_callbacks/idt_write.c`)
-- `EVENT_CR0_WRITE` - CR0 register modification detection (`src/event_callbacks/cr0_write.c`)
-- `EVENT_MSR_WRITE` - MSR monitoring (`src/event_callbacks/msr_write.c`)
-- `EVENT_CODE_SECTION_MODIFY` - Code section modification detection (`src/event_callbacks/code_section_modify.c`)
-- `EVENT_PAGE_TABLE_MODIFICATION` - Page table modification detection (`src/event_callbacks/page_table_modification.c`)
-- `EVENT_KALLSYMS_TABLE_WRITE` - Kernel symbol table modification (`src/event_callbacks/kallsyms_table_write.c`)
-- `EVENT_NETFILTER_HOOK_WRITE` - Netfilter hook modification (`src/event_callbacks/netfilter_hook_write.c`)
-- `EVENT_IO_URING_RING_WRITE` - io_uring `__x64_sys_io_uring_enter` (`src/event_callbacks/io_uring_ring_write.c`)
+#### ⚡ Event Tasks (Real-time Monitoring)
+| Feature | Description | Implementation |
+|---------|-------------|----------------|
+| `EVENT_FTRACE_HOOK` | Real-time ftrace hook detection | [`src/event_callbacks/ftrace_hook.c`](src/event_callbacks/ftrace_hook.c) |
+| `EVENT_SYSCALL_TABLE_WRITE` | Syscall table modification events | [`src/event_callbacks/syscall_table_write.c`](src/event_callbacks/syscall_table_write.c) |
+| `EVENT_IDT_WRITE` | IDT modification detection | [`src/event_callbacks/idt_write.c`](src/event_callbacks/idt_write.c) |
+| `EVENT_CR0_WRITE` | CR0 register modification detection | [`src/event_callbacks/cr0_write.c`](src/event_callbacks/cr0_write.c) |
+| `EVENT_MSR_WRITE` | MSR monitoring | [`src/event_callbacks/msr_write.c`](src/event_callbacks/msr_write.c) |
+| `EVENT_CODE_SECTION_MODIFY` | Code section modification detection | [`src/event_callbacks/code_section_modify.c`](src/event_callbacks/code_section_modify.c) |
+| `EVENT_PAGE_TABLE_MODIFICATION` | Page table modification detection | [`src/event_callbacks/page_table_modification.c`](src/event_callbacks/page_table_modification.c) |
+| `EVENT_KALLSYMS_TABLE_WRITE` | Kernel symbol table modification | [`src/event_callbacks/kallsyms_table_write.c`](src/event_callbacks/kallsyms_table_write.c) |
 
-#### Interrupt Tasks
-- `INTERRUPT_EBPF_PROBE` - eBPF probe breakpoint monitoring (`src/event_callbacks/ebpf_probe.c`)
-- `INTERRUPT_IO_URING_RING_WRITE` - io_uring ring buffer monitoring (`src/event_callbacks/io_uring_ring_write.c`)
-- `INTERRUPT_NETFILTER_HOOK_WRITE` - Netfilter hook monitoring (`src/event_callbacks/netfilter_hook_write.c`)
+#### 🚨 Interrupt Tasks (Breakpoint Monitoring)
+| Feature | Description | Implementation |
+|---------|-------------|----------------|
+| `INTERRUPT_EBPF_PROBE` | eBPF probe breakpoint monitoring | [`src/event_callbacks/ebpf_probe.c`](src/event_callbacks/ebpf_probe.c) |
+| `INTERRUPT_IO_URING_RING_WRITE`  | io_uring detection on invocation of `__x64_sys_io_uring_enter` | [`src/event_callbacks/io_uring_ring_write.c`](src/event_callbacks/io_uring_ring_write.c) |
+| `INTERRUPT_NETFILTER_HOOK_WRITE` | Netfilter hook monitoring | [`src/event_callbacks/netfilter_hook_write.c`](src/event_callbacks/netfilter_hook_write.c) |
 
 ## Response Format
 
@@ -187,11 +191,11 @@ This project is licensed under the GNU Lesser General Public License v2.1 - see 
 If you use this project in your research, please cite it as:
 
 ```bibtex
-@software{vmi_rootkit_detection,
-  title={VMI Linux Rootkit Feature Collection},
+@software{rhadamanthus,
+  title={Rhadamanthus},
   author={Gkolemi, Myrsini},
   year={2025},
-  url={https://github.com/Mirtia/VMI-Linux-Rootkit-Feature-Collection},
+  url={https://github.com/Mirtia/Rhadamanthus},
   license={LGPL-2.1}
 }
 ```

@@ -1,13 +1,13 @@
 from conan import ConanFile
 from conan.tools.cmake import CMake, cmake_layout
 
-class VMIExamplesConan(ConanFile):
-    name = "vmi_features_extraction"
+class RhadamanthusConan(ConanFile):
+    name = "rhadamanthus"
     version = "0.0"
     license = "General Lesser Public License v2.1 (LGPL-2.1)"
     author = "Myrsini Gkolemi"
-    url = "https://github.com/Mirtia/VMI-Linux-Rootkit-Feature-Collection.git"
-    description = "VMI Linux Rootkit Feature Collection"
+    url = "https://github.com/Mirtia/Rhadamanthus.git"
+    description = "Rhadamanthus - VMI Linux Rootkit Detection Framework"
     settings = "os", "compiler", "build_type", "arch"
     generators = "CMakeDeps", "CMakeToolchain"
     requires = (
