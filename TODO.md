@@ -1,6 +1,7 @@
 # TODO
 
 ## Do not forget
+
 - [ ] Use context pointer to pass the dispatcher and check if the VM is paused, if not, then the state checks should not continue as they may perform the checks in an inconsistent state.
 - [ ] Add test for idt that modifies all vcpu IDT.
 - [ ] Write down clean requirements from Obsidian.
@@ -36,8 +37,7 @@
 - [ ] Kernel code integrity is a stupid approach. It will only make sense when you compare at same alive boot. Compare along time window. Hold a history of the hashes.
 - [ ] Double-check implementations so far and rationalize.
 
-
-## TODO
+## TODO ?? - 13/09/2025
 
 - [ ] ARCHITECTURE: Response schema. It should be identical to the schema or at least same schema as Clueless Admin.
   - [ ] Google response schema, let's go with that.
@@ -48,3 +48,15 @@
 - [ ] Scenarios
 - [ ] Name: something related to Crete or Greek Mythology (Radamanthus)
 - [ ] Secure VMs ???
+
+## TODO 13/9/2025 - 14/09/2025
+
+- [ ] Modify the LKM to support disarming.
+- [ ] Create new clean VM and snapshot management plan (also write down notes).
+  - [ ] 4 VMs could also be an option with one baseline (save) with all the tools.
+  - [ ] What went wrong with snapshot divergence?
+- [ ] Try to see what happens with DRAKVUF injection. (Workaround: Manually start the Clueless Administrator). See capabilities.
+- [ ] Go through scenarios and debug the hell out of the tool. 
+- [ ] As you develop scenarios, implement Clueless-Attacker.
+- [ ] CPU tests (prepare).
+- [ ] Examine the kernel compatibility table.

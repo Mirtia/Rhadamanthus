@@ -17,11 +17,11 @@ touch "$LOGFILE"
   sudo pahole --hex -C io_ring_ctx,io_rings,io_kiocb,io_uring_task "$VMLINUX"
 
   echo
-  echo "[*] Expanded nested members of io_ring_ctx"
+  echo "Expanded nested members of io_ring_ctx"
   sudo pahole --hex -E -C io_ring_ctx "$VMLINUX"
 
   echo
-  echo "[*] Cross-check with gdb type printer"
+  echo "Cross-check with gdb type printer"
   gdb -q "$VMLINUX" \
     -ex 'set print type hex on' \
     -ex 'ptype /o struct io_ring_ctx' \
