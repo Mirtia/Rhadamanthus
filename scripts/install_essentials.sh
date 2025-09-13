@@ -122,8 +122,6 @@ fi
 if [ "$ENABLE_REPSITORIES" -eq 1 ]; then
   cd ~/Documents
   git clone https://github.com/Mirtia/Clueless-Admin.git
-  git clone https://github.com/Mirtia/Rootkit-Suite.git
 fi
-
 
 echo "Done."
