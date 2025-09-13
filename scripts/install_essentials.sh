@@ -20,6 +20,7 @@ ENABLE_BPF=0
 ENABLE_UV=0
 ENABLE_LIBURING=0
 ENABLE_GO=0
+ENABLE_REPSITORIES=0
 
 for arg in "$@"; do
   case "$arg" in
@@ -29,6 +30,7 @@ for arg in "$@"; do
     --uv)       ENABLE_UV=1 ;;
     --liburing) ENABLE_LIBURING=1 ;;
     --go)       ENABLE_GO=1 ;;
+    --repositories) ENABLE_REPSITORIES=1 ;;
     -h|--help)
       grep '^# ' "$0" | sed 's/^# //'
       exit 0
@@ -116,5 +118,12 @@ if [ "$ENABLE_GO" -eq 1 ]; then
   fi
   echo "Go ${GO_VERSION} installed. If needed: export PATH=/usr/local/go/bin:\$PATH"
 fi
+
+if [ "$ENABLE_REPSITORIES" -eq 1 ]; then
+  cd ~/Documents
+  git clone https://github.com/Mirtia/Clueless-Admin.git
+  git clone https://github.com/Mirtia/Rootkit-Suite.git
+fi
+
 
 echo "Done."
