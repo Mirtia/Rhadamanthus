@@ -7,7 +7,7 @@
 
 ## Overview
 
-A Virtual Machine Introspection (VMI) framework for detecting Linux rootkits and malicious kernel modifications using  [LibVMI](https://libvmi.com/). This project is designed to help with collecting information about potential rootkit indicators on a running virtual machine (Dom0) using a privileged virtual machine (DomU). It can be used as a base later on, to develop a machine learning approach for linux kernel-mode rootkit detection.
+A Virtual Machine Introspection (VMI) framework for detecting Linux rootkits and malicious kernel modifications using  [LibVMI](https://libvmi.com/). This project is designed to help with collecting information about potential rootkit indicators on a running virtual machine (DomU) using a privileged virtual machine (Dom0). It can be used as a base later on, to develop a machine learning approach for linux kernel-mode rootkit detection.
 
 🤔 If I had to pitch this, I would say "An amateurish downgraded untested DRAKVUF that focuses in kernel-mode rootkit detection and has a response format I prefer".
 
@@ -21,6 +21,8 @@ The framework was built and run under the following system specifications:
 - **CPU**: Intel(R) Core(TM) i7-8665U (2) @ 2.11 GHz with Intel VT-x enabled
 - **DomU VMs OS**: Ubuntu 20.04.6 LTS (Focal Fossa)
 - **DomU VMs Kernel version**: 5.15.0-139-generic
+
+For more details, check out [Setup.md](Setup.md).
 
 ## Architecture
 
@@ -202,4 +204,4 @@ If you use this project in your research, please cite it as:
 
 ## AI usage
 
-Generative AI was used for the creation of boilerplate of response management, scripting and documentation.
+Generative AI was used for the creation of boilerplate e.g response management, scripting and documentation.

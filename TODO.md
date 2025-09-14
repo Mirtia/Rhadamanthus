@@ -51,11 +51,14 @@
 
 ## TODO 13/9/2025 - 14/09/2025
 
-- [ ] Modify the LKM to support disarming.
-- [ ] Create new clean VM and snapshot management plan (also write down notes).
-  - [ ] 4 VMs could also be an option with one baseline (save) with all the tools.
-  - [ ] What went wrong with snapshot divergence?
+- [-] Modify the LKM to support disarming.
+  - [ ] No need. Just removed the persistence.  
+- [x] Create new clean VM and snapshot management plan (also write down notes).
+  - [x] 4 VMs could also be an option with one baseline (save) with all the tools.
+  - [x] What went wrong with snapshot divergence? (just use dd)
 - [ ] Try to see what happens with DRAKVUF injection. (Workaround: Manually start the Clueless Administrator). See capabilities.
+  - [ ] Built standalone executable. See if you can add capablities.
+  - [ ] If capabilities work, create a script in Clueless-Admin to "decorate" the executable.
 - [ ] Go through scenarios and debug the hell out of the tool. 
 - [ ] As you develop scenarios, implement Clueless-Attacker.
 - [ ] CPU tests (prepare).
