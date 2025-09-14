@@ -1,10 +1,10 @@
-# This script is used to install the kernel debug symbols and headers for the running kernel. Essential script for the machines 
+# This script is used to install the kernel debug symbols for the running kernel. Essential script for the machines 
 # that are being monitored by the VMI-Introspector tool.
 
-#!/usr/bin/bash
+#!/bin/bash
 set -euo pipefail
 
-# Configure Ubuntu DDEBs and install kernel debug symbols and headers for the running kernel.
+# Configure Ubuntu DDEBs and install kernel debug symbols for the running kernel.
 
 want_proposed=0
 if [[ "${1:-}" == "--enable-proposed" ]]; then
@@ -61,15 +61,17 @@ fi
 echo "Refreshing APT indices ..."
 apt-get update -y
 
-PKG1="linux-image-${KREL}-dbgsym"
-PKG2="linux-image-${KREL}-generic-dbgsym"
-HEADER_PKG="linux-headers-${KREL}-generic"
+# Check if kernel release already contains "generic"
+if echo "${KREL}" | grep -q "-generic"; then
+  PKG1="linux-image-${KREL}-dbgsym"
+  PKG2="linux-image-${KREL}-dbgsym"  # Same as PKG1 since generic is already in KREL
+else
+  PKG1="linux-image-${KREL}-dbgsym"
+  PKG2="linux-image-${KREL}-generic-dbgsym"
+fi
 
 echo "Checking for candidate debug symbol packages:"
 apt-cache policy "${PKG1}" "${PKG2}" || true
-
-echo "Checking for candidate kernel header package:"
-apt-cache policy "${HEADER_PKG}" || true
 
 # Install debug symbols - try the main package first, then fall back to generic variant.
 installed_pkg=""
@@ -105,31 +107,6 @@ else
   fi
 fi
 
-# Install kernel headers
-echo "Installing kernel headers..."
-installed_header_pkg=""
-if apt-cache policy "${HEADER_PKG}" | grep -q "Candidate:" && \
-   ! apt-cache policy "${HEADER_PKG}" | grep -q "Candidate: (none)"; then
-  echo "Installing ${HEADER_PKG} ..."
-  apt-get install -y "${HEADER_PKG}"
-  installed_header_pkg="${HEADER_PKG}"
-else
-  echo "WARNING: No candidate header package visible for ${KREL}."
-  echo "Attempting direct download via apt-get download (if available in current indices) ..."
-  set +e
-  apt-get download "${HEADER_PKG}"
-  dl_rc=$?
-  set -e
-  if [[ $dl_rc -eq 0 ]]; then
-    echo "Installing downloaded header package ..."
-    dpkg -i linux-headers-"${KREL}"-generic*.deb || apt-get -f install -y
-    installed_header_pkg="(downloaded .deb)"
-  else
-    echo "ERROR: Could not find or download header package for ${KREL} from configured pockets." >&2
-    echo "Check that your kernel comes from ${CODENAME}-updates (or use --enable-proposed if on -proposed)." >&2
-    exit 4
-  fi
-fi
 
 # Verify presence and usability of vmlinux with debug info.
 VMLINUX="/usr/lib/debug/boot/vmlinux-${KREL}"
@@ -146,14 +123,3 @@ else
   exit 3
 fi
 
-# Verify kernel headers installation
-HEADERS_DIR="/usr/src/linux-headers-${KREL}"
-echo "Verifying ${HEADERS_DIR} ..."
-if [[ -d "${HEADERS_DIR}" ]]; then
-  echo "OK: ${HEADERS_DIR} exists."
-  echo "SUCCESS: Kernel headers installed (${installed_header_pkg})."
-else
-  echo "ERROR: ${HEADERS_DIR} not found after installation." >&2
-  echo "Run: dpkg -L ${installed_header_pkg}  (if a package name) to inspect contents." >&2
-  exit 5
-fi

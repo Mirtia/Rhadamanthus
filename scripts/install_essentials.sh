@@ -3,8 +3,8 @@ set -e
 
 # Minimal, flag-driven setup. Run with sudo for system-wide installs.
 # Examples:
-#   sudo bash setup-min.sh --basics --net --bpf --uv --liburing --go
-#   sudo bash setup-min.sh --basics
+#   sudo ./install-essentials.sh --basics --net --bpf --uv --liburing --go
+#   sudo ./install-essentials.sh --basics
 #
 # Flags (all optional):
 #   --basics     build-essential, git, headers, python, etc.
@@ -13,6 +13,8 @@ set -e
 #   --uv         install Astral uv for current user
 #   --liburing   build & install liburing + io_uring-cp
 #   --go         install Go (default 1.22.6). Override: GO_VERSION=1.23.1 bash setup-min.sh --go
+#   --clang14    install clang-14 from source
+#   --repositories install repositories (Clueless-Admin)
 
 ENABLE_BASICS=0
 ENABLE_NET=0
@@ -20,7 +22,8 @@ ENABLE_BPF=0
 ENABLE_UV=0
 ENABLE_LIBURING=0
 ENABLE_GO=0
-ENABLE_REPSITORIES=0
+ENABLE_CLANG14=0
+ENABLE_REPOSITORIES=0
 
 for arg in "$@"; do
   case "$arg" in
@@ -30,7 +33,8 @@ for arg in "$@"; do
     --uv)       ENABLE_UV=1 ;;
     --liburing) ENABLE_LIBURING=1 ;;
     --go)       ENABLE_GO=1 ;;
-    --repositories) ENABLE_REPSITORIES=1 ;;
+    --clang14)  ENABLE_CLANG14=1 ;;
+    --repositories) ENABLE_REPOSITORIES=1 ;;
     -h|--help)
       grep '^# ' "$0" | sed 's/^# //'
       exit 0
@@ -69,7 +73,7 @@ if [ "$ENABLE_BPF" -eq 1 ]; then
   apt_install bpfcc-tools libbpf-dev libelf-dev zlib1g-dev || true
 
   if ! command -v bpftool >/dev/null 2>&1; then
-    apt_install clang llvm libcap-dev flex bison libssl-dev libzstd-dev
+    apt_install llvm libcap-dev flex bison libssl-dev libzstd-dev
     mkdir -p /usr/local/src
     if [ ! -d /usr/local/src/bpftool ]; then
       git clone --recurse-submodules https://github.com/libbpf/bpftool.git /usr/local/src/bpftool
@@ -119,8 +123,34 @@ if [ "$ENABLE_GO" -eq 1 ]; then
   echo "Go ${GO_VERSION} installed. If needed: export PATH=/usr/local/go/bin:\$PATH"
 fi
 
-if [ "$ENABLE_REPSITORIES" -eq 1 ]; then
-  cd ~/Documents
+if [ "$ENABLE_CLANG14" -eq 1 ]; then
+  echo "Installing Clang 14 from apt.llvm.org..."
+
+  # Add LLVM apt repo
+  apt_install wget gnupg lsb-release software-properties-common
+  wget -qO - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
+
+  CODENAME="$(lsb_release -cs)"
+  echo "deb http://apt.llvm.org/${CODENAME}/ llvm-toolchain-${CODENAME}-14 main" > /etc/apt/sources.list.d/llvm14.list
+
+  apt_update_once
+
+  apt_install clang-14 clangd-14 clang-format-14 clang-tidy-14 lld-14
+
+  # Create symlinks
+  ln -sf /usr/bin/clang-14 /usr/local/bin/clang
+  ln -sf /usr/bin/clang++-14 /usr/local/bin/clang++
+  ln -sf /usr/bin/clang-format-14 /usr/local/bin/clang-format
+  ln -sf /usr/bin/clang-tidy-14 /usr/local/bin/clang-tidy
+
+  echo "Clang 14 installed via apt.llvm.org!"
+  echo "Default symlinks: clang → clang-14, etc."
+  echo "If needed: export PATH=/usr/local/bin:\$PATH"
+fi
+
+
+if [ "$ENABLE_REPOSITORIES" -eq 1 ]; then
+  cd "${HOME}/Documents"
   git clone https://github.com/Mirtia/Clueless-Admin.git
 fi
 
