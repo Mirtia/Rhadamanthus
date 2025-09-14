@@ -1,8 +1,9 @@
+#!/bin/bash
+
 # This script is used to install the kernel debug symbols for the running kernel. Essential script for the machines 
 # that are being monitored by the VMI-Introspector tool.
 
-#!/bin/bash
-set -euo pipefail
+set -e
 
 # Configure Ubuntu DDEBs and install kernel debug symbols for the running kernel.
 

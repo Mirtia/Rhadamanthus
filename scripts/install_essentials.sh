@@ -1,10 +1,8 @@
 #!/bin/bash
 set -e
 
-# Minimal, flag-driven setup. Run with sudo for system-wide installs.
 # Examples:
 #   sudo ./install-essentials.sh --basics --net --bpf --uv --liburing --go
-#   sudo ./install-essentials.sh --basics
 #
 # Flags (all optional):
 #   --basics     build-essential, git, headers, python, etc.
@@ -13,7 +11,7 @@ set -e
 #   --uv         install Astral uv for current user
 #   --liburing   build & install liburing + io_uring-cp
 #   --go         install Go (default 1.22.6). Override: GO_VERSION=1.23.1 bash setup-min.sh --go
-#   --clang14    install clang-14 from source
+#   --clang14    install clang-14 from apt.llvm.org
 #   --repositories install repositories (Clueless-Admin)
 
 ENABLE_BASICS=0
