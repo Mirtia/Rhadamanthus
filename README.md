@@ -199,3 +199,7 @@ If you use this project in your research, please cite it as:
   license={LGPL-2.1}
 }
 ```
+
+## AI usage
+
+Generative AI was used for the creation of boilerplate of response management, scripting and documentation.
