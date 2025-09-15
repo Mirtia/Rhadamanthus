@@ -14,11 +14,18 @@ sudo lvcreate -L 20G -n ubuntu-20-04-new-kernel vg0
 sudo xl block-attach ubuntu-20-04-new-kernel  phy:/dev/vg/file-transfer xvdb w
 ```
 
-**Note**: I tried taking snapshots using *lv*, but since I wasn't very familiar with it, I ended up having merging issues when I wanted to restore a disk state. In the end, I chose *dd* for cloning.
+>**Note**: I tried taking snapshots using *lv*, but since I wasn't very familiar with it, I ended up having merging issues when I wanted to restore a disk state. In the end, I chose *dd* for cloning.
 
 ## Workspace
 
+### Minimal isolation
+
 I first added a basic firewall (*ufw*) and only allowed an open port for *ssh* connections.
+
+>**Note**: Some hardware (like EliteBooks ugh...) have limited driver support with Debian, and after Xen installation, everything just goes downhill, making SSH the preferred access method. For example, in my case, the Elitebook touchpad stopped working.
+
+### Display
+
 Then, since I am using VNC for the display of the domU VMs, I decided to use [noVNC](https://novnc.com/).
 
 This is what I typically run:
@@ -29,7 +36,14 @@ This is what I typically run:
 ssh nootkit@debian -i ~/.ssh/id_nootkit -L 6081:localhost:6081
 # Finally visiting the browser, http://localhost:6081/vnc.html?host=localhost&port=6081.
 ```
+### Console
 
-- **xl console**: I will write more on the scripts necessary for running with tty. Both guest and host need some configuration.
+I will write more on the scripts necessary for running with tty. Both guest and host need some configuration.
 
-**Note**: Some hardware (like EliteBooks ugh...) have limited driver support with Debian, and after Xen installation, everything just goes downhill, making SSH the preferred access method. For example, in my case, the Elitebook touchpad stopped working.
+### Network
+
+Regarding the network configuration, I thought of using NAT, but registering a bridge was far easier and thoroughly documented. 
+The official [Xen Wiki](https://wiki.xenproject.org/wiki/Xen_Networking) has a detailed article on how to create a bridge and attach it to your domU VMs.
+
+
+
