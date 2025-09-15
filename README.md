@@ -23,6 +23,7 @@ The framework was built and run under the following system specifications:
 - **DomU VMs Kernel version**: 5.15.0-139-generic
 
 For more details, check out [Setup.md](Setup.md).
+For demonstrations, check out [Scenarios.md](scenarios/Scenarios.md).
 
 ## Architecture
 
