@@ -1,0 +1,39 @@
+# Which Xen domain (domain name) to attach to (LibVMI)
+domain_name: "ubuntu-20-04-ftrace-lkm"
+
+# How long the entire introspection window should last (in seconds)
+monitor:
+  window_seconds: 10
+  state_sampling_seconds: 1
+
+# Which detection services to dispatch.
+# Tasks are split into two categories:
+# 1. State polling tasks (e.g., task_module_list)
+# 2. Event-driven tasks (e.g., mem_event)
+# 3. Interrupt-driven tasks (e.g., breakpoint at syscall)
+features:
+  state:
+    - id: STATE_KERNEL_MODULE_LIST
+    - id: STATE_FTRACE_HOOKS
+    - id: STATE_NETWORK_TRACE
+    - id: STATE_SYSCALL_TABLE
+    - id: STATE_IDT_TABLE
+    - id: STATE_DIR_STRING_MATCHING
+    - id: STATE_PROCESS_LIST
+    - id: STATE_MSR_REGISTERS
+    - id: STATE_EBPF_ARTIFACTS
+    - id: STATE_KALLSYMS_SYMBOLS
+    - id: STATE_IO_URING_ARTIFACTS
+  event:
+    - id: EVENT_FTRACE_HOOK
+    - id: EVENT_SYSCALL_TABLE_WRITE
+    - id: EVENT_IDT_WRITE
+    - id: EVENT_CR0_WRITE
+    - id: EVENT_PAGE_TABLE_MODIFICATION
+    - id: EVENT_MSR_WRITE
+    - id: EVENT_CODE_SECTION_MODIFY
+    - id: EVENT_KALLSYMS_TABLE_WRITE
+  interrupt:
+    - id: INTERRUPT_EBPF_PROBE
+    - id: INTERRUPT_IO_URING_RING_WRITE
+    - id: INTERRUPT_NETFILTER_HOOK_WRITE
