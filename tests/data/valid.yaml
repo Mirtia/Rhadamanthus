@@ -3,8 +3,8 @@ domain_name: "test-domain"
 
 # How long the entire introspection window should last (in seconds)
 monitor:
-  window_ms: 5000
-  state_sampling_ms: 1000
+  window_seconds: 5
+  state_sampling_seconds: 1
 
 # Which detection services to dispatch.
 # Tasks are split into two categories:

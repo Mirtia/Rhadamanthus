@@ -11,11 +11,11 @@
 struct config_t {
   char* domain_name;  ///< Domain name for LibVMI introspection.
   uint32_t
-      window_ms;  ///< Duration of the introspection window in milliseconds.
-  uint32_t state_sampling_ms;  ///< Frequency of state sampling in milliseconds.
-  GList* state_tasks;          ///< List of state_task_id_t.
-  GList* event_tasks;          ///< List of event_task_id_t.
-  GList* interrupt_tasks;      ///< List of interrupt_task_id_t.
+      window_seconds;  ///< Duration of the introspection window in seconds.
+  uint32_t state_sampling_seconds;  ///< Frequency of state sampling in seconds.
+  GList* state_tasks;               ///< List of state_task_id_t.
+  GList* event_tasks;               ///< List of event_task_id_t.
+  GList* interrupt_tasks;           ///< List of interrupt_task_id_t.
 };
 
 // Type definition for the config_t structure.

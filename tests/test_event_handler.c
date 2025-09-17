@@ -35,13 +35,13 @@ static void test_event_handler_creation_valid(void** state) {
     log_error("Failed to init LibVMI library.\n");
     vmi_destroy(vmi);
   }
-  uint32_t window_ms = 1000;
-  uint32_t state_sampling_ms = 100;
+  uint32_t window_seconds = 1;
+  uint32_t state_sampling_seconds = 1;
   event_handler_t* event_handler_valid =
-      event_handler_initialize(vmi, window_ms, state_sampling_ms);
+      event_handler_initialize(vmi, window_seconds, state_sampling_seconds);
   assert_non_null(event_handler_valid);
-  assert_int_equal(event_handler_valid->window_ms, window_ms);
-  assert_int_equal(event_handler_valid->state_sampling_ms, state_sampling_ms);
+  assert_int_equal(event_handler_valid->window_seconds, window_seconds);
+  assert_int_equal(event_handler_valid->state_sampling_seconds, state_sampling_seconds);
   assert_int_equal(event_handler_valid->vmi, vmi);
 
   assert_non_null(event_handler_valid->state_tasks);

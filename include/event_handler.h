@@ -75,9 +75,9 @@ struct event_handler {
       [INTERRUPT_TASK_ID_MAX];  ///< Array of interrupt tasks (if they are enabled or not) indexed by their IDs.
   interrupt_context_t* interrupt_context;  // The shared interrupt context.
   vmi_event_t* global_interrupt_event;     ///< The LibVMI event for interrupts.
-  uint32_t window_ms;  ///< The time window in milliseconds for monitoring.
+  uint32_t window_seconds;  ///< The time window in seconds for monitoring.
   uint32_t
-      state_sampling_ms;  ///< The frequency in milliseconds for state tasks sampling.
+      state_sampling_seconds;  ///< The frequency in seconds for state tasks sampling.
   uint64_t
       latest_state_sampling_ms;  ///< The latest time in milliseconds since epoch when the state tasks were sampled. Used to limit the frequency of state tasks execution.
   GThread* event_thread;         ///< The thread running the LibVMI event loop.
@@ -169,13 +169,13 @@ int interrupt_task_id_from_str(const char* str);
  * state and event tasks.
  *
  * @param vmi The LibVMI instance to use for the event_handler.
- * @param window_ms The time window in milliseconds for event processing.
- * @param state_sampling_ms The frequency in milliseconds for state tasks
+ * @param window_seconds The time window in seconds for event processing.
+ * @param state_sampling_seconds The frequency in seconds for state tasks
  * @return event_handler_t* The created event_handler instance.
  */
 event_handler_t* event_handler_initialize(vmi_instance_t vmi,
-                                          uint32_t window_ms,
-                                          uint32_t state_sampling_ms);
+                                          uint32_t window_seconds,
+                                          uint32_t state_sampling_seconds);
 
 /**
  * @brief Cleaning up and freeing the resources used by the event_handler.
@@ -235,7 +235,7 @@ static gpointer event_loop_thread(gpointer data);
 
 /**
  * @brief The event_handler starts a thread that has a thread sleeping
- * for window_ms till it sends a singal to the event processing loop.
+ * for window_seconds till it sends a singal to the event processing loop.
  *
  * @param event_handler The event_handler instance.
  */

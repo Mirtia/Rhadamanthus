@@ -48,8 +48,8 @@ event_handler_t* event_handler_initialize_from_config(const char* config_path) {
     return NULL;
   }
 
-  event_handler_t* event_handler =
-      event_handler_initialize(vmi, config.window_ms, config.state_sampling_ms);
+  event_handler_t* event_handler = event_handler_initialize(
+      vmi, config.window_seconds, config.state_sampling_seconds);
   if (!event_handler) {
     log_error("Failed to allocate event_handler.");
     vmi_destroy(vmi);
@@ -165,18 +165,18 @@ int parse_yaml_config(const char* path, config_t* config) {
           config->domain_name = g_strdup(val);
           context = NONE;
         } else if (context == MONITOR) {
-          if (strcmp(val, "window_ms") == 0 ||
-              strcmp(val, "state_sampling_ms") == 0) {
+          if (strcmp(val, "window_seconds") == 0 ||
+              strcmp(val, "state_sampling_seconds") == 0) {
             if (last_key) {
               g_free(last_key);
             }
             last_key = g_strdup(val);
           } else if (last_key) {
             // This is a value for the last key
-            if (strcmp(last_key, "window_ms") == 0) {
-              config->window_ms = (uint32_t)atoi(val);
-            } else if (strcmp(last_key, "state_sampling_ms") == 0) {
-              config->state_sampling_ms = (uint32_t)atoi(val);
+            if (strcmp(last_key, "window_seconds") == 0) {
+              config->window_seconds = (uint32_t)atoi(val);
+            } else if (strcmp(last_key, "state_sampling_seconds") == 0) {
+              config->state_sampling_seconds = (uint32_t)atoi(val);
             }
             g_free(last_key);
             last_key = NULL;
@@ -285,8 +285,8 @@ int parse_yaml_config(const char* path, config_t* config) {
   yaml_parser_delete(&parser);
   (void)fclose(file);
 
-  if (!config->domain_name || config->window_ms == 0 ||
-      config->state_sampling_ms == 0) {
+  if (!config->domain_name || config->window_seconds == 0 ||
+      config->state_sampling_seconds == 0) {
     log_error("Missing required fields in configuration.");
     config_free(config);
     return EXIT_FAILURE;

@@ -117,8 +117,8 @@ int interrupt_task_id_from_str(const char* str) {
 
 event_handler_t* event_handler_initialize(vmi_instance_t vmi,
                                           // NOLINTNEXTLINE
-                                          uint32_t window_ms,
-                                          uint32_t state_sampling_ms) {
+                                          uint32_t window_seconds,
+                                          uint32_t state_sampling_seconds) {
 
   if (vmi == NULL) {
     log_error("The provided VMI instance is NULL.");
@@ -132,8 +132,8 @@ event_handler_t* event_handler_initialize(vmi_instance_t vmi,
     return NULL;
   }
 
-  event_handler->window_ms = window_ms;
-  event_handler->state_sampling_ms = state_sampling_ms;
+  event_handler->window_seconds = window_seconds;
+  event_handler->state_sampling_seconds = state_sampling_seconds;
   event_handler->vmi = vmi;
   event_handler->stop_signal = 0;
   event_handler->stop_signal_json_serialization = 0;
@@ -343,13 +343,13 @@ static gpointer event_loop_thread(gpointer data) {
   log_info("Pre-sampling state tasks before starting the event loop thread.");
   sample_state_tasks_all(event_handler);
 
-  log_info("Starting event loop thread with window size: %u ms.",
-           event_handler->window_ms);
+  log_info("Starting event loop thread with window size: %u seconds.",
+           event_handler->window_seconds);
   // LibVMI processes one event at a time, listen to total of time window_ms.
   // The callback will be triggered, which will enqueue the item.
   while (!g_atomic_int_get(&event_handler->stop_signal)) {
-    if (vmi_events_listen(event_handler->vmi, event_handler->window_ms) ==
-        VMI_FAILURE) {
+    if (vmi_events_listen(event_handler->vmi, event_handler->window_seconds *
+                                                  1000) == VMI_FAILURE) {
       log_error("vmi_events_listen failed.");
     }
   }
@@ -369,13 +369,13 @@ static gpointer event_window(gpointer data) {
   event_handler_t* event_handler = (event_handler_t*)data;
 
   // microseconds
-  g_usleep((gulong)event_handler->window_ms * 1000);
+  g_usleep((gulong)event_handler->window_seconds * 1000000);
 
   // Signal the event loop to stop
   g_atomic_int_set(&event_handler->stop_signal, 1);
 
-  log_info("event_window: Signaled event loop to stop after %u ms.",
-           event_handler->window_ms);
+  log_info("event_window: Signaled event loop to stop after %u seconds.",
+           event_handler->window_seconds);
 
   return NULL;
 }
@@ -394,8 +394,8 @@ void event_handler_start_event_window(event_handler_t* event_handler) {
   if (!event_handler->signal_event_thread) {
     log_error("event_handler_start_event_window: Failed to create thread.");
   } else {
-    log_info("Started event window thread to run for %u ms.",
-             event_handler->window_ms);
+    log_info("Started event window thread to run for %u seconds.",
+             event_handler->window_seconds);
   }
 }
 
@@ -469,7 +469,7 @@ void sample_state_tasks(event_handler_t* event_handler) {
   // Check if the time since the last state sampling exceeds the configured interval.
   uint64_t current_time_ms = g_get_monotonic_time() / 1000;
   if (current_time_ms - event_handler->latest_state_sampling_ms <
-      event_handler->state_sampling_ms) {
+      event_handler->state_sampling_seconds * 1000) {
     log_warn(
         "State sampling skipped, "
         "not enough time has passed since the last sampling: "

@@ -21,8 +21,8 @@ static void test_parse_valid_config(void** state) {
   assert_int_equal(result, EXIT_SUCCESS);
   assert_non_null(config.domain_name);
   assert_string_equal(config.domain_name, "test-domain");
-  assert_int_equal(config.window_ms, 5000);
-  assert_int_equal(config.state_sampling_ms, 1000);
+  assert_int_equal(config.window_seconds, 5);
+  assert_int_equal(config.state_sampling_seconds, 1);
 
   assert_non_null(config.state_tasks);
   assert_non_null(config.event_tasks);

@@ -1,0 +1,3 @@
+[submodule "rootkit-suite"]
+	path = rootkit-suite
+	url = https://github.com/Mirtia/Rootkit-Suite.git

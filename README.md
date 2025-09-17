@@ -85,8 +85,8 @@ domain_name: "ubuntu-20-04-new-kernel"
 
 # Monitoring parameters
 monitor:
-  window_ms: 10000        # Total monitoring window (10 seconds)
-  state_sampling_ms: 1000 # State polling interval (1 second)
+  window_seconds: 10      # Total monitoring window (10 seconds)
+  state_sampling_seconds: 1 # State polling interval (1 second)
 
 # Detection features
 features:
