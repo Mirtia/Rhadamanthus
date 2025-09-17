@@ -1,0 +1,5 @@
+<map id="msr_registers_state_data" name="msr_registers_state_data">
+<area shape="rect" id="node1" title="State data for MSR registers analysis." alt="" coords="75,109,261,136"/>
+<area shape="rect" id="node2" href="$structlegitimate__syscall__entry.html" title="Information about the legitimate syscall entry point." alt="" coords="5,5,147,47"/>
+<area shape="rect" id="node3" href="$structmsr__registers__summary.html" title="Summary information for MSR registers analysis." alt="" coords="171,13,351,39"/>
+</map>

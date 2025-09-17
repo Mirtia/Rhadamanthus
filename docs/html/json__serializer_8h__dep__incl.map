@@ -1,0 +1,9 @@
+<map id="include/json_serializer.h" name="include/json_serializer.h">
+<area shape="rect" id="node1" title="Header for JSON serializer to serialize responses to individual files." alt="" coords="352,5,531,32"/>
+<area shape="rect" id="node2" href="$event__handler_8h_source.html" title=" " alt="" coords="353,80,530,107"/>
+<area shape="rect" id="node3" href="$config__parser_8h_source.html" title=" " alt="" coords="5,162,176,189"/>
+<area shape="rect" id="node4" href="$event__task__map_8h_source.html" title=" " alt="" coords="201,155,346,196"/>
+<area shape="rect" id="node5" href="$state__task__map_8h.html" title="Header file for mapping state task IDs to their corresponding function pointers." alt="" coords="371,155,512,196"/>
+<area shape="rect" id="node6" href="$utils_8h.html" title="Utility functions for error handling, logging, and kernel memory operations." alt="" coords="537,162,650,189"/>
+<area shape="rect" id="node7" href="$test__utils_8h.html" title="This header file contains utility functions for generating and freeing data objects for testing." alt="" coords="675,162,805,189"/>
+</map>

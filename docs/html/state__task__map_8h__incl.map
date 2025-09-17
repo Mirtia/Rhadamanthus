@@ -1,0 +1,14 @@
+<map id="include/state_task_map.h" name="include/state_task_map.h">
+<area shape="rect" id="node1" title="Header file for mapping state task IDs to their corresponding function pointers." alt="" coords="51,5,192,47"/>
+<area shape="rect" id="node2" title=" " alt="" coords="5,244,125,271"/>
+<area shape="rect" id="node3" href="$event__handler_8h_source.html" title=" " alt="" coords="178,95,305,121"/>
+<area shape="rect" id="node4" title=" " alt="" coords="150,244,261,271"/>
+<area shape="rect" id="node5" title=" " alt="" coords="285,244,408,271"/>
+<area shape="rect" id="node6" href="$interrupt__context_8h.html" title="The file defining the global interrupt context and breakpoint management." alt="" coords="224,169,371,196"/>
+<area shape="rect" id="node9" href="$json__serializer_8h.html" title="Header for JSON serializer to serialize responses to individual files." alt="" coords="547,169,674,196"/>
+<area shape="rect" id="node7" title=" " alt="" coords="432,244,515,271"/>
+<area shape="rect" id="node8" title=" " alt="" coords="539,244,610,271"/>
+<area shape="rect" id="node10" title=" " alt="" coords="634,319,745,345"/>
+<area shape="rect" id="node11" title=" " alt="" coords="803,244,861,271"/>
+<area shape="rect" id="node12" href="$response_8h.html" title="The file with the generic response schema." alt="" coords="685,244,779,271"/>
+</map>

@@ -1,0 +1,21 @@
+var searchData=
+[
+  ['page_5fsize_0',['page_size',['../structprocess__list__state__data.html#a3b5695a273c93d805270c5550659e917',1,'process_list_state_data']]],
+  ['paging_5fenable_1',['paging_enable',['../structcr0__flags.html#a3fd5856c08ab58c27b1c45342ab6773f',1,'cr0_flags']]],
+  ['pid_2',['pid',['../structebpf__syscall__ctx__t.html#ab8235b3eaa754de015d3b320b76baeeb',1,'ebpf_syscall_ctx_t::pid()'],['../structebpf__probe__data__t.html#a853172f2028d8d7c916e486d9f0b9693',1,'ebpf_probe_data_t::pid()'],['../structebpf__program__info.html#af4cf124c93e8bcecefb09b7dd0222ee8',1,'ebpf_program_info::pid()'],['../structebpf__map__info.html#ae5a95266786a8ee466cbaadf3e59b837',1,'ebpf_map_info::pid()'],['../structebpf__link__info.html#a7d6d4dd924fcaf82b7f2fbfe04bd6ef3',1,'ebpf_link_info::pid()'],['../structio__uring__instance__info.html#a6bcad051e10a88809d3b125415df953d',1,'io_uring_instance_info::pid()'],['../structprocess__info.html#a65a9bce6342a0fe75cba1c47e547c6a9',1,'process_info::pid()'],['../structlocal__process__info__t.html#a73a71471cfb3444188f776e48f263048',1,'local_process_info_t::pid()']]],
+  ['pml4_5fpa_3',['pml4_pa',['../structpt__watch__ctx__t.html#ad550026fd83e41d7d8f449aaaa5cd8ba',1,'pt_watch_ctx_t::pml4_pa()'],['../structpage__table__modification__data.html#a8207b160fce31fadf2fd8df371747572',1,'page_table_modification_data::pml4_pa()']]],
+  ['present_4',['present',['../structpt__entry__flags.html#aa65a546be65f3946c30136f81a7007d5',1,'pt_entry_flags']]],
+  ['priv_5faddress_5',['priv_address',['../structnetfilter__hook__entry.html#a7b067b38a6d19b075c041df77da453e6',1,'netfilter_hook_entry']]],
+  ['probe_5ftype_6',['probe_type',['../structebpf__probe__data__t.html#a53230fc5e296468594ba8748a7d589a9',1,'ebpf_probe_data_t']]],
+  ['process_5fname_7',['process_name',['../structebpf__program__info.html#a8f6105eec279599a2c71bd4c0862184a',1,'ebpf_program_info::process_name()'],['../structebpf__map__info.html#a2b87e1783c6edaee9b20a530331f8b96',1,'ebpf_map_info::process_name()'],['../structebpf__link__info.html#a73fff4b674086c8663070f9a3477130b',1,'ebpf_link_info::process_name()'],['../structio__uring__instance__info.html#aa29387a69962eba694d77fd822f324a5',1,'io_uring_instance_info::process_name()']]],
+  ['processes_8',['processes',['../structprocess__list__state__data.html#ad6316fed150be9b75c4056040238928a',1,'process_list_state_data']]],
+  ['processes_5fwith_5febpf_9',['processes_with_ebpf',['../structebpf__activity__summary.html#a3fc55d7f684efcea02bab8264f52d34d',1,'ebpf_activity_summary']]],
+  ['prog_5faddr_10',['prog_addr',['../structebpf__program__info.html#a92e925b94b723ec71f3b580fb41a0465',1,'ebpf_program_info']]],
+  ['prog_5ffops_11',['prog_fops',['../structbpf__fops__syms.html#ac85724ac978c57cbdd4f127947c74601',1,'bpf_fops_syms']]],
+  ['prog_5fname_12',['prog_name',['../structebpf__syscall__ctx__t.html#a77dd04c5f7c766e01a098212178b7965',1,'ebpf_syscall_ctx_t']]],
+  ['prog_5ftype_13',['prog_type',['../structebpf__syscall__ctx__t.html#af6617ff9375e4217943bca367b2f7abc',1,'ebpf_syscall_ctx_t']]],
+  ['programs_5fby_5ftype_14',['programs_by_type',['../structebpf__activity__summary.html#a96b587afffcc799f1502e805a80bcad7',1,'ebpf_activity_summary']]],
+  ['protected_5fmode_15',['protected_mode',['../structcr0__flags.html#aad20c3363fad873ff8e0ef997a95474f',1,'cr0_flags']]],
+  ['protocol_16',['protocol',['../structnetfilter__hook__entry.html#a49b3ea5a243f39cbecfad7f1292aec05',1,'netfilter_hook_entry']]],
+  ['pt_5fregs_5faddr_17',['pt_regs_addr',['../structio__uring__ring__write__data.html#a5a5ab46dbb49d6c4c38d2459cb177a9d',1,'io_uring_ring_write_data']]]
+];

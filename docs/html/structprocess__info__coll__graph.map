@@ -1,0 +1,4 @@
+<map id="process_info" name="process_info">
+<area shape="rect" id="node1" title="Information about a single process." alt="" coords="29,95,133,121"/>
+<area shape="rect" id="node2" href="$structprocess__credentials.html" title="Process credentials information." alt="" coords="5,5,156,32"/>
+</map>

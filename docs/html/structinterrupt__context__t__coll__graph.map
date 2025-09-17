@@ -1,0 +1,4 @@
+<map id="interrupt_context_t" name="interrupt_context_t">
+<area shape="rect" id="node1" title="Global interrupt context managing all breakpoints." alt="" coords="5,95,152,121"/>
+<area shape="rect" id="node2" href="$structbreakpoint__entry.html" title="Individual breakpoint entry in the lookup table." alt="" coords="12,5,145,32"/>
+</map>

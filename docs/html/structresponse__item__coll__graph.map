@@ -1,0 +1,6 @@
+<map id="response_item" name="response_item">
+<area shape="rect" id="node1" title="Response item for the serialization queue Uses your response.h structure instead of custom format." alt="" coords="19,184,138,211"/>
+<area shape="rect" id="node2" href="$structresponse.html" title="The general response structure." alt="" coords="38,95,119,121"/>
+<area shape="rect" id="node3" href="$structerror.html" title=" " alt="" coords="5,5,59,32"/>
+<area shape="rect" id="node4" href="$structmetadata.html" title=" " alt="" coords="83,5,168,32"/>
+</map>

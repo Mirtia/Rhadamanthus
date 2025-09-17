@@ -1,0 +1,4 @@
+<map id="include/event_callbacks/page_table_modification.h" name="include/event_callbacks/page_table_modification.h">
+<area shape="rect" id="node1" title="This file monitors the page table modifications by tracking changes in the PML4 entries." alt="" coords="5,5,204,47"/>
+<area shape="rect" id="node2" title=" " alt="" coords="43,95,166,121"/>
+</map>
