@@ -1,8 +1,0 @@
-<map id="event_handler" name="event_handler">
-<area shape="rect" id="node1" title=" " alt="" coords="176,184,291,211"/>
-<area shape="rect" id="node2" href="$structstate__task.html" title="A state task acts as a state information extractor for the system every time an LibVMI is triggered." alt="" coords="5,95,96,121"/>
-<area shape="rect" id="node3" href="$structevent__task.html" title="An event task is a persistent LibVMI event registration." alt="" coords="121,95,215,121"/>
-<area shape="rect" id="node4" href="$structinterrupt__context__t.html" title="Global interrupt context managing all breakpoints." alt="" coords="240,95,387,121"/>
-<area shape="rect" id="node5" href="$structbreakpoint__entry.html" title="Individual breakpoint entry in the lookup table." alt="" coords="247,5,380,32"/>
-<area shape="rect" id="node6" href="$structjson__serializer.html" title="JSON Serializer object &#45; simplified for individual file output." alt="" coords="411,95,527,121"/>
-</map>

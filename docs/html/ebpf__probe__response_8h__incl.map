@@ -1,8 +1,0 @@
-<map id="include/event_callbacks/responses/ebpf_probe_response.h" name="include/event_callbacks/responses/ebpf_probe_response.h">
-<area shape="rect" id="node1" title="Response structure and functions for eBPF probe events." alt="" coords="194,5,373,61"/>
-<area shape="rect" id="node2" title=" " alt="" coords="5,109,116,136"/>
-<area shape="rect" id="node3" title=" " alt="" coords="141,109,199,136"/>
-<area shape="rect" id="node4" title=" " alt="" coords="223,109,343,136"/>
-<area shape="rect" id="node5" title=" " alt="" coords="367,109,450,136"/>
-<area shape="rect" id="node6" title=" " alt="" coords="475,109,545,136"/>
-</map>

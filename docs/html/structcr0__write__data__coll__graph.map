@@ -1,4 +1,0 @@
-<map id="cr0_write_data" name="cr0_write_data">
-<area shape="rect" id="node1" title="Event payload for a CR0 write." alt="" coords="5,95,124,121"/>
-<area shape="rect" id="node2" href="$structcr0__flags.html" title="Decoded flag view of the CR0 control register." alt="" coords="25,5,105,32"/>
-</map>

@@ -1,5 +1,0 @@
-<map id="io_uring_artifacts_state_data" name="io_uring_artifacts_state_data">
-<area shape="rect" id="node1" title="State data for io_uring artifacts analysis." alt="" coords="119,109,254,151"/>
-<area shape="rect" id="node2" href="$structio__uring__worker__threads.html" title="Information about io_uring worker threads." alt="" coords="5,13,187,39"/>
-<area shape="rect" id="node3" href="$structio__uring__artifacts__summary.html" title="Summary information for io_uring artifacts analysis." alt="" coords="211,5,346,47"/>
-</map>
