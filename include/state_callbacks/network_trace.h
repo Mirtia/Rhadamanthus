@@ -13,27 +13,30 @@
 #include <stdint.h>
 
 /**
- * @brief Network rootkit detection callback for VMI-based security monitoring
+ * @brief Network trace state callback. Detects established TCP connections only!
  * 
- * This callback performs comprehensive network level rootkit detection by analyzing
- * kernel networking structures and identifying suspicious network activities that
- * may indicate the presence of kernel-mode rootkits.
+ * @details This callback walks the kernel's TCP established connections hash table
+ * to find active TCP connections. It does NOT include:
+ * * Listening sockets (TCP_LISTEN state)
+ * * UDP connections
+ * * Unix domain sockets
  * 
- * * Netfilter hook analysis: Detects unauthorized or excessive netfilter hooks
- *   that rootkits use to filter network traffic visibility
- * * Direct TCP hash table walking: Bypasses normal networking APIs to find
- *   connections hidden from /proc/net/tcp by rootkit manipulation
- * * Suspicious pattern detection: Identifies known rootkit ports and unusual
- *   network patterns commonly used by malicious kernel modules
- * 
- * Known Kernel Rootkit Ports:
- * * Port 666: Reptile rootkit default for port-knocking mechanism
- *
- * @todo: Add more known rootkit ports / backdoors.
+ * This is intentional to provide a focused view of active established
+ * TCP connections that may indicate suspicious network activity.
+ * @note This is a direct example of wrong assumptions. The structure for established connections is not the same as
+ * listening sockets or UDP sockets. Established TCP connections are stored in the ehash (established hash table)
+ * while listening sockets are stored in lhash2 (listening hash table) and UDP sockets have their own hash table.
+ * See:
+ * * Linux kernel source code: https://elixir.bootlin.com/linux/v5.15.139/source/net/ipv4/tcp_ipv4.c
+ * * Inet hashtables header: https://elixir.bootlin.com/linux/v5.15.139/source/include/net/inet_hashtables.h
+ * * Network internals book: https://www.oreilly.com/library/view/understanding-linux-network/0596002556/
+ * * Linux kernel networking documentation: https://www.kernel.org/doc/html/latest/networking/
+ * Since this callback became too complicated, we try to go for event-based detection instead. And try to monitor
+ * specific syscall invocations.
  * 
  * @param vmi The VMI instance.
- * @param context User-defined context [unused].
- * @return VMI_SUCCESS on successful inspection, else VMI_FAILURE.
+ * @param context The event handler context.
+ * @return uint32_t VMI_SUCCESS on success, error code on failure.
  */
 uint32_t state_network_trace_callback(vmi_instance_t vmi, void* context);
 

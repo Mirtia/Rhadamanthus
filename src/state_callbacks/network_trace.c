@@ -9,23 +9,8 @@
 #include "state_callbacks/responses/network_trace_response.h"
 #include "utils.h"
 
-/**
-* @brief TCP connection states.
-*/
-typedef enum {
-  TCP_ESTABLISHED = 1,
-  TCP_SYN_SENT = 2,
-  TCP_SYN_RECV = 3,
-  TCP_FIN_WAIT1 = 4,
-  TCP_FIN_WAIT2 = 5,
-  TCP_TIME_WAIT = 6,
-  TCP_CLOSE = 7,
-  TCP_CLOSE_WAIT = 8,
-  TCP_LAST_ACK = 9,
-  TCP_LISTEN = 10,
-  TCP_CLOSING = 11,
-  TCP_NEW_SYN_RECV = 12
-} tcp_state_t;
+// TCP states: *only* need max valid state for filtering
+#define TCP_MAX_VALID_STATE 12  // TCP_NEW_SYN_RECV
 
 /**
  * @brief Structure representing a network connection.
@@ -39,7 +24,7 @@ typedef struct {
   uint16_t local_port;   ///< Local port number.
   uint16_t remote_port;  ///< Remote port number.
   uint32_t state;        ///< State (tcp_state_t).
-  vmi_pid_t pid;         //< Process ID associated with the connection.
+  vmi_pid_t pid;         ///< Process ID associated with the connection.
   addr_t sock_addr;      ///< Socket address in kernel memory.
 } network_connection_t;
 
@@ -50,46 +35,7 @@ typedef struct {
  */
 typedef struct {
   GArray* kernel_connections;  ///< Direct kernel connections.
-  uint32_t to_be_reviewed;     ///< Count of suspicious connections.
-} detection_context_t;         ///< Context for network detection.
-
-/**
- * @brief Convert TCP state to string representation.
- * @note https://elixir.bootlin.com/linux/v5.15.139/source/include/net/tcp_states.h#L13
- * 
- * @param state The TCP state to convert.
- * @return const char* String representation of the TCP state. 
- */
-static const char* tcp_state_to_string(tcp_state_t state) {
-  switch (state) {
-    case TCP_ESTABLISHED:
-      return "ESTABLISHED";
-    case TCP_SYN_SENT:
-      return "SYN_SENT";
-    case TCP_SYN_RECV:
-      return "SYN_RECV";
-    case TCP_FIN_WAIT1:
-      return "FIN_WAIT1";
-    case TCP_FIN_WAIT2:
-      return "FIN_WAIT2";
-    case TCP_TIME_WAIT:
-      return "TIME_WAIT";
-    case TCP_CLOSE:
-      return "CLOSE";
-    case TCP_CLOSE_WAIT:
-      return "CLOSE_WAIT";
-    case TCP_LAST_ACK:
-      return "LAST_ACK";
-    case TCP_LISTEN:
-      return "LISTEN";
-    case TCP_CLOSING:
-      return "CLOSING";
-    case TCP_NEW_SYN_RECV:
-      return "NEW_SYN_RECV";
-    default:
-      return "UNKNOWN";
-  }
-}
+} detection_context_t;
 
 /**
  * @brief Check if a port is suspicious based on known rootkit patterns.
@@ -98,42 +44,33 @@ static const char* tcp_state_to_string(tcp_state_t state) {
  * @return true if the port is suspicious else false.
  */
 static bool is_suspicious_port(uint16_t port) {
+  // Common rootkit/backdoor ports
   uint16_t suspicious_ports[] = {
-      666,  // Reptile rootkit default SRCPORT (documented)
-      // Reptile has been removed from public repositories but references exist:
-      // https://web.archive.org/web/20250506040024/https://github.com/f0rb1dd3n/Reptile
-      665, 667,  ///< Possible Reptile variations
-      4444, 5555, 6666, 7777, 8888,
-      9999,  ///< Sequential and simple patterns used by malware tools and backdoors.
-      1234, 2222, 3333,
-      31337,  ///< Back Orifice backdoor default port (LEET).
-      0,      ///< Port 0 is invalid.
-      65535,  ///< Highest port, invalid.
-      5900,   ///< VNC Rooty
-      8222,   ///< Enyelkm
-      // TODO: Add more after checking out the EBPF rootkit samples.
-      8000,  ///< Default web server (ebpfkit uses).
+      666,   667,   // Reptile rootkit
+      4444,  5555,  // Common backdoor ports
+      31337,        // Back Orifice (LEET)
+      5900,         // VNC Rooty
+      8000,         // Web backdoors
+      0,     65535  // Invalid ports
   };
 
   size_t count = sizeof(suspicious_ports) / sizeof(suspicious_ports[0]);
   for (size_t i = 0; i < count; i++) {
     if (port == suspicious_ports[i]) {
-      // TODO: Very frequent logging. May comment out in the future.
-      // log_debug("Suspicious port detected: %u", port);
       return true;
     }
   }
 
-  // High ports that are unusual for legitimate services.
-  if (port >= 60000 && port <= 65534) {
-    // TODO: Very frequent logging. May comment out in the future.
-    // log_debug("High range suspicious port detected: %u", port);
-    return true;
-  }
-
-  return false;
+  // High ports (often used by malware)
+  return (port >= 60000);
 }
 
+/**
+ * @brief Check if an IPv4 address is public (not in private ranges).
+ * 
+ * @param ip_be The IP address in network byte order.
+ * @return true if the IP address is public, false if private.
+ */
 static inline bool ipv4_is_public(uint32_t ip_be) {
   uint32_t ip_addr = ntohl(ip_be);
 
@@ -248,20 +185,10 @@ static bool is_suspicious_ip(uint32_t ip_addr) {
               octets[2], octets[3]);
     return true;
   }
-  // Private IP ranges are less suspicious than public unknown IPs
-  // but could still be lateral movement.
 
-  // Check for unusual patterns
-  // e.g. All octets same (e.g., 1.1.1.1, 127.127.127.127)
+  // Check for unusual patterns (all same octets)
   if (octets[0] == octets[1] && octets[1] == octets[2] &&
       octets[2] == octets[3]) {
-    return true;
-  }
-
-  // Sequential patterns
-  // e.g. 1.2.3.4
-  if (octets[0] + 1 == octets[1] && octets[1] + 1 == octets[2] &&
-      octets[2] + 1 == octets[3]) {
     return true;
   }
 
@@ -269,16 +196,14 @@ static bool is_suspicious_ip(uint32_t ip_addr) {
 }
 
 /**
- * @brief Walk the TCP hash table to find hidden connections (improved version).
- * 
- * @details The TCP hash table 
+ * @brief Walk the TCP established connections hash table to find active connections.
  * 
  * @param vmi The VMI instance.
  * @param ctx The detection context containing state and results.
  * @return uint32_t VMI_SUCCESS on success, VMI_FAILURE on error.
  */
-static uint32_t walk_tcp_hash_table(vmi_instance_t vmi,
-                                    detection_context_t* ctx) {
+static uint32_t walk_tcp_established_hash_table(vmi_instance_t vmi,
+                                                detection_context_t* ctx) {
   addr_t tcp_hashinfo_addr = 0;
   addr_t ehash = 0;
   uint32_t ehash_mask = 0;
@@ -290,6 +215,8 @@ static uint32_t walk_tcp_hash_table(vmi_instance_t vmi,
     return VMI_FAILURE;
   }
 
+  log_info("tcp_hashinfo resolved at 0x%" PRIx64, tcp_hashinfo_addr);
+
   // Read ehash pointer and mask
   if (vmi_read_addr_va(vmi,
                        tcp_hashinfo_addr + LINUX_INET_HASHINFO_EHASH_OFFSET, 0,
@@ -298,43 +225,80 @@ static uint32_t walk_tcp_hash_table(vmi_instance_t vmi,
                      tcp_hashinfo_addr + LINUX_INET_HASHINFO_EHASH_MASK_OFFSET,
                      0, &ehash_mask) != VMI_SUCCESS) {
     log_error("Failed to read TCP established hash table info.");
+    log_error("tcp_hashinfo_addr=0x%" PRIx64
+              ", ehash_offset=0x%x, mask_offset=0x%x",
+              tcp_hashinfo_addr, LINUX_INET_HASHINFO_EHASH_OFFSET,
+              LINUX_INET_HASHINFO_EHASH_MASK_OFFSET);
     return VMI_FAILURE;
   }
 
-  log_debug("TCP ehash=0x%" PRIx64 " mask=0x%x.", ehash, ehash_mask);
+  log_info("TCP established hash table: ehash=0x%" PRIx64
+           " mask=0x%x (scanning %u buckets).",
+           ehash, ehash_mask, ehash_mask + 1);
 
-  // inet_ehash_bucket layout (x86_64): spinlock (8 bytes) + hlist_nulls_head (first pointer @ +8)
-  const addr_t ehash_bucket_stride = 16;  // sizeof(struct inet_ehash_bucket)
-  const addr_t chain_first_offset = 8;    // offsetof(bucket, chain.first)
-  const addr_t nulls_mark = 1ULL;         // hlist_nulls tag bit in LSB
+  // Debug: Check if ehash is valid
+  if (ehash == 0) {
+    log_error("ERROR: ehash is NULL - hash table not initialized!");
+    return VMI_FAILURE;
+  }
 
+  log_info("TCP established hash table: ehash=0x%" PRIx64
+           " mask=0x%x (scanning %u buckets)",
+           ehash, ehash_mask, ehash_mask + 1);
+
+  uint32_t total_buckets_checked = 0;
+  uint32_t non_empty_buckets = 0;
+  uint32_t connections_processed = 0;
+  uint32_t connections_filtered_state = 0;
+  uint32_t connections_filtered_empty = 0;
+
+  // inet_ehash_bucket layout (x86_64): hlist_nulls_head (first pointer @ +0)
+  const addr_t ehash_bucket_stride =
+      LINUX_INET_EHASH_BUCKET_SIZE;  // sizeof(struct inet_ehash_bucket)
+  const addr_t chain_first_offset =
+      LINUX_INET_EHASH_BUCKET_CHAIN_OFFSET +
+      LINUX_HLIST_NULLS_HEAD_FIRST_OFFSET;  // offsetof(bucket, chain.first)
+  const addr_t nulls_mark = 1ULL;           // hlist_nulls tag bit in LSB
+
+  // Walk through each bucket in the established hash table
   for (uint32_t i = 0; i <= ehash_mask; i++) {
+    total_buckets_checked++;
     addr_t bucket_addr = ehash + (i * ehash_bucket_stride);
 
     // Read chain.first (may be NULLS-marked)
     addr_t first_ptr = 0;
     if (vmi_read_addr_va(vmi, bucket_addr + chain_first_offset, 0,
-                         &first_ptr) != VMI_SUCCESS)
+                         &first_ptr) != VMI_SUCCESS) {
+      log_warn("Failed to read established hash bucket %u at 0x%" PRIx64, i,
+               bucket_addr);
       continue;
+    }
 
-    // Empty bucket?  (hlist_nulls encodes end as NULLS-marked pointer)
-    if ((first_ptr == 0) || (first_ptr & nulls_mark))
+    // Empty bucket? (hlist_nulls encodes end as NULLS-marked pointer)
+    if ((first_ptr == 0) || (first_ptr & nulls_mark)) {
       continue;
+    }
 
+    non_empty_buckets++;
+    log_debug("Established hash bucket %u: head=0x%" PRIx64, i, first_ptr);
+
+    // Walk the linked list in this bucket
     addr_t node_addr =
         first_ptr &
         ~nulls_mark;  // address of struct hlist_nulls_node inside skc_node
     addr_t prev_node_addr = 0;  // For loop detection
-    int chain_count = 0;
+    uint32_t chain_count = 0;
 
-    while (node_addr && chain_count < 1000) {
+    while (node_addr != 0 && chain_count < 1000) {  // Prevent infinite loops
       // node_addr points to sock_common.skc_node (hlist_nulls_node at offset LINUX_SKC_NODE_OFFSET)
       addr_t sock_common_addr = node_addr - LINUX_SKC_NODE_OFFSET;
 
-      // Check socket family first (at offset 0x10)
+      // Check socket family first (at LINUX_SKC_FAMILY_OFFSET)
       uint16_t family = 0;
-      if (vmi_read_16_va(vmi, sock_common_addr + 0x10, 0, &family) !=
-          VMI_SUCCESS) {
+      if (vmi_read_16_va(vmi, sock_common_addr + LINUX_SKC_FAMILY_OFFSET, 0,
+                         &family) != VMI_SUCCESS) {
+        log_warn("Failed to read socket family at 0x%" PRIx64,
+                 sock_common_addr + LINUX_SKC_FAMILY_OFFSET);
         break;  // Failed to read, stop processing this chain
       }
 
@@ -369,7 +333,8 @@ static uint32_t walk_tcp_hash_table(vmi_instance_t vmi,
                         &state) == VMI_SUCCESS) {
 
         // Skip invalid/uninitialized connections
-        if (state == 0 || state > TCP_NEW_SYN_RECV) {
+        if (state == 0 || state > TCP_MAX_VALID_STATE) {
+          connections_filtered_state++;
           // Advance to next node
           addr_t next_ptr = 0;
           if (vmi_read_addr_va(vmi, node_addr, 0, &next_ptr) != VMI_SUCCESS)
@@ -385,6 +350,7 @@ static uint32_t walk_tcp_hash_table(vmi_instance_t vmi,
         // Skip completely empty entries
         if (daddr_be == 0 && saddr_be == 0 && dport_be == 0 &&
             sport_host == 0) {
+          connections_filtered_empty++;
           // Advance to next node
           addr_t next_ptr = 0;
           if (vmi_read_addr_va(vmi, node_addr, 0, &next_ptr) != VMI_SUCCESS)
@@ -397,176 +363,58 @@ static uint32_t walk_tcp_hash_table(vmi_instance_t vmi,
           continue;
         }
 
+        // Convert network byte order to host byte order
+        uint32_t laddr = ntohl(saddr_be);
+        uint32_t raddr = ntohl(daddr_be);
+        uint16_t lport = sport_host;  // skc_num is already in host byte order
+        uint16_t rport = ntohs(dport_be);
+
+        // Create connection structure
         network_connection_t conn = {0};
-        conn.sock_addr =
-            sock_common_addr;  // store common base (useful for later)
-        conn.remote_ip = ntohl(daddr_be);    // host order for printing
-        conn.local_ip = ntohl(saddr_be);     // host order
-        conn.remote_port = ntohs(dport_be);  // host order
-        conn.local_port = sport_host;        // skc_num is already host order
+        conn.local_ip = laddr;
+        conn.remote_ip = raddr;
+        conn.local_port = lport;
+        conn.remote_port = rport;
         conn.state = state;
+        conn.sock_addr = sock_common_addr;
 
-        struct in_addr laddr = {.s_addr = htonl(conn.local_ip)};
-        struct in_addr raddr = {.s_addr = htonl(conn.remote_ip)};
-        char laddr_str[INET_ADDRSTRLEN], raddr_str[INET_ADDRSTRLEN];
-        inet_ntop(AF_INET, &laddr, laddr_str, sizeof(laddr_str));
-        inet_ntop(AF_INET, &raddr, raddr_str, sizeof(raddr_str));
-        log_debug("TCP connection: %s:%u -> %s:%u state=%s.", laddr_str,
-                  conn.local_port, raddr_str, conn.remote_port,
-                  tcp_state_to_string((tcp_state_t)conn.state));
+        // Convert IP addresses to strings for logging
+        char laddr_str[INET_ADDRSTRLEN];
+        char raddr_str[INET_ADDRSTRLEN];
+        inet_ntop(AF_INET, &laddr, laddr_str, INET_ADDRSTRLEN);
+        inet_ntop(AF_INET, &raddr, raddr_str, INET_ADDRSTRLEN);
 
-        bool suspicious = false;
-
-        // Ports
-        if (is_suspicious_port(conn.local_port) ||
-            is_suspicious_port(conn.remote_port)) {
-          inet_ntop(AF_INET, &laddr, laddr_str, sizeof(laddr_str));
-          inet_ntop(AF_INET, &raddr, raddr_str, sizeof(raddr_str));
-          log_debug("Suspicious Port: %s:%u -> %s:%u.", laddr_str,
-                    conn.local_port, raddr_str, conn.remote_port);
-          suspicious = true;
-        }
-
-        // IPs — use network-order addresses for public check
-        if (ipv4_is_public(saddr_be) || ipv4_is_public(daddr_be)) {
-          inet_ntop(AF_INET, &laddr, laddr_str, sizeof(laddr_str));
-          inet_ntop(AF_INET, &raddr, raddr_str, sizeof(raddr_str));
-          log_debug("Suspicious IP (public): %s:%u -> %s:%u.", laddr_str,
-                    conn.local_port, raddr_str, conn.remote_port);
-          suspicious = true;
-        }
-
-        // State sanity (optional)
-        // Note: We already filtered state==0 and state > TCP_NEW_SYN_RECV above
-
-        if (suspicious)
-          ctx->to_be_reviewed++;
-
+        connections_processed++;
+        log_info("TCP connection: %s:%u -> %s:%u state=%u", laddr_str,
+                 conn.local_port, raddr_str, conn.remote_port, conn.state);
         g_array_append_val(ctx->kernel_connections, conn);
+      } else {
+        log_warn("Failed to read established socket data at 0x%" PRIx64,
+                 sock_common_addr);
       }
 
-      // Advance to next node in the hlist_nulls chain
+      // Advance to next node
       addr_t next_ptr = 0;
-      if (vmi_read_addr_va(vmi,
-                           node_addr /* + offsetof(hlist_nulls_node, next)=0 */,
-                           0, &next_ptr) != VMI_SUCCESS)
+      if (vmi_read_addr_va(vmi, node_addr, 0, &next_ptr) != VMI_SUCCESS)
         break;
-
       if (next_ptr & nulls_mark)
         break;
-
-      // Loop detection
-      if (next_ptr == node_addr || next_ptr == prev_node_addr) {
-        log_debug("Loop detected in bucket %u.", i);
-        break;
-      }
-
       prev_node_addr = node_addr;
-      node_addr =
-          next_ptr & ~nulls_mark;  // <- mask tag bit before using pointer
+      node_addr = next_ptr & ~nulls_mark;
       chain_count++;
     }
 
-    if (chain_count >= 100) {
-      // Too noisy log...
-      // log_debug("Excessive socket chain in bucket %u: %d connections.", i,
-      //           chain_count);
-      ctx->to_be_reviewed++;
+    if (chain_count >= 1000) {
+      log_warn(
+          "Established hash bucket %u: Chain too long, stopping at 1000 nodes",
+          i);
     }
   }
 
-  log_debug("Completed TCP hash table walk, found %u connections.",
-            ctx->kernel_connections->len);
-
-  return VMI_SUCCESS;
-}
-
-/**
- * @brief Check netfilter hooks for modifications (Kernel 5.x+ compatible).
- * 
- * @param vmi The VMI instance.
- * @param ctx The detection context containing state and results.
- * @return uint32_t VMI_SUCCESS on success, VMI_FAILURE on error.
- */
-static uint32_t check_netfilter_hooks(vmi_instance_t vmi,
-                                      detection_context_t* ctx) {
-  addr_t init_net_addr = 0;
-
-  if (vmi_translate_ksym2v(vmi, "init_net", &init_net_addr) != VMI_SUCCESS) {
-    log_error("Failed to resolve init_net symbol.");
-    return VMI_FAILURE;
-  }
-
-  addr_t netns_nf_addr = init_net_addr + LINUX_NET_NF_OFFSET;
-  log_debug("init_net @ 0x%" PRIx64 " netns_nf @ 0x%" PRIx64, init_net_addr,
-            netns_nf_addr);
-
-  struct {
-    const char* name;
-    size_t offset;
-    int count;
-  } hook_arrays[] = {
-      {"IPv4", LINUX_NETNF_HOOKS_IPV4_OFFSET, 5},
-      {"IPv6", LINUX_NETNF_HOOKS_IPV6_OFFSET, 5},
-      {"ARP", LINUX_NETNF_HOOKS_ARP_OFFSET, 3},
-      {"Bridge", LINUX_NETNF_HOOKS_BRIDGE_OFFSET, 5},
-  };
-
-  for (size_t arr = 0; arr < sizeof(hook_arrays) / sizeof(hook_arrays[0]);
-       arr++) {
-    for (int hook = 0; hook < hook_arrays[arr].count; hook++) {
-      addr_t hook_entries_addr = 0;
-      addr_t slot_addr =
-          netns_nf_addr + hook_arrays[arr].offset + hook * sizeof(addr_t);
-
-      if (vmi_read_addr_va(vmi, slot_addr, 0, &hook_entries_addr) !=
-          VMI_SUCCESS)
-        continue;
-      if (!hook_entries_addr)
-        continue;
-
-      uint16_t num_hook_entries = 0;
-      if (vmi_read_16_va(vmi,
-                         hook_entries_addr + LINUX_NF_HOOK_ENTRIES_NUM_OFFSET,
-                         0, &num_hook_entries) != VMI_SUCCESS)
-        continue;
-
-      if (num_hook_entries == 0 || num_hook_entries > 100)
-        continue;
-
-      log_debug("%s HOOK=%d -> %u entries @ 0x%" PRIx64, hook_arrays[arr].name,
-                hook, num_hook_entries, hook_entries_addr);
-
-      addr_t hooks_start = hook_entries_addr + LINUX_NF_HOOK_ENTRIES_PAD;
-
-      for (uint16_t i = 0; i < num_hook_entries; i++) {
-        addr_t entry_addr = hooks_start + i * LINUX_NF_HOOK_ENTRY_SIZE;
-        addr_t hook_func = 0, hook_priv = 0;
-
-        if (vmi_read_addr_va(vmi, entry_addr, 0, &hook_func) != VMI_SUCCESS ||
-            vmi_read_addr_va(vmi, entry_addr + 8, 0, &hook_priv) != VMI_SUCCESS)
-          continue;
-
-        if (!hook_func)
-          continue;
-
-        log_debug("%s HOOK=%d entry[%u]: func=0x%" PRIx64 " priv=0x%" PRIx64,
-                  hook_arrays[arr].name, hook, i, hook_func, hook_priv);
-
-        bool suspicious = false;
-
-        if (!is_in_kernel_text(vmi, hook_func)) {
-          log_debug(
-              "SUSPICIOUS: %s HOOK=%d func outside kernel text @ 0x%" PRIx64,
-              hook_arrays[arr].name, hook, hook_func);
-          suspicious = true;
-        }
-
-        if (suspicious)
-          ctx->to_be_reviewed++;
-      }
-    }
-  }
+  log_info(
+      "TCP established hash table: %u buckets, %u non-empty, %u connections "
+      "found",
+      ehash_mask + 1, non_empty_buckets, ctx->kernel_connections->len);
 
   return VMI_SUCCESS;
 }
@@ -598,7 +446,9 @@ uint32_t state_network_trace_callback(vmi_instance_t vmi, void* context) {
         "STATE_NETWORK_TRACE: Callback requires a valid event handler context");
   }
 
-  log_info("Executing STATE_NETWORK_TRACE callback.");
+  log_info(
+      "Executing STATE_NETWORK_TRACE callback - scanning established TCP "
+      "connections only (no UDP, no listening sockets).");
 
   // Create network trace state data structure
   network_trace_state_data_t* network_data = network_trace_state_data_new();
@@ -612,29 +462,16 @@ uint32_t state_network_trace_callback(vmi_instance_t vmi, void* context) {
   detection_context_t detection_context = {0};
   detection_context.kernel_connections =
       g_array_new(FALSE, TRUE, sizeof(network_connection_t));
-  detection_context.to_be_reviewed = 0;
 
-  // Check netfilter hooks and add to data structure
-  if (check_netfilter_hooks(vmi, &detection_context) != VMI_SUCCESS) {
-    cleanup_detection_context(&detection_context);
-    network_trace_state_data_free(network_data);
-    return log_error_and_queue_response_task(
-        "network_trace_state", STATE_NETWORK_TRACE, VMI_OP_FAILURE,
-        "STATE_NETWORK_TRACE: Failed to check netfilter hooks");
-  }
-
-  // Walk TCP hash table and add connections to data structure
-  if (walk_tcp_hash_table(vmi, &detection_context) != VMI_SUCCESS) {
-    cleanup_detection_context(&detection_context);
-    network_trace_state_data_free(network_data);
-    return log_error_and_queue_response_task(
-        "network_trace_state", STATE_NETWORK_TRACE, VMI_OP_FAILURE,
-        "STATE_NETWORK_TRACE: Failed to walk TCP hash tables");
+  // Walk TCP established hash table and add connections to data structure
+  if (walk_tcp_established_hash_table(vmi, &detection_context) != VMI_SUCCESS) {
+    log_warn(
+        "STATE_NETWORK_TRACE: Failed to walk TCP established hash tables, "
+        "continuing...");
   }
 
   // Convert detection context data to response data structure
   uint32_t suspicious_connections = 0;
-  uint32_t suspicious_hooks = 0;
 
   // Process TCP connections
   for (guint i = 0; i < detection_context.kernel_connections->len; i++) {
@@ -664,12 +501,12 @@ uint32_t state_network_trace_callback(vmi_instance_t vmi, void* context) {
 
     // Convert state to hex string
     char state_str[8];
-    snprintf(state_str, sizeof(state_str), "%02X", conn->state);
+    (void)snprintf(state_str, sizeof(state_str), "%02X", conn->state);
 
     // Convert inode to string (placeholder since we don't have it in the original structure)
     char inode_str[16];
-    snprintf(inode_str, sizeof(inode_str), "%lu",
-             (unsigned long)conn->sock_addr);
+    (void)snprintf(inode_str, sizeof(inode_str), "%lu",
+                   (unsigned long)conn->sock_addr);
 
     network_trace_state_add_tcp_socket(
         network_data, laddr_str, conn->local_port, raddr_str, conn->remote_port,
@@ -680,28 +517,20 @@ uint32_t state_network_trace_callback(vmi_instance_t vmi, void* context) {
   network_trace_state_set_summary(
       network_data, detection_context.kernel_connections->len,
       suspicious_connections,
-      0,  // total_hooks - would need to track this separately
-      suspicious_hooks);
+      0,   // total_hooks - removed netfilter hooks
+      0);  // suspicious_hooks - removed netfilter hooks
 
-  if (detection_context.to_be_reviewed > 0) {
-    log_warn(
-        "STATE_NETWORK_TRACE: Found %u network "
-        "activities to be reviewed.",
-        detection_context.to_be_reviewed);
-  } else {
-    log_info("STATE_NETWORK_TRACE: No immediate threats detected");
-  }
+  log_info("STATE_NETWORK_TRACE: No immediate threats detected");
 
-  log_info("STATE_NETWORK_TRACE: CONNECTIONS found: %u kernel",
+  log_info("STATE_NETWORK_TRACE: ESTABLISHED TCP CONNECTIONS found: %u",
            detection_context.kernel_connections->len);
 
   // Clean up detection context
   cleanup_detection_context(&detection_context);
 
-  int result = log_success_and_queue_response_task(
+  log_info("STATE_NETWORK_TRACE callback completed.");
+
+  return log_success_and_queue_response_task(
       "network_trace_state", STATE_NETWORK_TRACE, network_data,
       (void (*)(void*))network_trace_state_data_free);
-
-  log_info("STATE_NETWORK_TRACE callback completed.");
-  return result;
 }
