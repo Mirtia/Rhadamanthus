@@ -844,7 +844,6 @@ event_response_t event_network_monitor_callback(vmi_instance_t vmi,
   const char* func_name = ctx->symname ? ctx->symname : "unknown";
 
   // Log comprehensive execution context
-  log_info("=== NETWORK FUNCTION INTERCEPT ===");
   log_info("Timestamp: %ld", time(NULL));
   log_info("Function: %s @ 0x%" PRIx64, func_name, ctx->kaddr);
   log_info("vCPU: %u, RIP: 0x%" PRIx64 ", RSP: 0x%" PRIx64 ", CR3: 0x%" PRIx64,

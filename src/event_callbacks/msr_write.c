@@ -48,22 +48,9 @@ event_response_t event_msr_write_callback(vmi_instance_t vmi,
         "Failed to allocate memory for MSR write data.");
   }
 
-  // Enhanced logging with comprehensive context
-  log_warn("=== MSR WRITE DETECTION ===");
-  log_warn("Timestamp: %ld", time(NULL));
-  log_warn("Event: Model Specific Register write detected");
-  log_warn("Context: vCPU=%u RIP=0x%" PRIx64 " RSP=0x%" PRIx64
-           " CR3=0x%" PRIx64,
-           vcpu_id, rip, rsp, cr3);
-  log_warn("MSR Details: Index=0x%" PRIx64 " Value=0x%" PRIx64, msr_index,
-           msr_value);
-
-  // Check for security-relevant MSR writes
-  const char* msr_name = msr_get_name(msr_index);
-  if (msr_needs_further_investigation(msr_index)) {
-    log_warn("Suspicious MSR write detected: %s (0x%" PRIx64 ") = 0x%" PRIx64,
-             msr_name ? msr_name : "unknown", msr_index, msr_value);
-  }
+  log_warn("MSR WRITE: vCPU=%u RIP=0x%" PRIx64 " MSR=0x%" PRIx64
+           " Value=0x%" PRIx64,
+           vcpu_id, rip, msr_index, msr_value);
 
   return log_success_and_queue_response_event(
       "msr_write", EVENT_MSR_WRITE, (void*)msr_data,
