@@ -159,4 +159,37 @@ void cjson_add_bool(cJSON* parent, const char* key, bool value);
  */
 void cjson_add_hex_u32(cJSON* parent, const char* key, uint32_t val);
 
+/**
+ * @brief Parse an index file (syscall or interrupt) and return an array of names
+ * 
+ * @param index_file_path Path to the index file
+ * @param count_dst Pointer to store the number of entries parsed
+ * @return char** Array of names indexed by number, or NULL on failure
+ */
+char** parse_index_file(const char* index_file_path, size_t* count_dst);
+
+/**
+ * @brief Resolve a syscall number to its name using the syscall index file
+ * 
+ * @param syscall_number The syscall number to resolve
+ * @return Allocated string with syscall name, or NULL if not found
+ */
+char* resolve_syscall_name(uint32_t syscall_number);
+
+/**
+ * @brief Resolve an interrupt vector to its name using the interrupt index file
+ * 
+ * @param interrupt_vector The interrupt vector number to resolve
+ * @return Allocated string with interrupt name, or NULL if not found
+ */
+char* resolve_interrupt_name(uint8_t interrupt_vector);
+
+/**
+ * @brief Load interrupt vector names (0..255) from a text file
+ * 
+ * @param path Filesystem path to the index file
+ * @return A GPtrArray* of length 256 with gchar* names (owned by the array). Defaults to "unknown"
+ */
+GPtrArray* load_interrupt_index_table(const char* path);
+
 #endif
