@@ -40,8 +40,12 @@
 typedef struct ftrace_hook_data {
   uint32_t vcpu_id;  ///< vCPU that triggered the event.
   uint64_t rip;      ///< Guest RIP at the time of the event.
+  uint64_t rsp;      ///< Guest RSP at the time of the event.
+  uint64_t cr3;      ///< Guest CR3 at the time of the event.
+  uint64_t rflags;   ///< Guest RFLAGS at the time of the event.
   uint64_t gla;      ///< Guest Linear Address involved in the access.
   uint64_t gpa;      ///< Guest Physical Address involved in the access.
+  char* symname;     ///< Function name at RIP (allocated, must be freed).
 } ftrace_hook_data_t;
 
 /**
@@ -49,12 +53,18 @@ typedef struct ftrace_hook_data {
  *
  * @param vcpu_id The vCPU identifier.
  * @param rip The guest RIP.
+ * @param rsp The guest RSP.
+ * @param cr3 The guest CR3.
+ * @param rflags The guest RFLAGS.
  * @param gla The guest linear address associated with the event.
  * @param gpa The guest physical address associated with the event.
+ * @param symname The function name at RIP (will be duplicated).
  * @return Pointer to a newly allocated ftrace_hook_data_t, or NULL on failure.
  */
 ftrace_hook_data_t* ftrace_hook_data_new(uint32_t vcpu_id, uint64_t rip,
-                                         uint64_t gla, uint64_t gpa);
+                                         uint64_t rsp, uint64_t cr3,
+                                         uint64_t rflags, uint64_t gla,
+                                         uint64_t gpa, const char* symname);
 
 /**
  * @brief Free a ftrace hook data object (safe on NULL).

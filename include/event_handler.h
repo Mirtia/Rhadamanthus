@@ -50,7 +50,8 @@ enum event_task_id {
  * @brief Task IDs for interrupt tasks.
  */
 enum interrupt_task_id {
-  INTERRUPT_EBPF_PROBE = 0,       ///< eBPF/kprobe function monitoring.
+  INTERRUPT_KPROBE = 0,  ///< Traditional kernel hooks (kprobe, uprobe).
+  INTERRUPT_EBPF_TRACEPOINT,  ///< eBPF tracepoint programs (bpf_prog_attach, fmod_ret, etc.).
   INTERRUPT_IO_URING_RING_WRITE,  ///< io_uring ring buffer write monitoring.
   INTERRUPT_NETWORK_MONITOR,  ///< Comprehensive network monitoring (sockets, ports, connections, netfilter hooks).
   INTERRUPT_TASK_ID_MAX       ///< Maximum number of interrupt tasks.

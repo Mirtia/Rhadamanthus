@@ -22,7 +22,8 @@
  * @brief Breakpoint types for different monitoring categories
  */
 typedef enum {
-  BP_TYPE_EBPF_PROBE,       ///< eBPF/kprobe function monitoring.
+  BP_TYPE_KPROBE,  ///< Traditional kernel hooks (kprobe, uprobe).
+  BP_TYPE_EBPF_TRACEPOINT,  ///< eBPF tracepoint programs (bpf_prog_attach, fmod_ret, etc.).
   BP_TYPE_IO_URING,         ///< io_uring system call monitoring.
   BP_TYPE_NETWORK_MONITOR,  ///< Comprehensive network monitoring (sockets, ports, connections, netfilter hooks).
   BP_TYPE_MAX

@@ -75,7 +75,8 @@ error* create_error(int code, const char* message) {
 
 // NOLINTNEXTLINE
 struct response* create_success_response(task_type task_type, void* subtype,
-                                         void* data_ptr) {
+                                         void* data_ptr,
+                                         void (*data_free_func)(void*)) {
   if (!data_ptr) {
     log_error("Cannot create success response with NULL data");
     return NULL;
@@ -101,6 +102,7 @@ struct response* create_success_response(task_type task_type, void* subtype,
   }
 
   resp->data = data_ptr;
+  resp->data_free_func = data_free_func;
   resp->error = NULL;
 
   return resp;

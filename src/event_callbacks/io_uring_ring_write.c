@@ -28,6 +28,9 @@ static event_response_t event_io_uring_ring_write_ss_callback(
     log_warn("Failed to disable single-step.");
   }
 
+  // Note: We don't clear the single-step event here as it's automatically
+  // cleaned up by LibVMI when the event completes
+
   log_debug("EVENT_IO_URING_RING_WRITE: Breakpoint re-armed on vCPU %u.",
             event->vcpu_id);
 

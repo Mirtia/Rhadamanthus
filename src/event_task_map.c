@@ -4,11 +4,12 @@
 #include <stddef.h>
 #include "event_callbacks/code_section_modify.h"
 #include "event_callbacks/cr0_write.h"
-#include "event_callbacks/ebpf_probe.h"
+#include "event_callbacks/ebpf_tracepoint.h"
 #include "event_callbacks/ftrace_hook.h"
 #include "event_callbacks/idt_write.h"
 #include "event_callbacks/io_uring_ring_write.h"
 #include "event_callbacks/kallsyms_table_write.h"
+#include "event_callbacks/kprobe.h"
 #include "event_callbacks/msr_write.h"
 #include "event_callbacks/network_monitor.h"
 #include "event_callbacks/page_table_modification.h"

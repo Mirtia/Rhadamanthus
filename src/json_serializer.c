@@ -2,11 +2,12 @@
 #include <log.h>
 #include "event_callbacks/responses/code_section_modify_response.h"
 #include "event_callbacks/responses/cr0_write_response.h"
-#include "event_callbacks/responses/ebpf_probe_response.h"
+#include "event_callbacks/responses/ebpf_tracepoint_response.h"
 #include "event_callbacks/responses/ftrace_hook_response.h"
 #include "event_callbacks/responses/idt_write_response.h"
 #include "event_callbacks/responses/io_uring_ring_write_response.h"
 #include "event_callbacks/responses/kallsyms_table_write_response.h"
+#include "event_callbacks/responses/kprobe_response.h"
 #include "event_callbacks/responses/msr_write_response.h"
 #include "event_callbacks/responses/network_monitor_response.h"
 #include "event_callbacks/responses/page_table_modification_response.h"
@@ -233,8 +234,10 @@ void response_item_free(response_item_t* item) {
     if (item->response_data->metadata) {
       g_free(item->response_data->metadata);
     }
-    // Note: response_data->data points to user structures that should be
-    // managed by their specific cleanup functions.
+    // Call the user-provided cleanup function for the data
+    if (item->response_data->data_free_func && item->response_data->data) {
+      item->response_data->data_free_func(item->response_data->data);
+    }
     if (item->response_data->error) {
       g_free(item->response_data->error);
     }
@@ -487,14 +490,27 @@ cJSON* response_to_json(const struct response* response) {
           }
           break;
         }
-        case INTERRUPT_EBPF_PROBE: {
-          ebpf_probe_data_t* ebpf_data = (ebpf_probe_data_t*)response->data;
-          cJSON* ebpf_data_json = ebpf_probe_data_to_json(ebpf_data);
+        case INTERRUPT_KPROBE: {
+          kprobe_data_t* kprobe_data = (kprobe_data_t*)response->data;
+          cJSON* kprobe_data_json = kprobe_data_to_json(kprobe_data);
+          if (kprobe_data_json) {
+            cJSON_AddItemToObject(data_json, "kprobe", kprobe_data_json);
+          } else {
+            cJSON_AddStringToObject(data_json, "note",
+                                    "Failed to convert kprobe data to JSON");
+          }
+          break;
+        }
+        case INTERRUPT_EBPF_TRACEPOINT: {
+          ebpf_tracepoint_data_t* ebpf_data =
+              (ebpf_tracepoint_data_t*)response->data;
+          cJSON* ebpf_data_json = ebpf_tracepoint_data_to_json(ebpf_data);
           if (ebpf_data_json) {
-            cJSON_AddItemToObject(data_json, "ebpf_probe", ebpf_data_json);
+            cJSON_AddItemToObject(data_json, "ebpf_tracepoint", ebpf_data_json);
           } else {
             cJSON_AddStringToObject(
-                data_json, "note", "Failed to convert ebpf probe data to JSON");
+                data_json, "note",
+                "Failed to convert eBPF tracepoint data to JSON");
           }
           break;
         }

@@ -1,8 +1,9 @@
 #include "event_handler.h"
 #include <inttypes.h>
 #include <log.h>
-#include "event_callbacks/ebpf_probe.h"
+#include "event_callbacks/ebpf_tracepoint.h"
 #include "event_callbacks/io_uring_ring_write.h"
+#include "event_callbacks/kprobe.h"
 #include "event_callbacks/network_monitor.h"
 
 const char* state_task_id_to_str(state_task_id_t task_id) {
@@ -61,8 +62,10 @@ const char* event_task_id_to_str(event_task_id_t task_id) {
 
 const char* interrupt_task_id_to_str(interrupt_task_id_t task_id) {
   switch (task_id) {
-    case INTERRUPT_EBPF_PROBE:
-      return "INTERRUPT_EBPF_PROBE";
+    case INTERRUPT_KPROBE:
+      return "INTERRUPT_KPROBE";
+    case INTERRUPT_EBPF_TRACEPOINT:
+      return "INTERRUPT_EBPF_TRACEPOINT";
     case INTERRUPT_IO_URING_RING_WRITE:
       return "INTERRUPT_IO_URING_RING_WRITE";
     case INTERRUPT_NETWORK_MONITOR:
@@ -501,10 +504,19 @@ void sample_state_tasks(event_handler_t* event_handler) {
 static void* create_interrupt_task_context(interrupt_task_id_t task_id,
                                            const char* symbol_name) {
   switch (task_id) {
-    case INTERRUPT_EBPF_PROBE: {
-      ebpf_probe_ctx_t* ctx = g_malloc0(sizeof(ebpf_probe_ctx_t));
+    case INTERRUPT_KPROBE: {
+      kprobe_ctx_t* ctx = g_malloc0(sizeof(kprobe_ctx_t));
       if (ctx) {
-        ctx->symname = symbol_name;
+        ctx->symname = g_strdup(symbol_name);
+        ctx->kaddr = 0;
+        ctx->orig = 0;
+      }
+      return ctx;
+    }
+    case INTERRUPT_EBPF_TRACEPOINT: {
+      ebpf_tracepoint_ctx_t* ctx = g_malloc0(sizeof(ebpf_tracepoint_ctx_t));
+      if (ctx) {
+        ctx->symname = g_strdup(symbol_name);
         ctx->kaddr = 0;
         ctx->orig = 0;
       }
@@ -544,8 +556,10 @@ static void* create_interrupt_task_context(interrupt_task_id_t task_id,
 breakpoint_type_t interrupt_task_to_breakpoint_type(
     interrupt_task_id_t task_id) {
   switch (task_id) {
-    case INTERRUPT_EBPF_PROBE:
-      return BP_TYPE_EBPF_PROBE;
+    case INTERRUPT_KPROBE:
+      return BP_TYPE_KPROBE;
+    case INTERRUPT_EBPF_TRACEPOINT:
+      return BP_TYPE_EBPF_TRACEPOINT;
     case INTERRUPT_IO_URING_RING_WRITE:
       return BP_TYPE_IO_URING;
     case INTERRUPT_NETWORK_MONITOR:
@@ -607,22 +621,50 @@ static int register_network_breakpoints(event_handler_t* event_handler) {
  * @param event_handler The event handler instance.
  * @return int The number of successfully registered breakpoints.
  */
-static int register_ebpf_breakpoints(event_handler_t* event_handler) {
-  static const char* ebpf_symbols[] = {"register_kprobe",
-                                       "register_kretprobe",
-                                       "register_uprobe",
-                                       "bpf_prog_attach",
-                                       "bpf_raw_tracepoint_open",
-                                       "tracepoint_probe_register",
-                                       NULL};
+static int register_kprobe_breakpoints(event_handler_t* event_handler) {
+  static const char* kprobe_symbols[] = {
+      "register_kprobe", "register_kretprobe", "register_uprobe", NULL};
 
   int registered = 0;
   breakpoint_type_t bp_type =
-      interrupt_task_to_breakpoint_type(INTERRUPT_EBPF_PROBE);
+      interrupt_task_to_breakpoint_type(INTERRUPT_KPROBE);
+
+  for (int i = 0; kprobe_symbols[i] != NULL; i++) {
+    void* ctx =
+        create_interrupt_task_context(INTERRUPT_KPROBE, kprobe_symbols[i]);
+    if (!ctx) {
+      log_warn("Failed to create context for kprobe symbol: %s.",
+               kprobe_symbols[i]);
+      continue;
+    }
+
+    if (interrupt_context_add_breakpoint(event_handler->interrupt_context,
+                                         event_handler->vmi, kprobe_symbols[i],
+                                         bp_type, ctx) == 0) {
+      registered++;
+      log_info("Registered kprobe breakpoint: %s.", kprobe_symbols[i]);
+    } else {
+      log_debug("Kprobe symbol not found: %s.", kprobe_symbols[i]);
+      g_free(ctx);
+    }
+  }
+
+  return registered;
+}
+
+static int register_ebpf_tracepoint_breakpoints(
+    event_handler_t* event_handler) {
+  static const char* ebpf_symbols[] = {"bpf_prog_attach",
+                                       "bpf_raw_tracepoint_open",
+                                       "tracepoint_probe_register", NULL};
+
+  int registered = 0;
+  breakpoint_type_t bp_type =
+      interrupt_task_to_breakpoint_type(INTERRUPT_EBPF_TRACEPOINT);
 
   for (int i = 0; ebpf_symbols[i] != NULL; i++) {
-    void* ctx =
-        create_interrupt_task_context(INTERRUPT_EBPF_PROBE, ebpf_symbols[i]);
+    void* ctx = create_interrupt_task_context(INTERRUPT_EBPF_TRACEPOINT,
+                                              ebpf_symbols[i]);
     if (!ctx) {
       log_warn("Failed to create context for eBPF symbol: %s.",
                ebpf_symbols[i]);
@@ -633,7 +675,7 @@ static int register_ebpf_breakpoints(event_handler_t* event_handler) {
                                          event_handler->vmi, ebpf_symbols[i],
                                          bp_type, ctx) == 0) {
       registered++;
-      log_info("Registered eBPF breakpoint: %s.", ebpf_symbols[i]);
+      log_info("Registered eBPF tracepoint breakpoint: %s.", ebpf_symbols[i]);
     } else {
       log_debug("eBPF symbol not found: %s.", ebpf_symbols[i]);
       g_free(ctx);
@@ -704,10 +746,17 @@ int event_handler_register_interrupt_task(event_handler_t* event_handler,
 
   int result = -1;
   switch (task_id) {
-    case INTERRUPT_EBPF_PROBE:
-      result = register_ebpf_breakpoints(event_handler);
+    case INTERRUPT_KPROBE:
+      result = register_kprobe_breakpoints(event_handler);
       if (result > 0) {
-        log_info("Registered %d eBPF breakpoints.", result);
+        log_info("Registered %d kprobe breakpoints.", result);
+        result = 0;  // Convert count to success/failure
+      }
+      break;
+    case INTERRUPT_EBPF_TRACEPOINT:
+      result = register_ebpf_tracepoint_breakpoints(event_handler);
+      if (result > 0) {
+        log_info("Registered %d eBPF tracepoint breakpoints.", result);
         result = 0;  // Convert count to success/failure
       }
       break;

@@ -84,9 +84,10 @@ error* create_error(int code, const char* message);
  * @brief The general response structure.
  */
 struct response {
-  const char* timestamp;  ///< The timestamp generated for the response.
-  error* error;           ///< The error associated with the response.
-  void* data;             ///< The data associated with the response.
+  const char* timestamp;          ///< The timestamp generated for the response.
+  error* error;                   ///< The error associated with the response.
+  void* data;                     ///< The data associated with the response.
+  void (*data_free_func)(void*);  ///< Function to free the data (can be NULL).
   metadata*
       metadata;  ///< The metadata associated with the response (task type, system details etc).
 };
@@ -107,7 +108,8 @@ char* generate_timestamp(void);
  * @return Allocated response object or NULL on failure
  */
 struct response* create_success_response(task_type task_type, void* subtype,
-                                         void* data_ptr);
+                                         void* data_ptr,
+                                         void (*data_free_func)(void*));
 
 /**
  * @brief Create a new response object for failed operations

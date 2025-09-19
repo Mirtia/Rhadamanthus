@@ -99,7 +99,8 @@ features:
     - id: EVENT_FTRACE_HOOK       # Real-time ftrace hook detection
   
   interrupt:
-    - id: INTERRUPT_EBPF_PROBE    # eBPF probe monitoring
+    - id: INTERRUPT_KPROBE        # Traditional kernel hooks monitoring
+    - id: INTERRUPT_EBPF_TRACEPOINT # eBPF tracepoint programs monitoring
 ```
 
 ### Available Detection Features
@@ -134,7 +135,8 @@ features:
 #### 🚨 Interrupt Tasks (Breakpoint Monitoring)
 | Feature | Description | Implementation |
 |---------|-------------|----------------|
-| `INTERRUPT_EBPF_PROBE` | eBPF probe breakpoint monitoring | [`src/event_callbacks/ebpf_probe.c`](src/event_callbacks/ebpf_probe.c) |
+| `INTERRUPT_KPROBE` | Traditional kernel hooks monitoring (kprobe, uprobe, tracepoint_probe_register) | [`src/event_callbacks/kprobe.c`](src/event_callbacks/kprobe.c) |
+| `INTERRUPT_EBPF_TRACEPOINT` | eBPF tracepoint programs monitoring (bpf_prog_attach, bpf_raw_tracepoint_open, fmod_ret) | [`src/event_callbacks/ebpf_tracepoint.c`](src/event_callbacks/ebpf_tracepoint.c) |
 | `INTERRUPT_IO_URING_RING_WRITE`  | io_uring detection on invocation of `__x64_sys_io_uring_enter` | [`src/event_callbacks/io_uring_ring_write.c`](src/event_callbacks/io_uring_ring_write.c) |
 | `INTERRUPT_NETWORK_MONITOR` | Comprehensive network monitoring (sockets, ports, connections, netfilter hooks) | [`src/event_callbacks/network_monitor.c`](src/event_callbacks/network_monitor.c) |
 
@@ -205,4 +207,4 @@ If you use this project in your research, please cite it as:
 
 ## AI usage
 
-Generative AI was used for the creation of boilerplate e.g response management, scripting and documentation.
+Generative AI was used for the creation of boilerplate e.g response management, scripting and doxygen documentation.

@@ -44,6 +44,9 @@ typedef struct syscall_table_write_data {
   uint64_t cr3;        ///< CR3 register value at the time of the event.
   uint64_t write_gla;  ///< Guest linear address of the write operation.
   uint64_t write_gpa;  ///< Guest physical address of the write operation.
+  uint32_t syscall_number;  ///< Syscall number being modified.
+  char*
+      syscall_name;  ///< Name of the syscall being modified (allocated, must be freed).
 } syscall_table_write_data_t;
 
 /**
@@ -59,7 +62,8 @@ typedef struct syscall_table_write_data {
  */
 syscall_table_write_data_t* syscall_table_write_data_new(
     uint32_t vcpu_id, uint64_t rip, uint64_t rsp, uint64_t cr3,
-    uint64_t write_gla, uint64_t write_gpa);
+    uint64_t write_gla, uint64_t write_gpa, uint32_t syscall_number,
+    const char* syscall_name);
 
 /**
  * @brief Free a syscall table write data object.

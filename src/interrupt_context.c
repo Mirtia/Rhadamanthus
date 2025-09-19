@@ -2,8 +2,9 @@
 #include <inttypes.h>
 #include <log.h>
 #include <string.h>
-#include "event_callbacks/ebpf_probe.h"
+#include "event_callbacks/ebpf_tracepoint.h"
 #include "event_callbacks/io_uring_ring_write.h"
+#include "event_callbacks/kprobe.h"
 #include "event_callbacks/network_monitor.h"
 
 interrupt_context_t* interrupt_context_init(size_t initial_capacity) {
@@ -42,7 +43,37 @@ void interrupt_context_cleanup(interrupt_context_t* ctx, vmi_instance_t vmi) {
       vmi_write_8_va(vmi, ctx->breakpoints[i].kaddr, 0,
                      &ctx->breakpoints[i].orig_byte);
     }
-    g_free(ctx->breakpoints[i].type_specific_data);
+    // Free context-specific data properly
+    if (ctx->breakpoints[i].type_specific_data) {
+      switch (ctx->breakpoints[i].type) {
+        case BP_TYPE_KPROBE: {
+          kprobe_ctx_t* kprobe_ctx =
+              (kprobe_ctx_t*)ctx->breakpoints[i].type_specific_data;
+          if (kprobe_ctx && kprobe_ctx->symname) {
+            g_free(kprobe_ctx->symname);
+          }
+          g_free(kprobe_ctx);
+          break;
+        }
+        case BP_TYPE_EBPF_TRACEPOINT: {
+          ebpf_tracepoint_ctx_t* ebpf_ctx =
+              (ebpf_tracepoint_ctx_t*)ctx->breakpoints[i].type_specific_data;
+          if (ebpf_ctx && ebpf_ctx->symname) {
+            g_free(ebpf_ctx->symname);
+          }
+          g_free(ebpf_ctx);
+          break;
+        }
+        case BP_TYPE_IO_URING:
+        case BP_TYPE_NETWORK_MONITOR:
+          // These contexts don't allocate symname, just free the context
+          g_free(ctx->breakpoints[i].type_specific_data);
+          break;
+        default:
+          g_free(ctx->breakpoints[i].type_specific_data);
+          break;
+      }
+    }
     g_free((char*)ctx->breakpoints[i].symbol_name);
   }
 
@@ -86,14 +117,18 @@ int interrupt_context_add_breakpoint(interrupt_context_t* ctx,
     ctx->capacity = new_capacity;
   }
 
-  // Read original byte and plant INT3 at the target address.
-  uint8_t orig_byte = 0;
-  if (vmi_read_8_va(vmi, kaddr, 0, &orig_byte) != VMI_SUCCESS) {
+  // Read original instruction bytes (save up to 15 bytes for x86-64 max instruction length)
+  uint8_t orig_bytes[15] = {0};
+  if (vmi_read_8_va(vmi, kaddr, 0, &orig_bytes[0]) != VMI_SUCCESS) {
     log_warn(
         "INTERRUPT_CONTEXT: Failed to read original byte at %s @0x%" PRIx64,
         symbol_name, kaddr);
     return -1;
   }
+
+  // For now, we'll save just the first byte but this should be expanded
+  // to save the full instruction length in a real implementation
+  uint8_t orig_byte = orig_bytes[0];
 
   uint8_t int3 = 0xCC;
   if (vmi_write_8_va(vmi, kaddr, 0, &int3) != VMI_SUCCESS) {
@@ -148,12 +183,11 @@ breakpoint_entry_t* interrupt_context_lookup_breakpoint(
  * @param breakpoint Breakpoint that was hit
  * @return event_response_t Response from the callback
  */
-static event_response_t handle_ebpf_breakpoint(vmi_instance_t vmi,
-                                               vmi_event_t* event,
-                                               breakpoint_entry_t* breakpoint) {
-  ebpf_probe_ctx_t* ctx = (ebpf_probe_ctx_t*)breakpoint->type_specific_data;
+static event_response_t handle_kprobe_breakpoint(
+    vmi_instance_t vmi, vmi_event_t* event, breakpoint_entry_t* breakpoint) {
+  kprobe_ctx_t* ctx = (kprobe_ctx_t*)breakpoint->type_specific_data;
   if (!ctx) {
-    log_error("INTERRUPT_CONTEXT: Missing eBPF context data.");
+    log_error("INTERRUPT_CONTEXT: Missing kprobe context data.");
     return VMI_EVENT_RESPONSE_NONE;
   }
 
@@ -163,7 +197,28 @@ static event_response_t handle_ebpf_breakpoint(vmi_instance_t vmi,
   void* original_data = event->data;
   event->data = ctx;
 
-  event_response_t result = event_ebpf_probe_callback(vmi, event);
+  event_response_t result = event_kprobe_callback(vmi, event);
+
+  event->data = original_data;
+  return result;
+}
+
+static event_response_t handle_ebpf_tracepoint_breakpoint(
+    vmi_instance_t vmi, vmi_event_t* event, breakpoint_entry_t* breakpoint) {
+  ebpf_tracepoint_ctx_t* ctx =
+      (ebpf_tracepoint_ctx_t*)breakpoint->type_specific_data;
+  if (!ctx) {
+    log_error("INTERRUPT_CONTEXT: Missing eBPF tracepoint context data.");
+    return VMI_EVENT_RESPONSE_NONE;
+  }
+
+  ctx->kaddr = breakpoint->kaddr;
+  ctx->orig = breakpoint->orig_byte;
+
+  void* original_data = event->data;
+  event->data = ctx;
+
+  event_response_t result = event_ebpf_tracepoint_callback(vmi, event);
 
   event->data = original_data;
   return result;
@@ -261,8 +316,11 @@ event_response_t interrupt_context_global_callback(vmi_instance_t vmi,
   ctx->total_hits++;
 
   switch (breakpoint->type) {
-    case BP_TYPE_EBPF_PROBE:
-      return handle_ebpf_breakpoint(vmi, event, breakpoint);
+    case BP_TYPE_KPROBE:
+      return handle_kprobe_breakpoint(vmi, event, breakpoint);
+
+    case BP_TYPE_EBPF_TRACEPOINT:
+      return handle_ebpf_tracepoint_breakpoint(vmi, event, breakpoint);
 
     case BP_TYPE_IO_URING:
       return handle_io_uring_breakpoint(vmi, event, breakpoint);
@@ -279,8 +337,10 @@ event_response_t interrupt_context_global_callback(vmi_instance_t vmi,
 
 const char* breakpoint_type_to_str(breakpoint_type_t type) {
   switch (type) {
-    case BP_TYPE_EBPF_PROBE:
-      return "eBPF_PROBE";
+    case BP_TYPE_KPROBE:
+      return "KPROBE";
+    case BP_TYPE_EBPF_TRACEPOINT:
+      return "EBPF_TRACEPOINT";
     case BP_TYPE_IO_URING:
       return "IO_URING";
     case BP_TYPE_NETWORK_MONITOR:
@@ -314,7 +374,39 @@ int interrupt_context_remove_breakpoint(interrupt_context_t* ctx,
   // Mark as inactive and cleanup
   breakpoint->active = false;
   g_free((char*)breakpoint->symbol_name);
-  g_free(breakpoint->type_specific_data);
+
+  // Free context-specific data properly
+  if (breakpoint->type_specific_data) {
+    switch (breakpoint->type) {
+      case BP_TYPE_KPROBE: {
+        kprobe_ctx_t* kprobe_ctx =
+            (kprobe_ctx_t*)breakpoint->type_specific_data;
+        if (kprobe_ctx && kprobe_ctx->symname) {
+          g_free(kprobe_ctx->symname);
+        }
+        g_free(kprobe_ctx);
+        break;
+      }
+      case BP_TYPE_EBPF_TRACEPOINT: {
+        ebpf_tracepoint_ctx_t* ebpf_ctx =
+            (ebpf_tracepoint_ctx_t*)breakpoint->type_specific_data;
+        if (ebpf_ctx && ebpf_ctx->symname) {
+          g_free(ebpf_ctx->symname);
+        }
+        g_free(ebpf_ctx);
+        break;
+      }
+      case BP_TYPE_IO_URING:
+      case BP_TYPE_NETWORK_MONITOR:
+        // These contexts don't allocate symname, just free the context
+        g_free(breakpoint->type_specific_data);
+        break;
+      default:
+        g_free(breakpoint->type_specific_data);
+        break;
+    }
+  }
+
   breakpoint->symbol_name = NULL;
   breakpoint->type_specific_data = NULL;
 

@@ -53,8 +53,8 @@ event_response_t log_success_and_queue_response_event(
     const char* event_name, event_task_id_t event_type, void* data_ptr,
     void (*data_free_func)(void*)) {
   if (json_serializer_is_global_initialized()) {
-    struct response* success_resp =
-        create_success_response(EVENT, (void*)(uintptr_t)event_type, data_ptr);
+    struct response* success_resp = create_success_response(
+        EVENT, (void*)(uintptr_t)event_type, data_ptr, data_free_func);
     if (success_resp) {
       json_serializer_queue_global(event_name, success_resp);
       return VMI_EVENT_RESPONSE_NONE;
@@ -78,7 +78,7 @@ event_response_t log_success_and_queue_response_interrupt(
 
   if (json_serializer_is_global_initialized()) {
     struct response* success_resp = create_success_response(
-        INTERRUPT, (void*)(uintptr_t)interrupt_type, data_ptr);
+        INTERRUPT, (void*)(uintptr_t)interrupt_type, data_ptr, data_free_func);
     if (success_resp) {
       json_serializer_queue_global(interrupt_name, success_resp);
       return VMI_EVENT_RESPONSE_NONE;
@@ -102,8 +102,8 @@ int log_success_and_queue_response_task(const char* task_name,
                                         void* data_ptr,
                                         void (*data_free_func)(void*)) {
   if (json_serializer_is_global_initialized()) {
-    struct response* success_resp =
-        create_success_response(STATE, (void*)(uintptr_t)task_type, data_ptr);
+    struct response* success_resp = create_success_response(
+        STATE, (void*)(uintptr_t)task_type, data_ptr, data_free_func);
     if (success_resp) {
       json_serializer_queue_global(task_name, success_resp);
       return VMI_SUCCESS;

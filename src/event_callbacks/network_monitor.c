@@ -756,6 +756,11 @@ static event_response_t event_network_monitor_ss_callback(vmi_instance_t vmi,
     log_warn("Failed to disable single-step");
   }
 
+  // Unregister the single-step event to prevent memory leaks
+  if (vmi_clear_event(vmi, &ctx->ss_evt, NULL) != VMI_SUCCESS) {
+    log_warn("INTERRUPT_NETWORK_MONITOR: Failed to clear single-step event");
+  }
+
   log_debug("INTERRUPT_NETWORK_MONITOR: Breakpoint re-armed on vCPU %u",
             event->vcpu_id);
 
