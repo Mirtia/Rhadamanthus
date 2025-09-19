@@ -232,10 +232,6 @@ static uint32_t walk_tcp_established_hash_table(vmi_instance_t vmi,
     return VMI_FAILURE;
   }
 
-  log_info("TCP established hash table: ehash=0x%" PRIx64
-           " mask=0x%x (scanning %u buckets).",
-           ehash, ehash_mask, ehash_mask + 1);
-
   // Debug: Check if ehash is valid
   if (ehash == 0) {
     log_error("ERROR: ehash is NULL - hash table not initialized!");
@@ -246,11 +242,7 @@ static uint32_t walk_tcp_established_hash_table(vmi_instance_t vmi,
            " mask=0x%x (scanning %u buckets)",
            ehash, ehash_mask, ehash_mask + 1);
 
-  uint32_t total_buckets_checked = 0;
   uint32_t non_empty_buckets = 0;
-  uint32_t connections_processed = 0;
-  uint32_t connections_filtered_state = 0;
-  uint32_t connections_filtered_empty = 0;
 
   // inet_ehash_bucket layout (x86_64): hlist_nulls_head (first pointer @ +0)
   const addr_t ehash_bucket_stride =
@@ -262,7 +254,6 @@ static uint32_t walk_tcp_established_hash_table(vmi_instance_t vmi,
 
   // Walk through each bucket in the established hash table
   for (uint32_t i = 0; i <= ehash_mask; i++) {
-    total_buckets_checked++;
     addr_t bucket_addr = ehash + (i * ehash_bucket_stride);
 
     // Read chain.first (may be NULLS-marked)
@@ -286,7 +277,6 @@ static uint32_t walk_tcp_established_hash_table(vmi_instance_t vmi,
     addr_t node_addr =
         first_ptr &
         ~nulls_mark;  // address of struct hlist_nulls_node inside skc_node
-    addr_t prev_node_addr = 0;  // For loop detection
     uint32_t chain_count = 0;
 
     while (node_addr != 0 && chain_count < 1000) {  // Prevent infinite loops
@@ -310,7 +300,6 @@ static uint32_t walk_tcp_established_hash_table(vmi_instance_t vmi,
           break;
         if (next_ptr & nulls_mark)
           break;
-        prev_node_addr = node_addr;
         node_addr = next_ptr & ~nulls_mark;
         chain_count++;
         continue;
@@ -334,14 +323,12 @@ static uint32_t walk_tcp_established_hash_table(vmi_instance_t vmi,
 
         // Skip invalid/uninitialized connections
         if (state == 0 || state > TCP_MAX_VALID_STATE) {
-          connections_filtered_state++;
           // Advance to next node
           addr_t next_ptr = 0;
           if (vmi_read_addr_va(vmi, node_addr, 0, &next_ptr) != VMI_SUCCESS)
             break;
           if (next_ptr & nulls_mark)
             break;
-          prev_node_addr = node_addr;
           node_addr = next_ptr & ~nulls_mark;
           chain_count++;
           continue;
@@ -350,14 +337,12 @@ static uint32_t walk_tcp_established_hash_table(vmi_instance_t vmi,
         // Skip completely empty entries
         if (daddr_be == 0 && saddr_be == 0 && dport_be == 0 &&
             sport_host == 0) {
-          connections_filtered_empty++;
           // Advance to next node
           addr_t next_ptr = 0;
           if (vmi_read_addr_va(vmi, node_addr, 0, &next_ptr) != VMI_SUCCESS)
             break;
           if (next_ptr & nulls_mark)
             break;
-          prev_node_addr = node_addr;
           node_addr = next_ptr & ~nulls_mark;
           chain_count++;
           continue;
@@ -384,7 +369,6 @@ static uint32_t walk_tcp_established_hash_table(vmi_instance_t vmi,
         inet_ntop(AF_INET, &laddr, laddr_str, INET_ADDRSTRLEN);
         inet_ntop(AF_INET, &raddr, raddr_str, INET_ADDRSTRLEN);
 
-        connections_processed++;
         log_info("TCP connection: %s:%u -> %s:%u state=%u", laddr_str,
                  conn.local_port, raddr_str, conn.remote_port, conn.state);
         g_array_append_val(ctx->kernel_connections, conn);
@@ -399,7 +383,6 @@ static uint32_t walk_tcp_established_hash_table(vmi_instance_t vmi,
         break;
       if (next_ptr & nulls_mark)
         break;
-      prev_node_addr = node_addr;
       node_addr = next_ptr & ~nulls_mark;
       chain_count++;
     }

@@ -41,33 +41,73 @@
 // inet_hashinfo
 #define LINUX_INET_HASHINFO_EHASH_OFFSET 0x0
 #define LINUX_INET_HASHINFO_EHASH_MASK_OFFSET 0x10
+#define LINUX_INET_HASHINFO_BHASH_OFFSET 0x20
+#define LINUX_INET_HASHINFO_BHASH_SIZE_OFFSET 0x28
 #define LINUX_INET_HASHINFO_LHASH2_OFFSET 0x30
+
+// inet_ehash_bucket
+#define LINUX_INET_EHASH_BUCKET_SIZE 0x8
+#define LINUX_INET_EHASH_BUCKET_CHAIN_OFFSET 0x0
+#define LINUX_HLIST_NULLS_HEAD_FIRST_OFFSET 0x0
 
 // sock_common
 #define LINUX_SOCK_COMMON_OFFSET 0x0
+
+// Socket address structure offsets
+#define LINUX_SOCKADDR_SA_FAMILY_OFFSET 0x0
+#define LINUX_SOCKADDR_IN_SIN_PORT_OFFSET 0x2
+#define LINUX_SOCKADDR_IN_SIN_ADDR_OFFSET 0x4
+
 #define LINUX_SKC_DADDR_OFFSET 0x0
 #define LINUX_SKC_RCV_SADDR_OFFSET 0x4
 #define LINUX_SKC_DPORT_OFFSET 0xC
 #define LINUX_SKC_NUM_OFFSET 0xE
 #define LINUX_SKC_STATE_OFFSET 0x12
+#define LINUX_SKC_FAMILY_OFFSET 0x10
 #define LINUX_SKC_NODE_OFFSET 0x68
 #define LINUX_SKC_NODE_NEXT_OFFSET 0x0
 
 // netfilter hooks
 #define LINUX_NET_NF_OFFSET 0x40
 #define LINUX_NF_HOOKS_OFFSET 0x0
+// Corrected offsets from struct netns_nf:
 #define LINUX_NETNF_HOOKS_IPV4_OFFSET 0x78
 #define LINUX_NETNF_HOOKS_IPV6_OFFSET 0xA0
 #define LINUX_NETNF_HOOKS_ARP_OFFSET 0xC8
 #define LINUX_NETNF_HOOKS_BRIDGE_OFFSET 0xE0
 
+// Corrected offsets from struct nf_hook_entries:
 #define LINUX_NF_HOOK_ENTRIES_NUM_OFFSET 0x0
 #define LINUX_NF_HOOK_ENTRIES_PAD 0x8
 #define LINUX_NF_HOOK_ENTRY_SIZE 0x10
 
+// Netfilter hook operations structure offsets
+#define LINUX_NF_HOOK_OPS_HOOK_OFFSET 0x0
+#define LINUX_NF_HOOK_OPS_DEV_OFFSET 0x8
+#define LINUX_NF_HOOK_OPS_PRIV_OFFSET 0x10
+#define LINUX_NF_HOOK_OPS_PF_OFFSET 0x18
+#define LINUX_NF_HOOK_OPS_HOOKNUM_OFFSET 0x1C
+#define LINUX_NF_HOOK_OPS_PRIORITY_OFFSET 0x20
+
+// struct module offsets
+#define LINUX_MODULE_STATE_OFFSET 0x00
 #define LINUX_MODULE_LIST_OFFSET 0x08
 #define LINUX_MODULE_NAME_OFFSET 0x18
-#define LINUX_MODULE_STATE_OFFSET 0x00
+#define LINUX_MODULE_MKOBJ_OFFSET 0x50
+#define LINUX_MODULE_CORE_LAYOUT_OFFSET 0x140
+#define LINUX_MODULE_INIT_LAYOUT_OFFSET 0x190
+#define LINUX_MODULE_SECT_ATTRS_OFFSET 0x230
+#define LINUX_MODULE_NOTES_ATTRS_OFFSET 0x238
+
+// struct module_layout offsets
+#define LINUX_MODULE_LAYOUT_BASE_OFFSET 0x00
+#define LINUX_MODULE_LAYOUT_SIZE_OFFSET 0x08
+#define LINUX_MODULE_LAYOUT_TEXT_SIZE_OFFSET 0x0C
+#define LINUX_MODULE_LAYOUT_RO_SIZE_OFFSET 0x10
+
+// kobject state detection
+#define LINUX_MODULE_KOBJ_OFFSET 0x00
+#define LINUX_MODULE_KOBJ_STATE_OFFSET 0x3C
 
 // bpf_prog
 #define LINUX_BPF_PROG_TYPE_OFFSET 0x04
@@ -160,44 +200,45 @@
 */
 
 // ftrace_ops structure offsets
-#define LINUX_FTRACE_OPS_FUNC_OFFSET 0x00
-#define LINUX_FTRACE_OPS_NEXT_OFFSET 0x08
-#define LINUX_FTRACE_OPS_FLAGS_OFFSET 0x10
-// Note: These ftrace offsets are not currently used by any files
-// #define LINUX_FTRACE_OPS_PRIVATE_OFFSET          0x18
-// #define LINUX_FTRACE_OPS_SAVED_FUNC_OFFSET       0x20
-#define LINUX_FTRACE_OPS_LOCAL_HASH_OFFSET 0x28
-#define LINUX_FTRACE_OPS_FUNC_HASH_OFFSET 0x58
-#define LINUX_FTRACE_OPS_OLD_HASH_OFFSET 0x60
-#define LINUX_FTRACE_OPS_TRAMPOLINE_OFFSET 0x90
-#define LINUX_FTRACE_OPS_TRAMPOLINE_SIZE_OFFSET 0x98
-#define LINUX_FTRACE_OPS_LIST_OFFSET 0xA0
-#define LINUX_FTRACE_OPS_SIZE 0xB0
 
-// ftrace_ops_hash structure offsets (embedded, 48 bytes)
-#define FTRACE_OPS_HASH_FILTER_OFF 0x00
-#define FTRACE_OPS_HASH_NOTRACE_OFF 0x18
+// kset structure offsets (for advanced module detection)
+#define LINUX_KSET_LIST_OFFSET 0x00
 
-// ftrace_hash structure offsets (24 bytes)
-#define FTRACE_HASH_SIZE_BITS_OFF 0x00
-#define FTRACE_HASH_BUCKETS_OFF 0x08
-#define FTRACE_HASH_COUNT_OFF 0x10
+// kobject structure offsets
+#define LINUX_KOBJECT_ENTRY_OFFSET 0x08
+#define LINUX_KOBJECT_NAME_OFFSET 0x00
 
-// ftrace_func_entry structure offsets (24 bytes)
-#define FTRACE_FUNC_ENTRY_IP_OFF 0x00
-#define FTRACE_FUNC_ENTRY_HLIST_NEXT 0x08
-#define FTRACE_FUNC_ENTRY_HLIST_PPREV 0x10
-#define FTRACE_FUNC_ENTRY_SIZE 0x18
+// module_kobject structure offsets
+#define LINUX_MODULE_KOBJECT_MOD_OFFSET 0x40
 
-// ftrace_page structure offsets
-#define FTRACE_PAGE_NEXT_OFF 0x00
-#define FTRACE_PAGE_RECORDS_OFF 0x08
-#define FTRACE_PAGE_INDEX_OFF 0x10
-#define FTRACE_PAGE_ORDER_OFF 0x14
-#define FTRACE_PAGE_SIZE_OFF 0x18
+// Red-black tree node offsets
+#define LINUX_RB_NODE_LEFT_OFFSET 0x10
+#define LINUX_RB_NODE_RIGHT_OFFSET 0x08
+#define LINUX_RB_ROOT_RB_NODE_OFFSET 0x00
 
-// dyn_ftrace structure offsets
-#define DYN_FTRACE_IP_OFF 0x00
-#define DYN_FTRACE_FLAGS_OFF 0x08
+// Latch tree node offsets
+#define LINUX_LATCH_TREE_NODE_NODE_OFFSET 0x00
+
+// Module tree node offsets
+#define LINUX_MOD_TREE_NODE_NODE_OFFSET 0x08
+#define LINUX_MOD_TREE_NODE_MOD_OFFSET 0x00
+
+// Module tree root offsets
+#define LINUX_MOD_TREE_ROOT_TREE_OFFSET 0x00
+
+// VMA (Virtual Memory Area) offsets
+#define LINUX_VMAP_AREA_VA_START_OFFSET 0x00
+#define LINUX_VMAP_AREA_VA_END_OFFSET 0x08
+#define LINUX_VMAP_AREA_RB_NODE_OFFSET 0x10
+
+// Module bug list offset (in module structure)
+#define LINUX_MODULE_BUG_LIST_OFFSET 0x1f0
+
+// Module taints offset (in module structure)
+#define LINUX_MODULE_TAINTS_OFFSET 0x1e0
+
+// Ftrace module map offsets
+#define LINUX_FTRACE_MOD_MAP_LIST_OFFSET 0x10
+#define LINUX_FTRACE_MOD_MAP_MOD_OFFSET 0x20
 
 #endif  // OFFSETS_H

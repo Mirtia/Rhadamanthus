@@ -1,5 +1,5 @@
 /**
- * @file netfilter_hook_write.h
+ * @file network_monitor.h
  * @brief This file monitors netfilter hook registration events.
  * @version 0.0
  * @date 2025-08-24
@@ -7,13 +7,13 @@
  * @copyright GNU Lesser General Public License v2.1
  *
  */
-#ifndef NETFILTER_HOOK_WRITE_H
-#define NETFILTER_HOOK_WRITE_H
+#ifndef NETWORK_MONITOR_H
+#define NETWORK_MONITOR_H
 
 #include <libvmi/events.h>
 
 /**
- * @brief Context for the planted breakpoint on nf_register_net_hook(s).
+ * @brief Context for the planted breakpoint on network monitoring functions.
  */
 struct nf_bp_ctx_t {
   addr_t kaddr;         ///< Kernel VA of the function entry.
@@ -25,13 +25,13 @@ struct nf_bp_ctx_t {
 typedef struct nf_bp_ctx_t nf_bp_ctx_t;
 
 /**
- * @brief Callback function for handling netfilter hook write events.
+ * @brief Callback function for handling comprehensive network monitoring events.
  *
  * @param vmi The VMI instance.
  * @param event The event that triggered the callback.
  * @return event_response_t VMI_EVENT_RESPONSE_NONE (general monitoring).
  */
-event_response_t event_netfilter_hook_write_callback(vmi_instance_t vmi,
-                                                     vmi_event_t* event);
+event_response_t event_network_monitor_callback(vmi_instance_t vmi,
+                                                vmi_event_t* event);
 
-#endif  // NETFILTER_HOOK_WRITE_H
+#endif  // NETWORK_MONITOR_H

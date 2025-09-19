@@ -3,7 +3,7 @@
 #include <log.h>
 #include "event_callbacks/ebpf_probe.h"
 #include "event_callbacks/io_uring_ring_write.h"
-#include "event_callbacks/netfilter_hook_write.h"
+#include "event_callbacks/network_monitor.h"
 
 const char* state_task_id_to_str(state_task_id_t task_id) {
   switch (task_id) {
@@ -65,8 +65,8 @@ const char* interrupt_task_id_to_str(interrupt_task_id_t task_id) {
       return "INTERRUPT_EBPF_PROBE";
     case INTERRUPT_IO_URING_RING_WRITE:
       return "INTERRUPT_IO_URING_RING_WRITE";
-    case INTERRUPT_NETFILTER_HOOK_WRITE:
-      return "INTERRUPT_NETFILTER_HOOK_WRITE";
+    case INTERRUPT_NETWORK_MONITOR:
+      return "INTERRUPT_NETWORK_MONITOR";
     default:
       log_error("Unknown interrupt task with code: %d.", task_id);
       return NULL;
@@ -469,7 +469,7 @@ void sample_state_tasks(event_handler_t* event_handler) {
   // Check if the time since the last state sampling exceeds the configured interval.
   uint64_t current_time_ms = g_get_monotonic_time() / 1000;
   if (current_time_ms - event_handler->latest_state_sampling_ms <
-      event_handler->state_sampling_seconds * 1000) {
+      (uint64_t)event_handler->state_sampling_seconds * 1000) {
     log_warn(
         "State sampling skipped, "
         "not enough time has passed since the last sampling: "
@@ -519,7 +519,8 @@ static void* create_interrupt_task_context(interrupt_task_id_t task_id,
       }
       return ctx;
     }
-    case INTERRUPT_NETFILTER_HOOK_WRITE: {
+    case INTERRUPT_NETWORK_MONITOR: {
+      // Use the same context structure as netfilter for network monitoring
       nf_bp_ctx_t* ctx = g_malloc0(sizeof(nf_bp_ctx_t));
       if (ctx) {
         ctx->symname = symbol_name;
@@ -547,12 +548,57 @@ breakpoint_type_t interrupt_task_to_breakpoint_type(
       return BP_TYPE_EBPF_PROBE;
     case INTERRUPT_IO_URING_RING_WRITE:
       return BP_TYPE_IO_URING;
-    case INTERRUPT_NETFILTER_HOOK_WRITE:
-      return BP_TYPE_NETFILTER_HOOK;
+    case INTERRUPT_NETWORK_MONITOR:
+      return BP_TYPE_NETWORK_MONITOR;
     default:
       log_error("Invalid interrupt task ID: %d.", task_id);
       return BP_TYPE_MAX;
   }
+}
+
+/**
+ * @brief Register breakpoints for comprehensive network monitoring.
+ *
+ * @param event_handler The event handler instance.
+ * @return int The number of successfully registered breakpoints.
+ */
+static int register_network_breakpoints(event_handler_t* event_handler) {
+  static const char* network_symbols[] = {
+      // // TCP connection management
+      "tcp_connect", "tcp_accept", "tcp_close", "tcp_shutdown",
+      // // UDP socket operations
+      "udp_bind", "udp_connect", "udp_disconnect",
+      // // Network interface operations
+      "dev_open", "dev_close",
+      // Socket binding and listening
+      // "inet_bind", "inet_listen", "inet_accept",
+      // Network filtering and hooks
+      "nf_register_net_hook", "nf_unregister_net_hook", NULL};
+
+  int registered = 0;
+  breakpoint_type_t bp_type = BP_TYPE_NETWORK_MONITOR;
+
+  for (int i = 0; network_symbols[i] != NULL; i++) {
+    void* ctx = create_interrupt_task_context(INTERRUPT_NETWORK_MONITOR,
+                                              network_symbols[i]);
+    if (!ctx) {
+      log_warn("Failed to create context for network symbol: %s.",
+               network_symbols[i]);
+      continue;
+    }
+
+    if (interrupt_context_add_breakpoint(event_handler->interrupt_context,
+                                         event_handler->vmi, network_symbols[i],
+                                         bp_type, ctx) == 0) {
+      registered++;
+      log_info("Registered network breakpoint: %s.", network_symbols[i]);
+    } else {
+      log_debug("Network symbol not found: %s.", network_symbols[i]);
+      g_free(ctx);
+    }
+  }
+
+  return registered;
 }
 
 /**
@@ -669,9 +715,12 @@ int event_handler_register_interrupt_task(event_handler_t* event_handler,
       result = register_single_breakpoint(event_handler, task_id,
                                           "__x64_sys_io_uring_enter");
       break;
-    case INTERRUPT_NETFILTER_HOOK_WRITE:
-      result = register_single_breakpoint(event_handler, task_id,
-                                          "nf_register_net_hook");
+    case INTERRUPT_NETWORK_MONITOR:
+      result = register_network_breakpoints(event_handler);
+      if (result > 0) {
+        log_info("Registered %d network monitoring breakpoints.", result);
+        result = 0;  // Convert count to success/failure
+      }
       break;
     default:
       log_error("Unknown interrupt task ID: %d.", task_id);

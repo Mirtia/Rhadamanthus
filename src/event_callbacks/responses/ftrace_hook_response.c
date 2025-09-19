@@ -4,21 +4,6 @@
 #include <string.h>
 #include "utils.h"
 
-static void maybe_add_access_decoded(cJSON* parent) {
-  if (!parent)
-    return;
-
-  cJSON* dec = cJSON_CreateObject();
-  if (!dec)
-    return;
-
-  if (cJSON_GetArraySize(dec) > 0) {
-    cJSON_AddItemToObject(parent, "decoded", dec);
-  } else {
-    cJSON_Delete(dec);
-  }
-}
-
 // NOLINTNEXTLINE
 ftrace_hook_data_t* ftrace_hook_data_new(uint32_t vcpu_id, uint64_t rip,
                                          uint64_t gla, uint64_t gpa) {
@@ -36,6 +21,11 @@ ftrace_hook_data_t* ftrace_hook_data_new(uint32_t vcpu_id, uint64_t rip,
   return data;
 }
 
+/**
+ * @brief Free a ftrace hook data object (safe on NULL).
+ * 
+ * @param data Pointer to the object to free (may be NULL).
+ */
 void ftrace_hook_data_free(ftrace_hook_data_t* data) {
   if (!data) {
     log_warn("Attempted to free NULL ftrace_hook_data_t pointer.");
@@ -44,6 +34,12 @@ void ftrace_hook_data_free(ftrace_hook_data_t* data) {
   g_free(data);
 }
 
+/**
+ * @brief Convert ftrace hook data to JSON format
+ * 
+ * @param data Pointer to the ftrace hook data to convert
+ * @return cJSON object containing the data, or NULL on failure
+ */
 cJSON* ftrace_hook_data_to_json(const ftrace_hook_data_t* data) {
   if (!data) {
     log_error("Invalid ftrace_hook_data_t pointer.");

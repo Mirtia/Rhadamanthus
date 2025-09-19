@@ -8,6 +8,8 @@ set(CMAKE_BUILD_TYPE Release)
 
 # Dependencies
 find_package(PkgConfig REQUIRED)
+# The glib package is huge, so I decided to not add as dependency.
+# You need to install libglib2.0-dev by your package manager if not already present.
 pkg_check_modules(GLIB2 REQUIRED glib-2.0)
 find_package(cJSON REQUIRED)
 find_package(log.c REQUIRED)

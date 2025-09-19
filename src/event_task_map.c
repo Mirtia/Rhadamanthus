@@ -10,7 +10,7 @@
 #include "event_callbacks/io_uring_ring_write.h"
 #include "event_callbacks/kallsyms_table_write.h"
 #include "event_callbacks/msr_write.h"
-#include "event_callbacks/netfilter_hook_write.h"
+#include "event_callbacks/network_monitor.h"
 #include "event_callbacks/page_table_modification.h"
 #include "event_callbacks/syscall_table_write.h"
 

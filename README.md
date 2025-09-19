@@ -110,14 +110,14 @@ features:
 | `STATE_FTRACE_HOOKS` | Detects ftrace-based function hooks | [`src/state_callbacks/ftrace_hooks.c`](src/state_callbacks/ftrace_hooks.c) |
 | `STATE_SYSCALL_TABLE` | Monitors syscall table integrity | [`src/state_callbacks/syscall_table.c`](src/state_callbacks/syscall_table.c) |
 | `STATE_IDT_TABLE` | Monitors Interrupt Descriptor Table integrity | [`src/state_callbacks/idt_table.c`](src/state_callbacks/idt_table.c) |
-| `STATE_KERNEL_MODULE_LIST` | Analyzes loaded kernel modules | [`src/state_callbacks/kernel_module_list.c`](src/state_callbacks/kernel_module_list.c) |
+| `STATE_KERNEL_MODULE_LIST` | Analyzes loaded kernel modules (⚠️ TODO: Implement technique similar to [rkspotter](https://github.com/linuxthor/rkspotter) or  adjust [ModXRef](https://github.com/CrySyS/ModXRef) for LibVMI) | [`src/state_callbacks/kernel_module_list.c`](src/state_callbacks/kernel_module_list.c) |
 | `STATE_NETWORK_TRACE` | Monitors network connections and hooks | [`src/state_callbacks/network_trace.c`](src/state_callbacks/network_trace.c) |
 | `STATE_EBPF_ARTIFACTS` | Detects eBPF programs and maps | [`src/state_callbacks/ebpf_activity.c`](src/state_callbacks/ebpf_activity.c) |
 | `STATE_IO_URING_ARTIFACTS` | Monitors io_uring structures | [`src/state_callbacks/io_uring_artifacts.c`](src/state_callbacks/io_uring_artifacts.c) |
 | `STATE_MSR_REGISTERS` | Monitors Model Specific Registers | [`src/state_callbacks/msr_registers.c`](src/state_callbacks/msr_registers.c) |
 | `STATE_PROCESS_LIST` | Analyzes running processes | [`src/state_callbacks/process_list.c`](src/state_callbacks/process_list.c) |
 | `STATE_KALLSYMS_SYMBOLS` | Monitors kernel symbol table | [`src/state_callbacks/kallsyms_symbols.c`](src/state_callbacks/kallsyms_symbols.c) |
-| `STATE_DIR_STRING_MATCHING` | String matching in directories (NOT IMPLEMENTED) | [`src/state_callbacks/dir_string_matching.c`](src/state_callbacks/dir_string_matching.c)|
+| `STATE_DIR_STRING_MATCHING` | String matching in directories (TODO: Not high priority) | [`src/state_callbacks/dir_string_matching.c`](src/state_callbacks/dir_string_matching.c)|
 
 #### ⚡ Event Tasks (Real-time Monitoring)
 | Feature | Description | Implementation |
@@ -136,7 +136,7 @@ features:
 |---------|-------------|----------------|
 | `INTERRUPT_EBPF_PROBE` | eBPF probe breakpoint monitoring | [`src/event_callbacks/ebpf_probe.c`](src/event_callbacks/ebpf_probe.c) |
 | `INTERRUPT_IO_URING_RING_WRITE`  | io_uring detection on invocation of `__x64_sys_io_uring_enter` | [`src/event_callbacks/io_uring_ring_write.c`](src/event_callbacks/io_uring_ring_write.c) |
-| `INTERRUPT_NETFILTER_HOOK_WRITE` | Netfilter hook monitoring | [`src/event_callbacks/netfilter_hook_write.c`](src/event_callbacks/netfilter_hook_write.c) |
+| `INTERRUPT_NETWORK_MONITOR` | Comprehensive network monitoring (sockets, ports, connections, netfilter hooks) | [`src/event_callbacks/network_monitor.c`](src/event_callbacks/network_monitor.c) |
 
 ## Response Format
 

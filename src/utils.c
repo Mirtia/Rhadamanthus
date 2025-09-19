@@ -78,7 +78,7 @@ event_response_t log_success_and_queue_response_interrupt(
 
   if (json_serializer_is_global_initialized()) {
     struct response* success_resp = create_success_response(
-        EVENT, (void*)(uintptr_t)interrupt_type, data_ptr);
+        INTERRUPT, (void*)(uintptr_t)interrupt_type, data_ptr);
     if (success_resp) {
       json_serializer_queue_global(interrupt_name, success_resp);
       return VMI_EVENT_RESPONSE_NONE;

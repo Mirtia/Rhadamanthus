@@ -50,10 +50,10 @@ enum event_task_id {
  * @brief Task IDs for interrupt tasks.
  */
 enum interrupt_task_id {
-  INTERRUPT_EBPF_PROBE = 0,        ///< eBPF/kprobe function monitoring.
-  INTERRUPT_IO_URING_RING_WRITE,   ///< io_uring ring buffer write monitoring.
-  INTERRUPT_NETFILTER_HOOK_WRITE,  ///< Netfilter hook registration monitoring.
-  INTERRUPT_TASK_ID_MAX            ///< Maximum number of interrupt tasks.
+  INTERRUPT_EBPF_PROBE = 0,       ///< eBPF/kprobe function monitoring.
+  INTERRUPT_IO_URING_RING_WRITE,  ///< io_uring ring buffer write monitoring.
+  INTERRUPT_NETWORK_MONITOR,  ///< Comprehensive network monitoring (sockets, ports, connections, netfilter hooks).
+  INTERRUPT_TASK_ID_MAX       ///< Maximum number of interrupt tasks.
 };
 
 // Type definitions for the event_handler and task structures

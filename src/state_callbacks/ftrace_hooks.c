@@ -12,6 +12,9 @@
 #define MAX_FTRACE_PAGES 64
 #define MAX_MCOUNT_ENTRIES 2000
 
+// Linux kernel module virtual memory layout on x86_64
+// See: https://www.kernel.org/doc/Documentation/x86/x86_64/mm.txt
+// Kernel modules are loaded in the range 0xffffffffc0000000-0xffffffffc0ffffff (16MB)
 #define MODULE_START 0xffffffffc0000000
 #define MODULE_END 0xffffffffc0ffffff
 
@@ -66,6 +69,12 @@ static char* resolve_enclosing_symbol_pretty(vmi_instance_t vmi,
   return NULL;
 }
 
+/**
+ * @brief Known rootkit targets for ftrace hooking.
+ * 
+ * @param symbol_name The name of the rootkit target function.
+ * @param addr_ptr Pointer to the resolved address of the rootkit target function.
+ */
 static rootkit_target_t known_rootkit_targets[] = {
     {"tcp4_seq_show", NULL},
     {"tcp6_seq_show", NULL},
@@ -140,45 +149,6 @@ static rootkit_target_t known_rootkit_targets[] = {
 };
 
 /**
- * @brief Check if a call site matches any known rootkit target functions
- * 
- * @details Resolves the call site address to a function name and checks if it matches
- * any of the known rootkit target functions. This targets functions commonly
- * hooked by rootkits for hiding processes, network connections, files, and
- * system calls. The function extracts the base function name (removing +offset) for comparison
- * against the known targets list, which includes network stack functions,
- * syscalls, and process management functions.
- * 
- * @param vmi LibVMI instance
- * @param call_site_addr Address of the call site to check
- * @return Function name with offset if match found, NULL otherwise.
- *         Caller must free with g_free().
- */
-static char* check_rootkit_target_match(vmi_instance_t vmi,
-                                        addr_t call_site_addr) {
-  char* function_name = resolve_enclosing_symbol_pretty(vmi, call_site_addr);
-  if (!function_name) {
-    return NULL;
-  }
-
-  char* base_name = g_strdup(function_name);
-  char* plus_pos = strchr(base_name, '+');
-  if (plus_pos) {
-    *plus_pos = '\0';
-  }
-  for (int i = 0; known_rootkit_targets[i].symbol_name != NULL; i++) {
-    if (strcmp(base_name, known_rootkit_targets[i].symbol_name) == 0) {
-      g_free(base_name);
-      return function_name;  // Return with offset
-    }
-  }
-
-  g_free(base_name);
-  g_free(function_name);
-  return NULL;
-}
-
-/**
  * @brief Resolve known rootkit target function addresses.
  * 
  * @details Resolves all known rootkit target function names to their virtual addresses
@@ -240,7 +210,7 @@ static const char* determine_attachment_type(const char* function_name,
     }
   }
 
-  return "fentry";  // Default to fentry for general function hooks
+  return "fentry";
 }
 
 /**
@@ -293,11 +263,17 @@ static void scan_for_direct_hooks(vmi_instance_t vmi,
       targets_with_addresses++;
       addr_t target_addr = *(known_rootkit_targets[j].addr_ptr);
 
+      // Scan first 64 bytes of function for suspicious CALL/JMP instructions
+      // Ftrace typically patches the first few bytes of function prologues
+      // See: https://www.kernel.org/doc/Documentation/trace/ftrace-design.txt
       for (addr_t check_addr = target_addr; check_addr < target_addr + 0x40;
            check_addr++) {
         uint8_t byte1 = 0;
         if (vmi_read_8_va(vmi, check_addr, 0, &byte1) == VMI_SUCCESS &&
-            (byte1 == 0xE8 || byte1 == 0xE9)) {  // CALL or JMP
+            // Check for x86-64 CALL (0xE8) and JMP (0xE9) opcodes
+            // Intel Manual Vol. 2A: "CALL—Call Procedure" and "JMP—Jump"
+            // These opcodes use 32-bit relative addressing: E8/E9 <4-byte offset>
+            (byte1 == 0xE8 || byte1 == 0xE9)) {
           int32_t call_offset = 0;
           if (vmi_read_32_va(vmi, check_addr + 1, 0, (uint32_t*)&call_offset) ==
               VMI_SUCCESS) {
@@ -442,29 +418,11 @@ static ftrace_hooks_state_data_t* detect_ftrace_hooks(vmi_instance_t vmi) {
 
   uint32_t suspicious_count = 0;
   uint32_t hook_id = 1;
-  GSList* target_functions = NULL;
 
   resolve_rootkit_targets(vmi);
 
   addr_t kernel_start = 0, kernel_end = 0;
   get_kernel_text_section_range(vmi, &kernel_start, &kernel_end);
-
-  log_debug("Checking %d target functions for rootkit matches.",
-            (int)g_slist_length(target_functions));
-  int rootkit_matches = 0;
-  GSList* iter = target_functions;
-  while (iter) {
-    addr_t call_site = GPOINTER_TO_SIZE(iter->data);
-    char* match = check_rootkit_target_match(vmi, call_site);
-    if (match) {
-      rootkit_matches++;
-      log_debug("Found rootkit target match: %s.", match);
-      g_free(match);
-    }
-    iter = iter->next;
-  }
-  log_info("Target function matching found %d rootkit matches.",
-           rootkit_matches);
 
   log_debug("Starting direct memory scanning method.");
   uint32_t direct_scan_hooks_before = hook_id;
@@ -494,14 +452,9 @@ static ftrace_hooks_state_data_t* detect_ftrace_hooks(vmi_instance_t vmi) {
 
   // Final summary
   log_info("Detection summary:");
-  log_info("Total target functions found: %d",
-           (int)g_slist_length(target_functions));
-  log_info("Rootkit target matches: %d", rootkit_matches);
   log_info("Direct scan hooks found: %u", direct_scan_hooks_found);
   log_info("Ftrace ops hooks found: %u", ftrace_ops_hooks_found);
   log_info("Total suspicious hooks: %u", suspicious_count);
-
-  g_slist_free_full(target_functions, NULL);
 
   return data;
 }

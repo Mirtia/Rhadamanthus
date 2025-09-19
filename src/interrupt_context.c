@@ -4,7 +4,7 @@
 #include <string.h>
 #include "event_callbacks/ebpf_probe.h"
 #include "event_callbacks/io_uring_ring_write.h"
-#include "event_callbacks/netfilter_hook_write.h"
+#include "event_callbacks/network_monitor.h"
 
 interrupt_context_t* interrupt_context_init(size_t initial_capacity) {
   interrupt_context_t* ctx = g_malloc0(sizeof(interrupt_context_t));
@@ -170,34 +170,6 @@ static event_response_t handle_ebpf_breakpoint(vmi_instance_t vmi,
 }
 
 /**
- * @brief Handle netfilter hook breakpoint by populating context and calling callback
- *
- * @param vmi VMI instance
- * @param event Event structure
- * @param breakpoint Breakpoint that was hit
- * @return event_response_t Response from the callback
- */
-static event_response_t handle_netfilter_breakpoint(
-    vmi_instance_t vmi, vmi_event_t* event, breakpoint_entry_t* breakpoint) {
-  nf_bp_ctx_t* ctx = (nf_bp_ctx_t*)breakpoint->type_specific_data;
-  if (!ctx) {
-    log_error("INTERRUPT_CONTEXT: Missing netfilter context data.");
-    return VMI_EVENT_RESPONSE_NONE;
-  }
-
-  ctx->kaddr = breakpoint->kaddr;
-  ctx->orig = breakpoint->orig_byte;
-
-  void* original_data = event->data;
-  event->data = ctx;
-
-  event_response_t result = event_netfilter_hook_write_callback(vmi, event);
-
-  event->data = original_data;
-  return result;
-}
-
-/**
  * @brief Handle io_uring breakpoint by populating context and calling callback
  *
  * @param vmi VMI instance
@@ -223,6 +195,39 @@ static event_response_t handle_io_uring_breakpoint(
   event->data = ctx;
 
   event_response_t result = event_io_uring_ring_write_callback(vmi, event);
+
+  // Restore original event data
+  event->data = original_data;
+  return result;
+}
+
+/**
+ * @brief Handle network monitor breakpoint by populating context and calling callback
+ *
+ * @param vmi VMI instance
+ * @param event Event structure
+ * @param breakpoint Breakpoint that was hit
+ * @return event_response_t Response from the callback
+ */
+static event_response_t handle_network_monitor_breakpoint(
+    vmi_instance_t vmi, vmi_event_t* event, breakpoint_entry_t* breakpoint) {
+
+  // The breakpoint->type_specific_data contains the nf_bp_ctx_t (reused for network monitoring)
+  // but we need to populate it with the breakpoint info
+  nf_bp_ctx_t* ctx = (nf_bp_ctx_t*)breakpoint->type_specific_data;
+  if (!ctx) {
+    log_error("INTERRUPT_CONTEXT: Missing network monitor context data.");
+    return VMI_EVENT_RESPONSE_NONE;
+  }
+
+  ctx->kaddr = breakpoint->kaddr;
+  ctx->orig = breakpoint->orig_byte;
+
+  void* original_data = event->data;
+  event->data = ctx;
+
+  // Use the netfilter callback for all network monitoring (sockets, ports, connections, netfilter hooks)
+  event_response_t result = event_network_monitor_callback(vmi, event);
 
   // Restore original event data
   event->data = original_data;
@@ -259,11 +264,11 @@ event_response_t interrupt_context_global_callback(vmi_instance_t vmi,
     case BP_TYPE_EBPF_PROBE:
       return handle_ebpf_breakpoint(vmi, event, breakpoint);
 
-    case BP_TYPE_NETFILTER_HOOK:
-      return handle_netfilter_breakpoint(vmi, event, breakpoint);
-
     case BP_TYPE_IO_URING:
       return handle_io_uring_breakpoint(vmi, event, breakpoint);
+
+    case BP_TYPE_NETWORK_MONITOR:
+      return handle_network_monitor_breakpoint(vmi, event, breakpoint);
 
     default:
       log_warn("Unknown breakpoint type: %d at 0x%" PRIx64, breakpoint->type,
@@ -276,10 +281,10 @@ const char* breakpoint_type_to_str(breakpoint_type_t type) {
   switch (type) {
     case BP_TYPE_EBPF_PROBE:
       return "eBPF_PROBE";
-    case BP_TYPE_NETFILTER_HOOK:
-      return "NETFILTER_HOOK";
     case BP_TYPE_IO_URING:
       return "IO_URING";
+    case BP_TYPE_NETWORK_MONITOR:
+      return "NETWORK_MONITOR";
     default:
       log_warn("Unknown breakpoint type: %d", type);
       return "UNKNOWN";

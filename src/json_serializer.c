@@ -8,7 +8,7 @@
 #include "event_callbacks/responses/io_uring_ring_write_response.h"
 #include "event_callbacks/responses/kallsyms_table_write_response.h"
 #include "event_callbacks/responses/msr_write_response.h"
-#include "event_callbacks/responses/netfilter_hook_write_response.h"
+#include "event_callbacks/responses/network_monitor_response.h"
 #include "event_callbacks/responses/page_table_modification_response.h"
 #include "event_callbacks/responses/syscall_table_write_response.h"
 #include "event_handler.h"
@@ -455,19 +455,19 @@ cJSON* response_to_json(const struct response* response) {
       interrupt_task_id_t interrupt_id =
           (interrupt_task_id_t)(uintptr_t)response->metadata->subtype;
       switch (interrupt_id) {
-        case INTERRUPT_NETFILTER_HOOK_WRITE: {
-          netfilter_hook_write_data_t* netfilter_data =
-              (netfilter_hook_write_data_t*)response->data;
-          if (netfilter_data) {
-            cJSON* netfilter_data_json =
-                netfilter_hook_write_data_to_json(netfilter_data);
-            if (netfilter_data_json) {
-              cJSON_AddItemToObject(data_json, "netfilter_hook_write",
-                                    netfilter_data_json);
+        case INTERRUPT_NETWORK_MONITOR: {
+          network_monitor_data_t* network_data =
+              (network_monitor_data_t*)response->data;
+          if (network_data) {
+            cJSON* network_data_json =
+                network_monitor_data_to_json(network_data);
+            if (network_data_json) {
+              cJSON_AddItemToObject(data_json, "network_monitor",
+                                    network_data_json);
             } else {
               cJSON_AddStringToObject(
                   data_json, "note",
-                  "Failed to convert netfilter hook write data to JSON");
+                  "Failed to convert network monitor data to JSON");
             }
           }
           break;

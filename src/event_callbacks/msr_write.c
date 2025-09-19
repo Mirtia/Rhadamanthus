@@ -2,6 +2,7 @@
 #include <glib.h>
 #include <inttypes.h>
 #include <log.h>
+#include <time.h>
 #include "event_callbacks/responses/msr_write_response.h"
 #include "json_serializer.h"
 #include "utils.h"
@@ -47,9 +48,15 @@ event_response_t event_msr_write_callback(vmi_instance_t vmi,
         "Failed to allocate memory for MSR write data.");
   }
 
-  log_warn("EVENT_MSR_WRITE: VCPU: %u RIP: 0x%" PRIx64 " MSR_INDEX: 0x%" PRIx64
-           " VALUE: 0x%" PRIx64,
-           vcpu_id, rip, msr_index, msr_value);
+  // Enhanced logging with comprehensive context
+  log_warn("=== MSR WRITE DETECTION ===");
+  log_warn("Timestamp: %ld", time(NULL));
+  log_warn("Event: Model Specific Register write detected");
+  log_warn("Context: vCPU=%u RIP=0x%" PRIx64 " RSP=0x%" PRIx64
+           " CR3=0x%" PRIx64,
+           vcpu_id, rip, rsp, cr3);
+  log_warn("MSR Details: Index=0x%" PRIx64 " Value=0x%" PRIx64, msr_index,
+           msr_value);
 
   // Check for security-relevant MSR writes
   const char* msr_name = msr_get_name(msr_index);

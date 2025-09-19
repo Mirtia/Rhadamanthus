@@ -36,6 +36,7 @@ This is what I typically run:
 ssh nootkit@debian -i ~/.ssh/id_nootkit -L 6081:localhost:6081
 # Finally visiting the browser, http://localhost:6081/vnc.html?host=localhost&port=6081.
 ```
+
 ### Console
 
 I will write more on the scripts necessary for running with tty. Both guest and host need some configuration.
@@ -44,6 +45,11 @@ I will write more on the scripts necessary for running with tty. Both guest and 
 
 Regarding the network configuration, I thought of using NAT, but registering a bridge was far easier and thoroughly documented. 
 The official [Xen Wiki](https://wiki.xenproject.org/wiki/Xen_Networking) has a detailed article on how to create a bridge and attach it to your domU VMs.
+
+```sh
+# The bridge is not persistent through boots, so you have to add it every time.
+sudo brctl addbr xenbr0
+```
 
 
 
