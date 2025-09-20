@@ -107,39 +107,39 @@ features:
 ### Available Detection Features
 
 #### 🔍 State Tasks (Periodic Analysis)
-| Feature | Description | Implementation |
-|---------|-------------|----------------|
-| `STATE_FTRACE_HOOKS` | Detects ftrace-based function hooks | [`src/state_callbacks/ftrace_hooks.c`](src/state_callbacks/ftrace_hooks.c) |
-| `STATE_SYSCALL_TABLE` | Monitors syscall table integrity | [`src/state_callbacks/syscall_table.c`](src/state_callbacks/syscall_table.c) |
-| `STATE_IDT_TABLE` | Monitors Interrupt Descriptor Table integrity | [`src/state_callbacks/idt_table.c`](src/state_callbacks/idt_table.c) |
-| `STATE_KERNEL_MODULE_LIST` | Analyzes loaded kernel modules (⚠️ TODO: Implement technique similar to [rkspotter](https://github.com/linuxthor/rkspotter) or  adjust [ModXRef](https://github.com/CrySyS/ModXRef) for LibVMI) | [`src/state_callbacks/kernel_module_list.c`](src/state_callbacks/kernel_module_list.c) |
-| `STATE_NETWORK_TRACE` | Monitors network connections and hooks | [`src/state_callbacks/network_trace.c`](src/state_callbacks/network_trace.c) |
-| `STATE_EBPF_ARTIFACTS` | Detects eBPF programs and maps | [`src/state_callbacks/ebpf_activity.c`](src/state_callbacks/ebpf_activity.c) |
-| `STATE_IO_URING_ARTIFACTS` | Monitors io_uring structures | [`src/state_callbacks/io_uring_artifacts.c`](src/state_callbacks/io_uring_artifacts.c) |
-| `STATE_MSR_REGISTERS` | Monitors Model Specific Registers | [`src/state_callbacks/msr_registers.c`](src/state_callbacks/msr_registers.c) |
-| `STATE_PROCESS_LIST` | Analyzes running processes | [`src/state_callbacks/process_list.c`](src/state_callbacks/process_list.c) |
-| `STATE_KALLSYMS_SYMBOLS` | Monitors kernel symbol table | [`src/state_callbacks/kallsyms_symbols.c`](src/state_callbacks/kallsyms_symbols.c) |
-| `STATE_DIR_STRING_MATCHING` | String matching in directories (TODO: Not high priority) | [`src/state_callbacks/dir_string_matching.c`](src/state_callbacks/dir_string_matching.c)|
+| Feature | Description | Implementation | Status/Notes |
+|---------|-------------|----------------|--------------|
+| `STATE_FTRACE_HOOKS` | Detects ftrace-based function hooks | [`src/state_callbacks/ftrace_hooks.c`](src/state_callbacks/ftrace_hooks.c) | ✅ **Complete** - Information derived from state callback |
+| `STATE_SYSCALL_TABLE` | Monitors syscall table integrity | [`src/state_callbacks/syscall_table.c`](src/state_callbacks/syscall_table.c) | ✅ **Complete** |
+| `STATE_IDT_TABLE` | Monitors Interrupt Descriptor Table integrity | [`src/state_callbacks/idt_table.c`](src/state_callbacks/idt_table.c) | ✅ **Complete** |
+| `STATE_KERNEL_MODULE_LIST` | Analyzes loaded kernel modules | [`src/state_callbacks/kernel_module_list.c`](src/state_callbacks/kernel_module_list.c) | ⚠️ **Limitation**: Does not detect hidden modules - requires sophisticated RB tree traversal approach |
+| `STATE_NETWORK_TRACE` | Monitors network connections and hooks | [`src/state_callbacks/network_trace.c`](src/state_callbacks/network_trace.c) | ✅ **Complete** - Focuses on established connections only |
+| `STATE_EBPF_ARTIFACTS` | Detects eBPF programs and maps | [`src/state_callbacks/ebpf_activity.c`](src/state_callbacks/ebpf_activity.c) | ✅ **Complete** |
+| `STATE_IO_URING_ARTIFACTS` | Monitors io_uring structures | [`src/state_callbacks/io_uring_artifacts.c`](src/state_callbacks/io_uring_artifacts.c) | ✅ **Complete** - Does not show extensive information |
+| `STATE_MSR_REGISTERS` | Monitors Model Specific Registers | [`src/state_callbacks/msr_registers.c`](src/state_callbacks/msr_registers.c) | ⚠️ **Not fully tested** |
+| `STATE_PROCESS_LIST` | Analyzes running processes | [`src/state_callbacks/process_list.c`](src/state_callbacks/process_list.c) | ✅ **Complete** |
+| `STATE_KALLSYMS_SYMBOLS` | Monitors kernel symbol table | [`src/state_callbacks/kallsyms_symbols.c`](src/state_callbacks/kallsyms_symbols.c) | ✅ **Complete** |
+| `STATE_DIR_STRING_MATCHING` | String matching in directories | [`src/state_callbacks/dir_string_matching.c`](src/state_callbacks/dir_string_matching.c) | ⚠️ **TODO**: Not high priority |
 
 #### ⚡ Event Tasks (Real-time Monitoring)
-| Feature | Description | Implementation |
-|---------|-------------|----------------|
-| `EVENT_FTRACE_HOOK` | Real-time ftrace hook detection | [`src/event_callbacks/ftrace_hook.c`](src/event_callbacks/ftrace_hook.c) |
-| `EVENT_SYSCALL_TABLE_WRITE` | Syscall table modification events | [`src/event_callbacks/syscall_table_write.c`](src/event_callbacks/syscall_table_write.c) |
-| `EVENT_IDT_WRITE` | IDT modification detection | [`src/event_callbacks/idt_write.c`](src/event_callbacks/idt_write.c) |
-| `EVENT_CR0_WRITE` | CR0 register modification detection | [`src/event_callbacks/cr0_write.c`](src/event_callbacks/cr0_write.c) |
-| `EVENT_MSR_WRITE` | MSR monitoring | [`src/event_callbacks/msr_write.c`](src/event_callbacks/msr_write.c) |
-| `EVENT_CODE_SECTION_MODIFY` | Code section modification detection | [`src/event_callbacks/code_section_modify.c`](src/event_callbacks/code_section_modify.c) |
-| `EVENT_PAGE_TABLE_MODIFICATION` | Page table modification detection | [`src/event_callbacks/page_table_modification.c`](src/event_callbacks/page_table_modification.c) |
-| `EVENT_KALLSYMS_TABLE_WRITE` | Kernel symbol table modification | [`src/event_callbacks/kallsyms_table_write.c`](src/event_callbacks/kallsyms_table_write.c) |
+| Feature | Description | Implementation | Status/Notes |
+|---------|-------------|----------------|--------------|
+| `EVENT_FTRACE_HOOK` | Real-time ftrace hook detection | [`src/event_callbacks/ftrace_hook.c`](src/event_callbacks/ftrace_hook.c) | ✅ **Complete** - Information derived from state callback |
+| `EVENT_SYSCALL_TABLE_WRITE` | Syscall table modification events | [`src/event_callbacks/syscall_table_write.c`](src/event_callbacks/syscall_table_write.c) | ✅ **Complete** |
+| `EVENT_IDT_WRITE` | IDT modification detection | [`src/event_callbacks/idt_write.c`](src/event_callbacks/idt_write.c) | ✅ **Complete** |
+| `EVENT_CR0_WRITE` | CR0 register modification detection | [`src/event_callbacks/cr0_write.c`](src/event_callbacks/cr0_write.c) | ✅ **Complete** |
+| `EVENT_MSR_WRITE` | MSR monitoring | [`src/event_callbacks/msr_write.c`](src/event_callbacks/msr_write.c) | ⚠️ **Not fully tested** |
+| `EVENT_CODE_SECTION_MODIFY` | Code section modification detection | [`src/event_callbacks/code_section_modify.c`](src/event_callbacks/code_section_modify.c) | ✅ **Complete** |
+| `EVENT_PAGE_TABLE_MODIFICATION` | Page table modification detection | [`src/event_callbacks/page_table_modification.c`](src/event_callbacks/page_table_modification.c) | ✅ **Complete** |
+| `EVENT_KALLSYMS_TABLE_WRITE` | Kernel symbol table modification | [`src/event_callbacks/kallsyms_table_write.c`](src/event_callbacks/kallsyms_table_write.c) | ✅ **Complete** |
 
 #### 🚨 Interrupt Tasks (Breakpoint Monitoring)
-| Feature | Description | Implementation |
-|---------|-------------|----------------|
-| `INTERRUPT_KPROBE` | Traditional kernel hooks monitoring (kprobe, uprobe, tracepoint_probe_register) | [`src/event_callbacks/kprobe.c`](src/event_callbacks/kprobe.c) |
-| `INTERRUPT_EBPF_TRACEPOINT` | eBPF tracepoint programs monitoring (bpf_prog_attach, bpf_raw_tracepoint_open, fmod_ret) | [`src/event_callbacks/ebpf_tracepoint.c`](src/event_callbacks/ebpf_tracepoint.c) |
-| `INTERRUPT_IO_URING_RING_WRITE`  | io_uring detection on invocation of `__x64_sys_io_uring_enter` | [`src/event_callbacks/io_uring_ring_write.c`](src/event_callbacks/io_uring_ring_write.c) |
-| `INTERRUPT_NETWORK_MONITOR` | Comprehensive network monitoring (sockets, ports, connections, netfilter hooks) | [`src/event_callbacks/network_monitor.c`](src/event_callbacks/network_monitor.c) |
+| Feature | Description | Implementation | Status/Notes |
+|---------|-------------|----------------|--------------|
+| `INTERRUPT_KPROBE` | Traditional kernel hooks monitoring (kprobe, uprobe, tracepoint_probe_register) | [`src/event_callbacks/kprobe.c`](src/event_callbacks/kprobe.c) | ✅ **Complete** |
+| `INTERRUPT_EBPF_TRACEPOINT` | eBPF tracepoint programs monitoring (bpf_prog_attach, bpf_raw_tracepoint_open, fmod_ret) | [`src/event_callbacks/ebpf_tracepoint.c`](src/event_callbacks/ebpf_tracepoint.c) | ✅ **Complete** |
+| `INTERRUPT_IO_URING_RING_WRITE`  | io_uring detection on invocation of `__x64_sys_io_uring_enter` | [`src/event_callbacks/io_uring_ring_write.c`](src/event_callbacks/io_uring_ring_write.c) | ✅ **Complete** - Does not show extensive information |
+| `INTERRUPT_NETWORK_MONITOR` | Comprehensive network monitoring (sockets, ports, connections, netfilter hooks) | [`src/event_callbacks/network_monitor.c`](src/event_callbacks/network_monitor.c) | ✅ **Complete** |
 
 ## Response Format
 
