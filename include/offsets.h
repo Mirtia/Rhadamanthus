@@ -13,6 +13,10 @@
 
 #define LINUX_PTR_SIZE 8
 
+// kernel module space
+#define LINUX_MODULE_START 0xffffffffc0000000
+#define LINUX_MODULE_END 0xffffffffc0ffffff
+
 // struct tracepoint offsets
 #define LINUX_TRACEPOINT_NAME_OFFSET 0x00
 

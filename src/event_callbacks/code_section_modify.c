@@ -85,6 +85,10 @@ event_response_t event_code_section_modify_callback(vmi_instance_t vmi,
            vcpu_id, rip, (uint64_t)write_gla, (uint64_t)write_gpa,
            ksym ? " SYMBOL=" : "", ksym ? ksym : "");
 
+  // 😩 😩 😩 😩 😩 😩 😩 😩 😩 😩 😩 😩 😩 😩 😩
+  vmi_clear_event(vmi, event, NULL);
+  vmi_step_event(vmi, event, event->vcpu_id, 1, NULL);
+
   return log_success_and_queue_response_event(
       "code_section_modify", EVENT_CODE_SECTION_MODIFY, (void*)code_data,
       (void (*)(void*))code_section_modify_data_free);

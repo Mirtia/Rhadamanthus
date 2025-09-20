@@ -168,10 +168,8 @@ uint32_t state_kernel_module_list_callback(vmi_instance_t vmi, void* context) {
     log_info("STATE_KERNEL_MODULE_LIST: No suspicious modules detected");
   }
 
-  int result = log_success_and_queue_response_task(
+  log_info("STATE_KERNEL_MODULE_LIST callback completed.");
+  return log_success_and_queue_response_task(
       "kernel_module_list_state", STATE_KERNEL_MODULE_LIST, module_data,
       (void (*)(void*))kernel_module_list_state_data_free);
-
-  log_info("STATE_KERNEL_MODULE_LIST callback completed.");
-  return result;
 }

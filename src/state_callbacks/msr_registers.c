@@ -206,10 +206,8 @@ uint32_t state_msr_registers_callback(vmi_instance_t vmi, void* context) {
     log_info("STATE_MSR_REGISTERS: No suspicious vCPUs detected");
   }
 
-  int result = log_success_and_queue_response_task(
+  log_info("STATE_MSR_REGISTERS callback completed.");
+  return log_success_and_queue_response_task(
       "msr_registers_state", STATE_MSR_REGISTERS, msr_data,
       (void (*)(void*))msr_registers_state_data_free);
-
-  log_info("STATE_MSR_REGISTERS callback completed.");
-  return result;
 }

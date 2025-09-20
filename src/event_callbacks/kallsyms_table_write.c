@@ -51,6 +51,10 @@ event_response_t event_kallsyms_write_callback(vmi_instance_t vmi,
   log_warn("EVENT_KALLSYMS_WRITE: VCPU: %u GLA: 0x%" PRIx64 " GPA: 0x%" PRIx64,
            vcpu_id, gla, gpa);
 
+  // 😩 😩 😩 😩 😩 😩 😩 😩 😩 😩 😩 😩 😩 😩 😩
+  vmi_clear_event(vmi, event, NULL);
+  vmi_step_event(vmi, event, event->vcpu_id, 1, NULL);
+
   return log_success_and_queue_response_event(
       "kallsyms_table_write", EVENT_KALLSYMS_TABLE_WRITE, (void*)kallsyms_data,
       (void (*)(void*))kallsyms_table_write_data_free);

@@ -14,6 +14,7 @@
 #include "event_callbacks/network_monitor.h"
 #include "event_callbacks/page_table_modification.h"
 #include "event_callbacks/syscall_table_write.h"
+#include "utils.h"
 
 #define PAGE_SIZE 4096  ///< x86_64 page size
 #define PAGE_SHIFT 12
@@ -111,6 +112,11 @@ static vmi_event_t* setup_memory_event(
   // out_access is ignored.
   event->mem_event.in_access = access_type;
   event->callback = callback;
+
+  // Debug: Log the memory event setup
+  log_debug("Memory event setup: phy_addr=0x%" PRIx64 " gfn=%" PRIu64
+            " access_type=%d",
+            phy_addr, event->mem_event.gfn, access_type);
   return event;
 }
 
@@ -168,10 +174,17 @@ static GPtrArray* create_event_ftrace_hook(vmi_instance_t vmi) {
   vmi_event_t* event = setup_memory_event(ftrace_ops_phy_addr, VMI_MEMACCESS_W,
                                           event_ftrace_hook_callback);
   if (!event) {
+    log_error("Failed to create ftrace hook memory event");
     return NULL;
   }
 
   GPtrArray* events = g_ptr_array_new_with_free_func(g_free);
+  if (!events) {
+    log_error("Failed to create events array for ftrace hook");
+    g_free(event);  // Clean up the event
+    return NULL;
+  }
+
   g_ptr_array_add(events, event);
   return events;
 }
@@ -182,8 +195,10 @@ static GPtrArray* create_event_syscall_table_write(vmi_instance_t vmi) {
     log_error("Invalid VMI instance at event registration.");
     return NULL;
   }
+
   addr_t syscall_table_addr = 0;
   addr_t syscall_table_phy_addr = 0;
+  
   if (vmi_translate_ksym2v(vmi, "sys_call_table", &syscall_table_addr) !=
       VMI_SUCCESS) {
     log_error("Failed to resolve syscall_table_addr symbol");
@@ -200,10 +215,16 @@ static GPtrArray* create_event_syscall_table_write(vmi_instance_t vmi) {
       setup_memory_event(syscall_table_phy_addr, VMI_MEMACCESS_W,
                          event_syscall_table_write_callback);
   if (!event) {
+    log_error("Failed to create syscall table write memory event");
     return NULL;
   }
+
   GPtrArray* events = g_ptr_array_new_with_free_func(g_free);
   g_ptr_array_add(events, event);
+
+  log_info("Created syscall table write monitoring event at PA: 0x%" PRIx64,
+           syscall_table_phy_addr);
+
   return events;
 }
 

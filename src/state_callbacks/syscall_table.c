@@ -195,10 +195,9 @@ uint32_t state_syscall_table_callback(vmi_instance_t vmi, void* context) {
 
   cleanup_sys_index(sys_index, syscall_number);
 
-  int result = log_success_and_queue_response_task(
+  log_info("STATE_SYSCALL_TABLE callback completed.");
+
+  return log_success_and_queue_response_task(
       "syscall_table_state", STATE_SYSCALL_TABLE, syscall_data,
       (void (*)(void*))syscall_table_state_data_free);
-
-  log_info("STATE_SYSCALL_TABLE callback completed.");
-  return result;
 }

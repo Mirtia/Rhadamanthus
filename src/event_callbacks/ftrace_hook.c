@@ -1,8 +1,10 @@
 #include "event_callbacks/ftrace_hook.h"
 #include <inttypes.h>
+#include <libvmi/libvmi.h>
 #include <log.h>
 #include "event_callbacks/responses/ftrace_hook_response.h"
 #include "json_serializer.h"
+#include "offsets.h"
 #include "utils.h"
 
 event_response_t event_ftrace_hook_callback(vmi_instance_t vmi,
@@ -45,11 +47,14 @@ event_response_t event_ftrace_hook_callback(vmi_instance_t vmi,
   uint64_t gpa = (event->mem_event.gfn << 12) | event->mem_event.offset;
 
   // Get function name from RIP
-  const char* symname = vmi_translate_v2ksym(vmi, NULL, rip);
+  access_context_t access_ctx = {.version = ACCESS_CONTEXT_VERSION,
+                                 .translate_mechanism = VMI_TM_NONE,
+                                 .addr = 0,
+                                 .dtb = 0};
+  const char* symname = vmi_translate_v2ksym(vmi, &access_ctx, rip);
 
-  // Determine if this is in kernel module space
   const char* location = "KERNEL";
-  if (rip >= 0xffffffffc0000000 && rip <= 0xffffffffc0ffffff) {
+  if (rip >= LINUX_MODULE_START && rip <= LINUX_MODULE_END) {
     location = "MODULE";
   }
 
@@ -78,6 +83,11 @@ event_response_t event_ftrace_hook_callback(vmi_instance_t vmi,
         "ftrace_hook", EVENT_FTRACE_HOOK, MEMORY_ALLOCATION_FAILURE,
         "Failed to allocate memory for ftrace hook data.");
   }
+
+  // How to properly clear and register events!!!!!! ૮(˶╥︿╥)ა
+  // https://github.com/libvmi/libvmi/blob/master/examples/event-example.c
+  vmi_clear_event(vmi, event, NULL);
+  vmi_step_event(vmi, event, event->vcpu_id, 1, NULL);
 
   return log_success_and_queue_response_event(
       "ftrace_hook", EVENT_FTRACE_HOOK, (void*)ftrace_data,

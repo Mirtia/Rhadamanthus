@@ -460,10 +460,8 @@ uint32_t state_ebpf_activity_callback(vmi_instance_t vmi, void* context) {
   log_info("STATE_EBPF_ACTIVITY: Found %u programs, %u maps, %u links",
            total_programs, total_maps, total_links);
 
-  int result = log_success_and_queue_response_task(
+  log_info("STATE_EBPF_ACTIVITY callback completed.");
+  return log_success_and_queue_response_task(
       "ebpf_activity_state", STATE_EBPF_ARTIFACTS, activity_data,
       (void (*)(void*))ebpf_activity_state_data_free);
-
-  log_info("STATE_EBPF_ACTIVITY callback completed.");
-  return result;
 }

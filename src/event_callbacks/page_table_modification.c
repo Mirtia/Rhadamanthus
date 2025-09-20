@@ -117,6 +117,10 @@ event_response_t event_page_table_modification_callback(vmi_instance_t vmi,
     return VMI_EVENT_RESPONSE_NONE;
   }
 
+  // 😩 😩 😩 😩 😩 😩 😩 😩 😩 😩 😩 😩 😩 😩 😩
+  vmi_clear_event(vmi, event, NULL);
+  vmi_step_event(vmi, event, event->vcpu_id, 1, NULL);
+
   return log_success_and_queue_response_event(
       "page_table_modification", EVENT_PAGE_TABLE_MODIFICATION, (void*)pt_data,
       (void (*)(void*))page_table_modification_data_free);

@@ -58,6 +58,10 @@ event_response_t event_idt_write_callback(vmi_instance_t vmi,
       "Potential rootkit activity: IDT hooking for system call/interrupt "
       "interception");
 
+  // 😩 😩 😩 😩 😩 😩 😩 😩 😩 😩 😩 😩 😩 😩 😩
+  vmi_clear_event(vmi, event, NULL);
+  vmi_step_event(vmi, event, event->vcpu_id, 1, NULL);
+
   return log_success_and_queue_response_event(
       "idt_write", EVENT_IDT_WRITE, (void*)idt_data,
       (void (*)(void*))idt_write_data_free);

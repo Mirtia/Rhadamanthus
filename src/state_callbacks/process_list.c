@@ -331,10 +331,8 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
       "kernel threads)",
       total_processes, user_processes, kernel_threads);
 
-  int result = log_success_and_queue_response_task(
+  log_info("STATE_PROCESS_LIST callback completed.");
+  return log_success_and_queue_response_task(
       "process_list_state", STATE_PROCESS_LIST, process_data,
       (void (*)(void*))process_list_state_data_free);
-
-  log_info("STATE_PROCESS_LIST callback completed.");
-  return result;
 }

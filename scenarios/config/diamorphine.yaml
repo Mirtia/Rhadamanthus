@@ -25,10 +25,10 @@ features:
     # - id: STATE_KALLSYMS_SYMBOLS
   #   - id: STATE_IO_URING_ARTIFACTS
   event:
-    # - id: EVENT_FTRACE_HOOK
+    - id: EVENT_FTRACE_HOOK
     - id: EVENT_SYSCALL_TABLE_WRITE
   #   - id: EVENT_IDT_WRITE
-  #   - id: EVENT_CR0_WRITE
+    - id: EVENT_CR0_WRITE
     # - id: EVENT_PAGE_TABLE_MODIFICATION
   #   - id: EVENT_MSR_WRITE
   #   - id: EVENT_CODE_SECTION_MODIFY

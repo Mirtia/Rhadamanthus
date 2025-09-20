@@ -1,6 +1,6 @@
-#include "event_callbacks/syscall_table_write.h"
 #include <glib.h>
 #include <inttypes.h>
+#include <libvmi/libvmi.h>
 #include <log.h>
 #include "event_callbacks/responses/syscall_table_write_response.h"
 #include "json_serializer.h"
@@ -8,7 +8,7 @@
 
 /**
  * @brief Calculate syscall number from syscall table address
- * 
+ *
  * @param vmi VMI instance
  * @param write_gla Guest linear address of the write
  * @return Syscall number, or 0 if calculation fails
@@ -70,9 +70,31 @@ event_response_t event_syscall_table_write_callback(vmi_instance_t vmi,
         "Failed to get RSP register value.");
   }
 
-  // Calculate which syscall is being modified
+  // Calculate the actual syscall number from the write address
+  // The event->data contains the first syscall on the page, but we need to find the exact one
   uint32_t syscall_number = calculate_syscall_number(vmi, write_gla);
   char* syscall_name = resolve_syscall_name(syscall_number);
+
+  // Log which syscall was actually written to
+  log_debug("Write detected at GLA: 0x%" PRIx64 " -> syscall %u (%s)",
+            write_gla, syscall_number, syscall_name ? syscall_name : "unknown");
+
+  // Debug: Check if this is the same address as previous events
+  static uint64_t last_write_gla = 0;
+  static uint32_t event_count = 0;
+
+  if (write_gla == last_write_gla) {
+    event_count++;
+    log_warn("DUPLICATE EVENT #%u for same address 0x%" PRIx64 " (syscall %u)",
+             event_count, write_gla, syscall_number);
+  } else {
+    if (event_count > 0) {
+      log_warn("Previous address 0x%" PRIx64 " had %u duplicate events",
+               last_write_gla, event_count);
+    }
+    last_write_gla = write_gla;
+    event_count = 1;
+  }
 
   syscall_table_write_data_t* syscall_data =
       syscall_table_write_data_new(vcpu_id, rip, rsp, cr3, write_gla, write_gpa,
@@ -95,6 +117,21 @@ event_response_t event_syscall_table_write_callback(vmi_instance_t vmi,
       "SYSCALL_TABLE_WRITE Event: Suspicious activity detected. Syscall table "
       "modification at GPA: 0x%" PRIx64 " affecting syscall %u (%s)",
       write_gpa, syscall_number, syscall_name ? syscall_name : "unknown");
+
+  // This is a one-shot detection - once we detect a syscall table modification,
+  // we disable this specific event to prevent spam from repeated writes to the same syscall.
+  if (vmi_clear_event(vmi, event, NULL) != VMI_SUCCESS) {
+    log_warn(
+        "Failed to clear syscall table write event - may continue triggering");
+  } else {
+    log_info(
+        "Syscall table write event cleared after detection of syscall %u (%s)",
+        syscall_number, syscall_name ? syscall_name : "unknown");
+  }
+
+  // 😩 😩 😩 😩 😩 😩 😩 😩 😩 😩 😩 😩 😩 😩 😩
+  vmi_clear_event(vmi, event, NULL);
+  vmi_step_event(vmi, event, event->vcpu_id, 1, NULL);
 
   return log_success_and_queue_response_event(
       "syscall_table_write", EVENT_SYSCALL_TABLE_WRITE, (void*)syscall_data,
