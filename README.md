@@ -275,3 +275,9 @@ This project incorporates code examples and techniques from the following open-s
 ## AI usage
 
 Generative AI was used for the creation of boilerplate e.g response management and logging information, scripting and doxygen documentation.
+
+## Disclaimer
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU Lesser General Public License for more details.
+
+>This software is provided for educational and research purposes only. This is not a professional security tool and has not been thoroughly tested in production environments. The software is experimental and may contain bugs, security vulnerabilities, or other issues that could cause system instability or data loss. Do not use this software in production environments or on systems containing sensitive data without proper testing and validation. This project is intended for academic research and educational purposes and should not be used as a replacement for professional security tools.
