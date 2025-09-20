@@ -3,7 +3,7 @@ domain_name: "ubuntu-20-04-diamorphine"
 
 # How long the entire introspection window should last (in seconds)
 monitor:
-  window_seconds: 300
+  window_seconds: 100
   state_sampling_seconds: 1
 
 # Which detection services to dispatch.
@@ -32,9 +32,9 @@ features:
     # - id: EVENT_PAGE_TABLE_MODIFICATION
   #   - id: EVENT_MSR_WRITE
   #   - id: EVENT_CODE_SECTION_MODIFY
-  #   - id: EVENT_KALLSYMS_TABLE_WRITE
+    # - id: EVENT_KALLSYMS_TABLE_WRITE
   interrupt:
-    # - id: INTERRUPT_KPROBE
+    - id: INTERRUPT_KPROBE
   #   - id: INTERRUPT_EBPF_TRACEPOINT
   #   - id: INTERRUPT_IO_URING_RING_WRITE
     # - id: INTERRUPT_NETWORK_MONITOR

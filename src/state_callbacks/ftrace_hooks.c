@@ -12,12 +12,6 @@
 #define MAX_FTRACE_PAGES 64
 #define MAX_MCOUNT_ENTRIES 2000
 
-// Linux kernel module virtual memory layout on x86_64
-// See: https://www.kernel.org/doc/Documentation/x86/x86_64/mm.txt
-// Kernel modules are loaded in the range 0xffffffffc0000000-0xffffffffc0ffffff (16MB)
-#define MODULE_START 0xffffffffc0000000
-#define MODULE_END 0xffffffffc0ffffff
-
 /**
  * @brief Rootkit target structure
  * 
@@ -279,7 +273,8 @@ static void scan_for_direct_hooks(vmi_instance_t vmi,
               VMI_SUCCESS) {
             addr_t call_target = check_addr + 5 + (int64_t)call_offset;
 
-            if (call_target >= MODULE_START && call_target <= MODULE_END) {
+            if (call_target >= LINUX_MODULE_START &&
+                call_target <= LINUX_MODULE_END) {
 
               bool is_syscall = (strstr(known_rootkit_targets[j].symbol_name,
                                         "__x64_sys_") != NULL);

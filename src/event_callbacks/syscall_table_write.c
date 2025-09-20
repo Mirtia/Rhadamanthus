@@ -79,23 +79,6 @@ event_response_t event_syscall_table_write_callback(vmi_instance_t vmi,
   log_debug("Write detected at GLA: 0x%" PRIx64 " -> syscall %u (%s)",
             write_gla, syscall_number, syscall_name ? syscall_name : "unknown");
 
-  // Debug: Check if this is the same address as previous events
-  static uint64_t last_write_gla = 0;
-  static uint32_t event_count = 0;
-
-  if (write_gla == last_write_gla) {
-    event_count++;
-    log_warn("DUPLICATE EVENT #%u for same address 0x%" PRIx64 " (syscall %u)",
-             event_count, write_gla, syscall_number);
-  } else {
-    if (event_count > 0) {
-      log_warn("Previous address 0x%" PRIx64 " had %u duplicate events",
-               last_write_gla, event_count);
-    }
-    last_write_gla = write_gla;
-    event_count = 1;
-  }
-
   syscall_table_write_data_t* syscall_data =
       syscall_table_write_data_new(vcpu_id, rip, rsp, cr3, write_gla, write_gpa,
                                    syscall_number, syscall_name);

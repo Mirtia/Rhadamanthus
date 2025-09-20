@@ -198,7 +198,7 @@ static GPtrArray* create_event_syscall_table_write(vmi_instance_t vmi) {
 
   addr_t syscall_table_addr = 0;
   addr_t syscall_table_phy_addr = 0;
-  
+
   if (vmi_translate_ksym2v(vmi, "sys_call_table", &syscall_table_addr) !=
       VMI_SUCCESS) {
     log_error("Failed to resolve syscall_table_addr symbol");

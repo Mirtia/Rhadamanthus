@@ -46,6 +46,12 @@ typedef struct ftrace_hook_data {
   uint64_t gla;      ///< Guest Linear Address involved in the access.
   uint64_t gpa;      ///< Guest Physical Address involved in the access.
   char* symname;     ///< Function name at RIP (allocated, must be freed).
+  uint64_t original_value;  ///< Original value before modification.
+  uint64_t current_value;   ///< New value after modification.
+  char*
+      value_type;  ///< Type of value: "NULL", "flag/offset", "kernel_pointer", "structure_pointer", "other" (allocated, must be freed).
+  char*
+      modification_type;  ///< Type of modification: "ADDING", "REMOVING", "REPLACING" (allocated, must be freed).
 } ftrace_hook_data_t;
 
 /**
@@ -59,12 +65,17 @@ typedef struct ftrace_hook_data {
  * @param gla The guest linear address associated with the event.
  * @param gpa The guest physical address associated with the event.
  * @param symname The function name at RIP (will be duplicated).
+ * @param original_value The original value before modification.
+ * @param current_value The new value after modification.
+ * @param value_type The type of value (will be duplicated).
+ * @param modification_type The type of modification (will be duplicated).
  * @return Pointer to a newly allocated ftrace_hook_data_t, or NULL on failure.
  */
-ftrace_hook_data_t* ftrace_hook_data_new(uint32_t vcpu_id, uint64_t rip,
-                                         uint64_t rsp, uint64_t cr3,
-                                         uint64_t rflags, uint64_t gla,
-                                         uint64_t gpa, const char* symname);
+ftrace_hook_data_t* ftrace_hook_data_new(
+    uint32_t vcpu_id, uint64_t rip, uint64_t rsp, uint64_t cr3, uint64_t rflags,
+    uint64_t gla, uint64_t gpa, const char* symname, uint64_t original_value,
+    uint64_t current_value, const char* value_type,
+    const char* modification_type);
 
 /**
  * @brief Free a ftrace hook data object (safe on NULL).

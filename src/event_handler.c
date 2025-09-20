@@ -356,7 +356,8 @@ static gpointer event_loop_thread(gpointer data) {
       log_error("vmi_events_listen failed.");
     }
   }
-  // Process any remaining events.
+  // TODO: Process any remaining events (is this necessary?).
+  sample_state_tasks_all(event_handler);
   log_info("Event loop thread has finished processing events, exiting.");
   log_info("Signaling JSON serialization thread to stop.");
   g_atomic_int_set(&event_handler->stop_signal_json_serialization, 1);

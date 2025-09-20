@@ -13,6 +13,9 @@
 
 #define LINUX_PTR_SIZE 8
 
+// Linux kernel module virtual memory layout on x86_64
+// See: https://www.kernel.org/doc/Documentation/x86/x86_64/mm.txt
+// Kernel modules are loaded in the range 0xffffffffc0000000-0xffffffffc0ffffff (16MB)
 // kernel module space
 #define LINUX_MODULE_START 0xffffffffc0000000
 #define LINUX_MODULE_END 0xffffffffc0ffffff
