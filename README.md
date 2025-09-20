@@ -51,6 +51,7 @@ The following figure shows the VMI-Introspector in relation to the whole Experim
    ```bash
    # Install Conan (if not already installed)
    pip install conan
+   # Warning! glib is not pulled with conan. Install libglib2.0-dev in your system.
 
    # Install project dependencies
    make build
@@ -205,6 +206,14 @@ If you use this project in your research, please cite it as:
 }
 ```
 
+## Acknowledgments
+
+This project incorporates code examples and techniques from the following open-source repositories:
+
+- **[LibVMI](https://github.com/libvmi/libvmi)** - Virtual Machine Introspection library `/examples`
+- **[Cloud_Integrity](https://github.com/tianweiz07/Cloud_Integrity)** - Rootkit detection using LibVMI.
+
+
 ## AI usage
 
-Generative AI was used for the creation of boilerplate e.g response management, scripting and doxygen documentation.
+Generative AI was used for the creation of boilerplate e.g response management and logging information, scripting and doxygen documentation.

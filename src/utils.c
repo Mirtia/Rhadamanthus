@@ -54,6 +54,15 @@ event_response_t log_error_and_queue_response_interrupt(
   return VMI_EVENT_INVALID;
 }
 
+/**
+ * @brief Log success and queue a success response for an event.
+ *
+ * @param event_name Name of the event for logging purposes.
+ * @param event_type Type of event that succeeded.
+ * @param data_ptr Pointer to the event data to include in response.
+ * @param data_free_func Function to free the data_ptr when done.
+ * @return VMI_EVENT_RESPONSE_NONE on success, VMI_EVENT_INVALID on failure.
+ */
 event_response_t log_success_and_queue_response_event(
     const char* event_name, event_task_id_t event_type, void* data_ptr,
     void (*data_free_func)(void*)) {

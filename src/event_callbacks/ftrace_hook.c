@@ -82,7 +82,7 @@ event_response_t event_ftrace_hook_callback(vmi_instance_t vmi,
     context = "INTERRUPTS_DISABLED";
   }
 
-  log_warn(
+  log_info(
       "EVENT_FTRACE_HOOK: ftrace_ops_list modification detected | "
       "VCPU: %u RIP: 0x%" PRIx64 " RSP: 0x%" PRIx64 " CR3: 0x%" PRIx64
       " | "
@@ -109,7 +109,7 @@ event_response_t event_ftrace_hook_callback(vmi_instance_t vmi,
     value_type = "other";
   }
 
-  log_warn(
+  log_info(
       "EVENT_FTRACE_HOOK: Modification details | "
       "Original: 0x%" PRIx64 " -> New: 0x%" PRIx64
       " | "

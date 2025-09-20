@@ -107,7 +107,6 @@ event_response_t event_page_table_modification_callback(vmi_instance_t vmi,
         index, old_entry, new_entry, old_present, new_present, old_writable,
         new_writable, old_user, new_user, old_noexec, new_noexec);
 
-    // Update shadow with latest version.
     ctx->shadow[index] = new_entry;
   }
 

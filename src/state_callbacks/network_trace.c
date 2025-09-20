@@ -232,7 +232,6 @@ static uint32_t walk_tcp_established_hash_table(vmi_instance_t vmi,
     return VMI_FAILURE;
   }
 
-  // Debug: Check if ehash is valid
   if (ehash == 0) {
     log_error("ERROR: ehash is NULL - hash table not initialized!");
     return VMI_FAILURE;

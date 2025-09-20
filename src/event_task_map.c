@@ -113,7 +113,6 @@ static vmi_event_t* setup_memory_event(
   event->mem_event.in_access = access_type;
   event->callback = callback;
 
-  // Debug: Log the memory event setup
   log_debug("Memory event setup: phy_addr=0x%" PRIx64 " gfn=%" PRIu64
             " access_type=%d",
             phy_addr, event->mem_event.gfn, access_type);
