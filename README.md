@@ -11,6 +11,64 @@ A Virtual Machine Introspection (VMI) framework for detecting Linux rootkits and
 
 🤔 If I had to pitch this, I would say "An amateurish downgraded untested DRAKVUF that focuses in kernel-mode rootkit detection and has a response format I prefer".
 
+## Repository Roadmap
+
+```sh
+Rhadamanthus/
+├── src/                             # Core source code
+│   ├── state_callbacks/             # Periodic analysis tasks
+│   ├── event_callbacks/             # Real-time event monitoring
+│   ├── config_parser.c              # Configuration parsing
+│   ├── event_handler.c              # Event management
+│   ├── event_task_map.c             # Event task mapping
+│   ├── interrupt_context.c          # Interrupt handling
+│   ├── json_serializer.c            # JSON output
+│   ├── main.c                       # Main application
+│   ├── response.c                   # Response management
+│   ├── state_task_map.c             # State task mapping
+│   └── utils.c                      # Utility functions
+│
+├── include/                         # Header files
+│   ├── event_callbacks/             # Event callback headers
+│   ├── state_callbacks/             # State callback headers
+│   ├── offsets.h                    # Kernel structure offsets
+│   └── utils.h                      # Utility headers
+│
+├── config/                         # Configuration files
+│   ├── settings_schema.yaml        # Configuration schema
+│   ├── libvmi.conf                 # LibVMI configuration
+│   ├── linux-5.15.0-139.json       # Kernel symbols and vmlinux data
+│   └── Doxyfile                    # Documentation generation
+│
+├── data/                           # Static data files
+│   ├── interrupt_index.linux       # Linux interrupt definitions
+│   ├── syscall_index.linux         # System call definitions
+│   └── known_files.linux           # Known file signatures
+│
+├── scenarios/                      # Test scenarios
+│   ├── config/                     # Scenario configurations
+│   └── Scenarios.md                # Demonstration scenarios
+│
+├── tests/                          # Test suite
+│   ├── poc/                        # Proof of concept code
+│   └── test_*.c                    # Unit tests
+│
+├── scripts/                        # Utility scripts
+│   ├── pahole_*.sh                 # Kernel structure analysis
+│   └── install_essentials.sh       # Setup scripts
+│
+├── docs/                           # Documentation
+│   └── images/                     # Architecture diagrams
+│
+├── benchmark/                      # Performance benchmarks
+├── CMakeLists.txt                   
+├── Makefile                         
+├── Setup.md                        # Setup instructions
+├── TODO.md                          
+└── README.md                        
+```
+
+
 ## System
 
 The framework was built and run under the following system specifications:
