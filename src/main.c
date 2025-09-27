@@ -53,7 +53,7 @@ int main(int argc, char** argv) {
 
   // Start the timer and event loop
   event_handler_start_event_window(event_handler);
-  event_handler_start_event_loop(event_handler);
+  event_handler_start_event_listener(event_handler);
   event_handler_start_json_serialization(event_handler);
 
   if (event_handler->event_thread) {

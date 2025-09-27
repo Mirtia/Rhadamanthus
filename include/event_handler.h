@@ -88,9 +88,9 @@ struct event_handler {
       json_serialization_thread;  ///< The thread that handles JSON serialization of events. We do not want blocking I/O operations in the event callbacks.
   json_serializer_t* serializer;  ///< The JSON serializer instance.
   volatile sig_atomic_t
-      stop_signal;  ///< Signal to stop the event loop after the time window.
+      events_listener_stop_signal;  ///< Signal to stop the event loop after the time window.
   volatile sig_atomic_t
-      stop_signal_json_serialization;  ///< Signal to stop the JSON serialization thread.
+      json_serialization_stop_signal;  ///< Signal to stop the JSON serialization thread.
   volatile bool is_paused;             ///< Flag to indicate if vm is paused.
 };
 
@@ -224,7 +224,7 @@ int event_handler_register_interrupt_task(event_handler_t* event_handler,
  *
  * @param event_handler The event_handler instance.
  */
-void event_handler_start_event_loop(event_handler_t* event_handler);
+void event_handler_start_event_listener(event_handler_t* event_handler);
 
 /**
  * @brief The gthread function that runs the event loop and processes events.
@@ -232,7 +232,7 @@ void event_handler_start_event_loop(event_handler_t* event_handler);
  * @param data The data passed to the ghtread function, in this context, the event_handler instance.
  * @return gpointer The result of the thread execution, typically NULL.
  */
-static gpointer event_loop_thread(gpointer data);
+static gpointer event_listener_thread(gpointer data);
 
 /**
  * @brief The event_handler starts a thread that has a thread sleeping

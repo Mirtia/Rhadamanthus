@@ -138,8 +138,8 @@ event_handler_t* event_handler_initialize(vmi_instance_t vmi,
   event_handler->window_seconds = window_seconds;
   event_handler->state_sampling_seconds = state_sampling_seconds;
   event_handler->vmi = vmi;
-  event_handler->stop_signal = 0;
-  event_handler->stop_signal_json_serialization = 0;
+  event_handler->events_listener_stop_signal = 0;
+  event_handler->json_serialization_stop_signal = 0;
   event_handler->is_paused = false;
   // Initialize with timestamp when the first task state sampling is performed.
   // 0 is a placeholder value, indicating that no state sampling has been performed yet.
@@ -306,14 +306,14 @@ void event_handler_register_event_task(event_handler_t* event_handler,
   }
 }
 
-void event_handler_start_event_loop(event_handler_t* event_handler) {
+void event_handler_start_event_listener(event_handler_t* event_handler) {
   if (!event_handler) {
     log_error("The provided event_handler is NULL.");
     return;
   }
 
-  event_handler->event_thread =
-      g_thread_new("event_loop", (GThreadFunc)event_loop_thread, event_handler);
+  event_handler->event_thread = g_thread_new(
+      "event_listener", (GThreadFunc)event_listener_thread, event_handler);
 }
 
 void sample_state_tasks_all(event_handler_t* event_handler) {
@@ -336,7 +336,7 @@ void sample_state_tasks_all(event_handler_t* event_handler) {
   event_handler->is_paused = false;
 }
 
-static gpointer event_loop_thread(gpointer data) {
+static gpointer event_listener_thread(gpointer data) {
   if (!data) {
     log_error("The provided data to the event loop thread is NULL.");
     return NULL;
@@ -350,7 +350,7 @@ static gpointer event_loop_thread(gpointer data) {
            event_handler->window_seconds);
   // LibVMI processes one event at a time, listen to total of time window_ms.
   // The callback will be triggered, which will enqueue the item.
-  while (!g_atomic_int_get(&event_handler->stop_signal)) {
+  while (!g_atomic_int_get(&event_handler->events_listener_stop_signal)) {
     if (vmi_events_listen(event_handler->vmi, event_handler->window_seconds *
                                                   1000) == VMI_FAILURE) {
       log_error("vmi_events_listen failed.");
@@ -360,7 +360,7 @@ static gpointer event_loop_thread(gpointer data) {
   sample_state_tasks_all(event_handler);
   log_info("Event loop thread has finished processing events, exiting.");
   log_info("Signaling JSON serialization thread to stop.");
-  g_atomic_int_set(&event_handler->stop_signal_json_serialization, 1);
+  g_atomic_int_set(&event_handler->json_serialization_stop_signal, 1);
   return NULL;
 }
 
@@ -376,7 +376,7 @@ static gpointer event_window(gpointer data) {
   g_usleep((gulong)event_handler->window_seconds * 1000000);
 
   // Signal the event loop to stop
-  g_atomic_int_set(&event_handler->stop_signal, 1);
+  g_atomic_int_set(&event_handler->events_listener_stop_signal, 1);
 
   log_info("event_window: Signaled event loop to stop after %u seconds.",
            event_handler->window_seconds);
@@ -390,7 +390,7 @@ void event_handler_start_event_window(event_handler_t* event_handler) {
     return;
   }
 
-  g_atomic_int_set(&event_handler->stop_signal, 0);
+  g_atomic_int_set(&event_handler->events_listener_stop_signal, 0);
 
   // Launch the timer thread
   event_handler->signal_event_thread =
@@ -418,7 +418,7 @@ static gpointer json_serialization(gpointer data) {
   json_serializer_t* serializer = event_handler->serializer;
   uint64_t last_flush = g_get_monotonic_time() / 1000;
 
-  while (!g_atomic_int_get(&event_handler->stop_signal_json_serialization)) {
+  while (!g_atomic_int_get(&event_handler->json_serialization_stop_signal)) {
     int result = json_serializer_process_one(serializer);
 
     // Poll for 1ms
