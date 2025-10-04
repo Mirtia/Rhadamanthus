@@ -164,7 +164,7 @@ features:
 
 ### Available Detection Features
 
-#### 🔍 State Tasks (Periodic Analysis)
+#### State Tasks (Periodic Analysis)
 | Feature | Description | Implementation | Status/Notes |
 |---------|-------------|----------------|--------------|
 | `STATE_FTRACE_HOOKS` | Detects ftrace-based function hooks | [`src/state_callbacks/ftrace_hooks.c`](src/state_callbacks/ftrace_hooks.c) | ✅ **Complete** - Information derived from state callback |
@@ -179,7 +179,7 @@ features:
 | `STATE_KALLSYMS_SYMBOLS` | Monitors kernel symbol table | [`src/state_callbacks/kallsyms_symbols.c`](src/state_callbacks/kallsyms_symbols.c) | ✅ **Complete** |
 | `STATE_DIR_STRING_MATCHING` | String matching in directories | [`src/state_callbacks/dir_string_matching.c`](src/state_callbacks/dir_string_matching.c) | ⚠️ **TODO**: Not high priority |
 
-#### ⚡ Event Tasks (Real-time Monitoring)
+#### Event Tasks (Real-time Monitoring)
 | Feature | Description | Implementation | Status/Notes |
 |---------|-------------|----------------|--------------|
 | `EVENT_FTRACE_HOOK` | Real-time ftrace hook detection | [`src/event_callbacks/ftrace_hook.c`](src/event_callbacks/ftrace_hook.c) | ✅ **Complete** - Information derived from state callback |
@@ -191,7 +191,7 @@ features:
 | `EVENT_PAGE_TABLE_MODIFICATION` | Page table modification detection | [`src/event_callbacks/page_table_modification.c`](src/event_callbacks/page_table_modification.c) | ✅ **Complete** |
 | `EVENT_KALLSYMS_TABLE_WRITE` | Kernel symbol table modification | [`src/event_callbacks/kallsyms_table_write.c`](src/event_callbacks/kallsyms_table_write.c) | ✅ **Complete** |
 
-#### 🚨 Interrupt Tasks (Breakpoint Monitoring)
+#### Interrupt Tasks (Breakpoint Monitoring)
 | Feature | Description | Implementation | Status/Notes |
 |---------|-------------|----------------|--------------|
 | `INTERRUPT_KPROBE` | Traditional kernel hooks monitoring (kprobe, uprobe, tracepoint_probe_register) | [`src/event_callbacks/kprobe.c`](src/event_callbacks/kprobe.c) | ✅ **Complete** |
@@ -274,7 +274,7 @@ This project incorporates code examples and techniques from the following open-s
 
 ## AI usage
 
-Generative AI was used for the creation of boilerplate e.g response management and logging information, scripting and doxygen documentation.
+Generative AI was used for the creation of boilerplate e.g response management and logging information, scripting and doxygen documentation (Copilot).
 
 ## Disclaimer
 
