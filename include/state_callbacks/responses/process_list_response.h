@@ -28,8 +28,6 @@
  *       "pid": 1,
  *       "name": "init",
  *       "state": "S",
- *       "rss_pages": 1024,
- *       "rss_bytes": 4194304,
  *       "task_struct_addr": "0xffffffff81e00000",
  *       "is_kernel_thread": false,
  *       "credentials": {
@@ -65,8 +63,6 @@ typedef struct process_info {
   uint32_t pid;               ///< Process ID
   char* name;                 ///< Process name (comm)
   char state;                 ///< Process state character
-  uint32_t rss_pages;         ///< Resident Set Size in pages
-  uint32_t rss_bytes;         ///< Resident Set Size in bytes
   uint64_t task_struct_addr;  ///< Address of the task_struct
   bool is_kernel_thread;      ///< True if it's a kernel thread
   process_credentials_t
@@ -123,15 +119,12 @@ void process_list_state_set_basic_info(process_list_state_data_t* data,
  * @param pid Process ID.
  * @param name Process name.
  * @param state Process state character.
- * @param rss_pages RSS in pages.
- * @param rss_bytes RSS in bytes.
  * @param task_struct_addr Address of task_struct.
  * @param is_kernel_thread Whether it's a kernel thread.
  * @param credentials Process credentials (can be NULL for kernel threads).
  */
 void process_list_state_add_process(process_list_state_data_t* data,
                                     uint32_t pid, const char* name, char state,
-                                    uint32_t rss_pages, uint32_t rss_bytes,
                                     uint64_t task_struct_addr,
                                     bool is_kernel_thread,
                                     const process_credentials_t* credentials);

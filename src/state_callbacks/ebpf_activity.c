@@ -200,7 +200,7 @@ static int maybe_print_bpf_file(vmi_instance_t vmi, int32_t tgid,
                                 ebpf_activity_state_data_t* data) {
 
   // file->f_op == &bpf_*_fops => file->private_data points to bpf_{prog,map,link}.
-  // References:
+  // See:
   //   Layout: https://elixir.bootlin.com/linux/v5.15/source/include/linux/fdtable.h
   //   /proc/<pid>/fdinfo fields: see fs/proc/fd.c
   //   bpf inodes: https://elixir.bootlin.com/linux/v5.15/source/kernel/bpf/syscall.c

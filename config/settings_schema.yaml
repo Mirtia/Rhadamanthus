@@ -1,5 +1,5 @@
 # Which Xen domain (domain name) to attach to (LibVMI)
-domain_name: "ubuntu-20-04-new-kernel"
+domain_name: "ubuntu-20-04-diamorphine"
 
 # How long the entire introspection window should last (in seconds)
 monitor:
@@ -14,18 +14,18 @@ monitor:
 features:
   state:
     # - id: STATE_KERNEL_MODULE_LIST
-    - id: STATE_FTRACE_HOOKS
-    - id: STATE_NETWORK_TRACE
-    - id: STATE_SYSCALL_TABLE
+    # - id: STATE_FTRACE_HOOKS
+    # - id: STATE_NETWORK_TRACE
+    # - id: STATE_SYSCALL_TABLE
     # - id: STATE_IDT_TABLE
     # - id: STATE_DIR_STRING_MATCHING
-    # - id: STATE_PROCESS_LIST
+    - id: STATE_PROCESS_LIST
     # - id: STATE_MSR_REGISTERS
     # - id: STATE_EBPF_ARTIFACTS
     # - id: STATE_KALLSYMS_SYMBOLS
     # - id: STATE_IO_URING_ARTIFACTS
-  event:
-    - id: EVENT_FTRACE_HOOK
+  # event:
+    # - id: EVENT_FTRACE_HOOK
   #   - id: EVENT_SYSCALL_TABLE_WRITE
   #   - id: EVENT_IDT_WRITE
   #   - id: EVENT_CR0_WRITE
@@ -33,8 +33,8 @@ features:
   #   - id: EVENT_MSR_WRITE
   #   - id: EVENT_CODE_SECTION_MODIFY
   #   - id: EVENT_KALLSYMS_TABLE_WRITE
-  interrupt:
-    - id: INTERRUPT_KPROBE
-    - id: INTERRUPT_EBPF_TRACEPOINT
+  # interrupt:
+    # - id: INTERRUPT_KPROBE
+    # - id: INTERRUPT_EBPF_TRACEPOINT
   #   - id: INTERRUPT_IO_URING_RING_WRITE
-    - id: INTERRUPT_NETWORK_MONITOR
+    # - id: INTERRUPT_NETWORK_MONITOR

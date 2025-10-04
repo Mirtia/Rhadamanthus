@@ -50,7 +50,6 @@ void process_list_state_set_basic_info(process_list_state_data_t* data,
 
 void process_list_state_add_process(process_list_state_data_t* data,
                                     uint32_t pid, const char* name, char state,
-                                    uint32_t rss_pages, uint32_t rss_bytes,
                                     uint64_t task_struct_addr,
                                     bool is_kernel_thread,
                                     const process_credentials_t* credentials) {
@@ -61,8 +60,6 @@ void process_list_state_add_process(process_list_state_data_t* data,
       .pid = pid,
       .name = name ? g_strdup(name) : g_strdup("unknown"),
       .state = state,
-      .rss_pages = rss_pages,
-      .rss_bytes = rss_bytes,
       .task_struct_addr = task_struct_addr,
       .is_kernel_thread = is_kernel_thread,
       .credentials = credentials ? *credentials : (process_credentials_t){0}};
@@ -123,10 +120,6 @@ cJSON* process_list_state_data_to_json(const process_list_state_data_t* data) {
     char state_str[2] = {process_info->state, '\0'};
     cJSON_AddStringToObject(process_obj, "state", state_str);
 
-    cJSON_AddNumberToObject(process_obj, "rss_pages",
-                            (double)process_info->rss_pages);
-    cJSON_AddNumberToObject(process_obj, "rss_bytes",
-                            (double)process_info->rss_bytes);
     cjson_add_hex_u64(process_obj, "task_struct_addr",
                       process_info->task_struct_addr);
     cjson_add_bool(process_obj, "is_kernel_thread",

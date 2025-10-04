@@ -291,13 +291,9 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
           break;
       }
 
-      // Calculate RSS (simplified - would need actual RSS calculation)
-      uint32_t rss_pages = 0;  // Placeholder
-      uint32_t rss_bytes = rss_pages * page_size;
-
       process_list_state_add_process(
-          process_data, proc_info.pid, proc_info.name, state_char, rss_pages,
-          rss_bytes, proc_info.task_struct_addr, proc_info.is_kernel_thread,
+          process_data, proc_info.pid, proc_info.name, state_char,
+          proc_info.task_struct_addr, proc_info.is_kernel_thread,
           proc_info.is_kernel_thread ? NULL : &credentials);
 
       total_processes++;
