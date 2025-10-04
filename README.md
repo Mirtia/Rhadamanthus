@@ -274,7 +274,7 @@ This project incorporates code examples and techniques from the following open-s
 
 ## AI usage
 
-Generative AI was used for the creation of boilerplate e.g response management and logging information, scripting and doxygen documentation (Copilot).
+Generative AI was used for the creation of boilerplate e.g repetitive response management and logging information (logging completions), scripting (.sh) and doxygen documentation (template) (Copilot).
 
 ## Disclaimer
 
