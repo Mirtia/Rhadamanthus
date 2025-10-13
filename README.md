@@ -187,9 +187,9 @@ features:
 | `EVENT_IDT_WRITE` | IDT modification detection | [`src/event_callbacks/idt_write.c`](src/event_callbacks/idt_write.c) | ✅ **Complete** |
 | `EVENT_CR0_WRITE` | CR0 register modification detection | [`src/event_callbacks/cr0_write.c`](src/event_callbacks/cr0_write.c) | ✅ **Complete** |
 | `EVENT_MSR_WRITE` | MSR monitoring | [`src/event_callbacks/msr_write.c`](src/event_callbacks/msr_write.c) | ⚠️ **Not fully tested** |
-| `EVENT_CODE_SECTION_MODIFY` | Code section modification detection | [`src/event_callbacks/code_section_modify.c`](src/event_callbacks/code_section_modify.c) | ✅ **Complete** |
-| `EVENT_PAGE_TABLE_MODIFICATION` | Page table modification detection | [`src/event_callbacks/page_table_modification.c`](src/event_callbacks/page_table_modification.c) | ✅ **Complete** |
-| `EVENT_KALLSYMS_TABLE_WRITE` | Kernel symbol table modification | [`src/event_callbacks/kallsyms_table_write.c`](src/event_callbacks/kallsyms_table_write.c) | ✅ **Complete** |
+| `EVENT_CODE_SECTION_MODIFY` | Code section modification detection | [`src/event_callbacks/code_section_modify.c`](src/event_callbacks/code_section_modify.c) |  ⚠️ **Not fully tested** |
+| `EVENT_PAGE_TABLE_MODIFICATION` | Page table modification detection | [`src/event_callbacks/page_table_modification.c`](src/event_callbacks/page_table_modification.c) |  ⚠️ **Not fully tested** |
+| `EVENT_KALLSYMS_TABLE_WRITE` | Kernel symbol table modification | [`src/event_callbacks/kallsyms_table_write.c`](src/event_callbacks/kallsyms_table_write.c) |  ⚠️ **Not fully tested** |
 
 #### Interrupt Tasks (Breakpoint Monitoring)
 | Feature | Description | Implementation | Status/Notes |
