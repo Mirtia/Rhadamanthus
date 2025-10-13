@@ -132,4 +132,11 @@ add_compile_definitions(INTERRUPT_INDEX_FILE="${CMAKE_CURRENT_SOURCE_DIR}/data/i
 add_compile_definitions(BASELINE_HASH_FILE="${CMAKE_CURRENT_SOURCE_DIR}/data/ubuntu-20-04-new-kernel-clean.bin")
 add_compile_definitions(JSON_LOG_OUTPUT_DIR="${CMAKE_CURRENT_SOURCE_DIR}/output")
 
+if(ENABLE_BRUTEFORCE_MODULE_SCAN)
+    add_compile_definitions(BRUTEFORCE_MODULE_SCAN)
+    message(STATUS "Bruteforce module scanning: ENABLED")
+else()
+    message(STATUS "Bruteforce module scanning: DISABLED")
+endif()
+
 install(TARGETS introspector DESTINATION bin)

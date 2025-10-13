@@ -8,9 +8,6 @@
 #include "state_callbacks/responses/kernel_module_list_response.h"
 #include "utils.h"
 
-// Uncomment to enable bruteforce module scanning (See Phrack artictle: https://phrack.org/issues/71/12#article)
-#define BRUTEFORCE_MODULE_SCAN
-
 // Module state enum values (from Linux kernel)
 #define MODULE_STATE_LIVE 0
 #define MODULE_STATE_COMING 1
@@ -19,6 +16,39 @@
 
 // Maximum module name length in Linux kernel
 #define MODULE_NAME_LEN 56
+
+/**
+ * @brief Convert module state enum to string representation
+ * 
+ * @param state Module state value
+ * @return String representation of the state
+ */
+static const char* get_module_state_string(uint32_t state) {
+  switch (state) {
+    case MODULE_STATE_LIVE:
+      return "live";
+    case MODULE_STATE_COMING:
+      return "coming";
+    case MODULE_STATE_GOING:
+      return "going";
+    case MODULE_STATE_UNFORMED:
+      return "unformed";
+    default:
+      return "unknown";
+  }
+}
+
+/**
+ * @brief Format module base address as hex string
+ * 
+ * @param buffer Output buffer (must be at least 32 bytes)
+ * @param buffer_size Size of output buffer
+ * @param module_base Module base address
+ */
+static void format_module_offset(char* buffer, size_t buffer_size,
+                                 addr_t module_base) {
+  (void)snprintf(buffer, buffer_size, "0x%" PRIx64, (uint64_t)module_base);
+}
 
 #ifdef BRUTEFORCE_MODULE_SCAN
 // Alignment of struct module (typically 8 bytes on x86_64)
@@ -174,32 +204,12 @@ static int perform_bruteforce_module_scan(
 
         // Read module state
         uint32_t state = 0;
-        const char* state_str = "unknown";
-        if (vmi_read_32_va(vmi, current_addr + LINUX_MODULE_STATE_OFFSET, 0,
-                           &state) == VMI_SUCCESS) {
-          switch (state) {
-            case MODULE_STATE_LIVE:
-              state_str = "live";
-              break;
-            case MODULE_STATE_COMING:
-              state_str = "coming";
-              break;
-            case MODULE_STATE_GOING:
-              state_str = "going";
-              break;
-            case MODULE_STATE_UNFORMED:
-              state_str = "unformed";
-              break;
-            default:
-              state_str = "unknown";
-              break;
-          }
-        }
+        vmi_read_32_va(vmi, current_addr + LINUX_MODULE_STATE_OFFSET, 0, &state);
+        const char* state_str = get_module_state_string(state);
 
         // Format offset string
         char offset_str[32];
-        (void)snprintf(offset_str, sizeof(offset_str), "0x%" PRIx64,
-                       (uint64_t)current_addr);
+        format_module_offset(offset_str, sizeof(offset_str), current_addr);
 
         // Check if this module was in the linked list
         // NOLINTNEXTLINE(performance-no-int-to-ptr)
@@ -250,6 +260,7 @@ static int perform_bruteforce_module_scan(
 }
 #endif  // BRUTEFORCE_MODULE_SCAN
 
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
 uint32_t state_kernel_module_list_callback(vmi_instance_t vmi, void* context) {
   // Preconditions
   if (!vmi || !context) {
@@ -325,25 +336,7 @@ uint32_t state_kernel_module_list_callback(vmi_instance_t vmi, void* context) {
       state = 0xFFFFFFFF;  // Erroneous state.
     }
 
-    // Convert state to string representation
-    const char* state_str = "unknown";
-    switch (state) {
-      case 0:
-        state_str = "live";
-        break;
-      case 1:
-        state_str = "coming";
-        break;
-      case 2:
-        state_str = "going";
-        break;
-      case 3:
-        state_str = "unformed";
-        break;
-      default:
-        state_str = "unknown";
-        break;
-    }
+    const char* state_str = get_module_state_string(state);
 
     // Check if module is suspicious (basic heuristics)
     bool is_suspicious = false;
@@ -363,10 +356,8 @@ uint32_t state_kernel_module_list_callback(vmi_instance_t vmi, void* context) {
       suspicious_modules++;
     }
 
-    // Convert module base to hex string for offset
     char offset_str[32];
-    (void)snprintf(offset_str, sizeof(offset_str), "0x%" PRIx64,
-                   (uint64_t)module_base);
+    format_module_offset(offset_str, sizeof(offset_str), module_base);
 
     if (!modname) {
       log_debug(
