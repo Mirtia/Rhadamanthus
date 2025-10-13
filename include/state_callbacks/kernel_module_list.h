@@ -16,6 +16,8 @@
 
 /**
  * @brief List kernel modules callback for VMI-based security monitoring
+ * Since a lot of rootkits hide themselves by detaching from the kernel module list, we use the method of bruteforce scanning to find hidden modules.
+ * The method is identical to the technique from Phrack 71:12 and rkchk implementation.
  * 
  * @param vmi The VMI instance.
  * @param context The user-defined context [unused].

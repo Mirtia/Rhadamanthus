@@ -170,7 +170,7 @@ features:
 | `STATE_FTRACE_HOOKS` | Detects ftrace-based function hooks | [`src/state_callbacks/ftrace_hooks.c`](src/state_callbacks/ftrace_hooks.c) | ✅ **Complete** - Information derived from state callback |
 | `STATE_SYSCALL_TABLE` | Monitors syscall table integrity | [`src/state_callbacks/syscall_table.c`](src/state_callbacks/syscall_table.c) | ✅ **Complete** |
 | `STATE_IDT_TABLE` | Monitors Interrupt Descriptor Table integrity | [`src/state_callbacks/idt_table.c`](src/state_callbacks/idt_table.c) | ✅ **Complete** |
-| `STATE_KERNEL_MODULE_LIST` | Analyzes loaded kernel modules | [`src/state_callbacks/kernel_module_list.c`](src/state_callbacks/kernel_module_list.c) | ✅ **Complete**: Adapts [thalium](https://github.com/thalium/rkchk/tree/main) approach from Phrack article [71/12](https://phrack.org/issues/71/12#article) |
+| `STATE_KERNEL_MODULE_LIST` | Analyzes loaded kernel modules | [`src/state_callbacks/kernel_module_list.c`](src/state_callbacks/kernel_module_list.c) | ✅ **Complete**: Adapts [rkchk](https://github.com/thalium/rkchk/tree/main) approach from Phrack article [71/12](https://phrack.org/issues/71/12#article) |
 | `STATE_NETWORK_TRACE` | Monitors network connections and hooks | [`src/state_callbacks/network_trace.c`](src/state_callbacks/network_trace.c) | ✅ **Complete** - Focuses on established connections only |
 | `STATE_EBPF_ARTIFACTS` | Detects eBPF programs and maps | [`src/state_callbacks/ebpf_activity.c`](src/state_callbacks/ebpf_activity.c) | ✅ **Complete** |
 | `STATE_IO_URING_ARTIFACTS` | Monitors io_uring structures | [`src/state_callbacks/io_uring_artifacts.c`](src/state_callbacks/io_uring_artifacts.c) | ✅ **Complete** - Does not show extensive information |
