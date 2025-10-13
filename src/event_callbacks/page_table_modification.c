@@ -25,23 +25,10 @@ event_response_t event_page_table_modification_callback(vmi_instance_t vmi,
 
   uint32_t vcpu_id = event->vcpu_id;
   uint64_t rip = 0, cr3 = 0, rsp = 0;
-
-  if (vmi_get_vcpureg(vmi, &rip, RIP, vcpu_id) != VMI_SUCCESS) {
+  if (get_standard_registers(vmi, vcpu_id, &rip, &cr3, &rsp) != VMI_SUCCESS) {
     return log_error_and_queue_response_event(
         "page_table_modification", EVENT_PAGE_TABLE_MODIFICATION,
-        VMI_OP_FAILURE, "Failed to get RIP register value.");
-  }
-
-  if (vmi_get_vcpureg(vmi, &cr3, CR3, vcpu_id) != VMI_SUCCESS) {
-    return log_error_and_queue_response_event(
-        "page_table_modification", EVENT_PAGE_TABLE_MODIFICATION,
-        VMI_OP_FAILURE, "Failed to get CR3 register value.");
-  }
-
-  if (vmi_get_vcpureg(vmi, &rsp, RSP, vcpu_id) != VMI_SUCCESS) {
-    return log_error_and_queue_response_event(
-        "page_table_modification", EVENT_PAGE_TABLE_MODIFICATION,
-        VMI_OP_FAILURE, "Failed to get RSP register value.");
+        VMI_OP_FAILURE, "Failed to get standard registers.");
   }
 
   // Read current PML4 page (4096 bytes = 512 entries × 8 bytes each).

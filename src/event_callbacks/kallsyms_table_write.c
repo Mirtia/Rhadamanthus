@@ -20,23 +20,10 @@ event_response_t event_kallsyms_write_callback(vmi_instance_t vmi,
   addr_t gpa = (event->mem_event.gfn << 12) | event->mem_event.offset;
 
   uint64_t rip = 0, cr3 = 0, rsp = 0;
-
-  if (vmi_get_vcpureg(vmi, &rip, RIP, vcpu_id) != VMI_SUCCESS) {
+  if (get_standard_registers(vmi, vcpu_id, &rip, &cr3, &rsp) != VMI_SUCCESS) {
     return log_error_and_queue_response_event(
         "kallsyms_table_write", EVENT_KALLSYMS_TABLE_WRITE, VMI_OP_FAILURE,
-        "Failed to get RIP register value.");
-  }
-
-  if (vmi_get_vcpureg(vmi, &cr3, CR3, vcpu_id) != VMI_SUCCESS) {
-    return log_error_and_queue_response_event(
-        "kallsyms_table_write", EVENT_KALLSYMS_TABLE_WRITE, VMI_OP_FAILURE,
-        "Failed to get CR3 register value.");
-  }
-
-  if (vmi_get_vcpureg(vmi, &rsp, RSP, vcpu_id) != VMI_SUCCESS) {
-    return log_error_and_queue_response_event(
-        "kallsyms_table_write", EVENT_KALLSYMS_TABLE_WRITE, VMI_OP_FAILURE,
-        "Failed to get RSP register value.");
+        "Failed to get standard registers.");
   }
 
   kallsyms_table_write_data_t* kallsyms_data =

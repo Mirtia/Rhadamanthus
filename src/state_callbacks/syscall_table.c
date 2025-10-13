@@ -6,83 +6,6 @@
 #include "state_callbacks/responses/syscall_table_response.h"
 #include "utils.h"
 
-/**
- * @brief Frees the syscall index array.
- * 
- * @param sys_index The syscall index array to clean up.  
- * @param size The number of entries in the syscall index array.
- */
-static void cleanup_sys_index(char** sys_index, size_t size) {
-  for (size_t i = 0; i < size; ++i) {
-    g_free(sys_index[i]);
-  }
-  g_free(sys_index);
-}
-
-/**
- * @brief Parses the syscall index file to extract syscall names and their indices.
- * 
- * @param count_dst Pointer to store the number of syscalls parsed.
- * @return char** An array of syscall names, or NULL on failure.
- */
-static char** parse_syscall_index_file(size_t* count_dst) {
-  FILE* file = fopen(SYSCALL_INDEX_FILE, "r");
-  if (!file) {
-    log_error("Failed to open syscall index file: %s", SYSCALL_INDEX_FILE);
-    return NULL;
-  }
-
-  char** sys_index = NULL;
-  size_t count = 0;
-  char line[256];
-  char name_buf[SYSCALL_NAME_MAX_LEN];
-
-  while (fgets(line, sizeof(line), file)) {
-    char* ptr = line;
-    while (g_ascii_isspace(*ptr))
-      ptr++;
-
-    char* endptr = NULL;
-    long parsed_index = strtol(ptr, &endptr, 10);
-    if (endptr == ptr || parsed_index < 0 || parsed_index > INT_MAX) {
-      log_debug("Invalid index in line: %s", line);
-      continue;
-    }
-
-    while (g_ascii_isspace(*endptr))
-      endptr++;
-    if (*endptr == '\0' || *endptr == '\n') {
-      log_debug("Missing name in line: %s", line);
-      continue;
-    }
-
-    char* name = g_strdup(endptr);
-    if (!name) {
-      log_error("Endptr was NULL. Strdup failed for line: %s", line);
-      (void)fclose(file);
-      cleanup_sys_index(sys_index, count);
-      return NULL;
-    }
-
-    name[strcspn(name, "\r\n")] = '\0';
-    char** temp = g_realloc(sys_index, sizeof(char*) * (count + 1));
-    if (!temp) {
-      log_error("Realloc failed while expanding syscall index array.");
-      g_free(name);
-      (void)fclose(file);
-      cleanup_sys_index(sys_index, count);
-      return NULL;
-    }
-
-    sys_index = temp;
-    sys_index[count++] = name;
-  }
-
-  (void)fclose(file);
-  *count_dst = count;
-  return sys_index;
-}
-
 uint32_t state_syscall_table_callback(vmi_instance_t vmi, void* context) {
   // Preconditions
   if (!vmi || !context) {
@@ -111,9 +34,8 @@ uint32_t state_syscall_table_callback(vmi_instance_t vmi, void* context) {
         "state data.");
   }
 
-  // Parse syscall index file
   size_t syscall_number = 0;
-  char** sys_index = parse_syscall_index_file(&syscall_number);
+  char** sys_index = parse_index_file(SYSCALL_INDEX_FILE, &syscall_number);
   if (!sys_index) {
     syscall_table_state_data_free(syscall_data);
     return log_error_and_queue_response_task(
@@ -125,7 +47,7 @@ uint32_t state_syscall_table_callback(vmi_instance_t vmi, void* context) {
   addr_t kernel_start_addr = 0, kernel_end_addr = 0;
   if (get_kernel_text_section_range(vmi, &kernel_start_addr,
                                     &kernel_end_addr) != VMI_SUCCESS) {
-    cleanup_sys_index(sys_index, syscall_number);
+    free_string_index(sys_index, syscall_number);
     syscall_table_state_data_free(syscall_data);
     return log_error_and_queue_response_task(
         "syscall_table_state", STATE_SYSCALL_TABLE, VMI_OP_FAILURE,
@@ -143,7 +65,7 @@ uint32_t state_syscall_table_callback(vmi_instance_t vmi, void* context) {
   addr_t sys_call_table_addr = 0;
   if (vmi_translate_ksym2v(vmi, "sys_call_table", &sys_call_table_addr) ==
       VMI_FAILURE) {
-    cleanup_sys_index(sys_index, syscall_number);
+    free_string_index(sys_index, syscall_number);
     syscall_table_state_data_free(syscall_data);
     return log_error_and_queue_response_task(
         "syscall_table_state", STATE_SYSCALL_TABLE, VMI_OP_FAILURE,
@@ -193,7 +115,7 @@ uint32_t state_syscall_table_callback(vmi_instance_t vmi, void* context) {
     log_info("STATE_SYSCALL_TABLE: No hooked syscalls detected.");
   }
 
-  cleanup_sys_index(sys_index, syscall_number);
+  free_string_index(sys_index, syscall_number);
 
   log_info("STATE_SYSCALL_TABLE callback completed.");
 

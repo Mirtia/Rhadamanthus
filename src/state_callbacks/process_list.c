@@ -34,6 +34,80 @@ typedef struct {
  * @param mm_offset Offset of the mm field in the task_struct.
  * @return true if it is a kernel thread, false otherwise.
  */
+/**
+ * @brief Convert process state value to character representation
+ * 
+ * @param state Process state value from task_struct
+ * @return char Character representing the state
+ * 
+ * @details State mappings:
+ *  0 (TASK_RUNNING)            -> 'R'
+ *  1 (TASK_INTERRUPTIBLE)      -> 'S'
+ *  2 (TASK_UNINTERRUPTIBLE)    -> 'D'
+ *  4 (TASK_STOPPED)            -> 'T'
+ *  8 (TASK_TRACED)             -> 't'
+ *  16 (TASK_ZOMBIE)            -> 'Z'
+ *  32 (TASK_DEAD)              -> 'X'
+ *  Other                       -> '?'
+ */
+static char get_process_state_char(uint32_t state) {
+  switch (state) {
+    case 0:
+      return 'R';  // TASK_RUNNING
+    case 1:
+      return 'S';  // TASK_INTERRUPTIBLE
+    case 2:
+      return 'D';  // TASK_UNINTERRUPTIBLE
+    case 4:
+      return 'T';  // TASK_STOPPED
+    case 8:
+      return 't';  // TASK_TRACED
+    case 16:
+      return 'Z';  // TASK_ZOMBIE
+    case 32:
+      return 'X';  // TASK_DEAD
+    default:
+      return '?';  // UNKNOWN
+  }
+}
+
+/**
+ * @brief Convert process state value to string representation
+ * 
+ * @param state Process state value from task_struct
+ * @return const char* String representing the state
+ * 
+ * @details State mappings (see TASK_* defines in linux/sched.h):
+ *  0 (TASK_RUNNING)            -> "RUNNING"
+ *  1 (TASK_INTERRUPTIBLE)      -> "INTERRUPTIBLE"
+ *  2 (TASK_UNINTERRUPTIBLE)    -> "UNINTERRUPTIBLE"
+ *  4 (TASK_STOPPED)            -> "STOPPED"
+ *  8 (TASK_TRACED)             -> "TRACED"
+ *  16 (TASK_ZOMBIE)            -> "ZOMBIE"
+ *  32 (TASK_DEAD)              -> "DEAD"
+ *  Other                       -> "UNKNOWN"
+ */
+static const char* get_process_state_string(uint32_t state) {
+  switch (state) {
+    case 0:
+      return "RUNNING";
+    case 1:
+      return "INTERRUPTIBLE";
+    case 2:
+      return "UNINTERRUPTIBLE";
+    case 4:
+      return "STOPPED";
+    case 8:
+      return "TRACED";
+    case 16:
+      return "ZOMBIE";
+    case 32:
+      return "DEAD";
+    default:
+      return "UNKNOWN";
+  }
+}
+
 static bool is_kernel_thread(vmi_instance_t vmi, addr_t task_struct,
                              unsigned long mm_offset) {
   addr_t mm_addr = 0;
@@ -86,36 +160,7 @@ static bool read_process_credentials(vmi_instance_t vmi, addr_t task_struct,
  */
 static void print_process_info(const local_process_info_t* proc_info) {
   const char* thread_type = proc_info->is_kernel_thread ? "KERNEL" : "USER";
-  const char* state_str;
-
-  // Decode process state (simplified)
-  // Note: Process identifier at https://elixir.bootlin.com/linux/v6.16.3/source/include/linux/sched.h#L100
-  switch (proc_info->state) {
-    case 0:
-      state_str = "RUNNING";
-      break;
-    case 1:
-      state_str = "INTERRUPTIBLE";
-      break;
-    case 2:
-      state_str = "UNINTERRUPTIBLE";
-      break;
-    case 4:
-      state_str = "STOPPED";
-      break;
-    case 8:
-      state_str = "TRACED";
-      break;
-    case 16:
-      state_str = "ZOMBIE";
-      break;
-    case 32:
-      state_str = "DEAD";
-      break;
-    default:
-      state_str = "UNKNOWN";
-      break;
-  }
+  const char* state_str = get_process_state_string(proc_info->state);
 
   log_debug("PID %u: %s [%s] [%s] (task_struct=0x%" PRIx64 ")", proc_info->pid,
             proc_info->name, thread_type, state_str,
@@ -263,33 +308,7 @@ uint32_t state_process_list_callback(vmi_instance_t vmi, void* context) {
                                            .egid = proc_info.egid};
 
       // Convert state to character representation
-      char state_char = '?';
-      switch (proc_info.state) {
-        case 0:
-          state_char = 'R';
-          break;  // RUNNING
-        case 1:
-          state_char = 'S';
-          break;  // INTERRUPTIBLE
-        case 2:
-          state_char = 'D';
-          break;  // UNINTERRUPTIBLE
-        case 4:
-          state_char = 'T';
-          break;  // STOPPED
-        case 8:
-          state_char = 't';
-          break;  // TRACED
-        case 16:
-          state_char = 'Z';
-          break;  // ZOMBIE
-        case 32:
-          state_char = 'X';
-          break;  // DEAD
-        default:
-          state_char = '?';
-          break;
-      }
+      char state_char = get_process_state_char(proc_info.state);
 
       process_list_state_add_process(
           process_data, proc_info.pid, proc_info.name, state_char,

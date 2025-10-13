@@ -1,5 +1,6 @@
 #include "utils.h"
 
+#include <arpa/inet.h>
 #include <glib.h>
 #include <inttypes.h>
 #include <log.h>
@@ -231,6 +232,16 @@ void cjson_add_bool(cJSON* parent, const char* key, bool val) {
   cJSON_AddBoolToObject(parent, key, val);
 }
 
+void free_string_index(char** array, size_t count) {
+  if (!array) {
+    return;
+  }
+  for (size_t i = 0; i < count; i++) {
+    g_free(array[i]);
+  }
+  g_free(array);
+}
+
 char** parse_index_file(const char* index_file_path, size_t* count_dst) {
   if (!index_file_path || !count_dst) {
     return NULL;
@@ -270,12 +281,8 @@ char** parse_index_file(const char* index_file_path, size_t* count_dst) {
     char* name = g_strdup(name_start);
     if (!name) {
       log_error("Failed to allocate memory for name");
-      fclose(file);
-      // Clean up already allocated names
-      for (size_t i = 0; i < count; i++) {
-        g_free(names[i]);
-      }
-      g_free(names);
+      (void)fclose(file);
+      free_string_index(names, count);
       return NULL;
     }
 
@@ -284,12 +291,8 @@ char** parse_index_file(const char* index_file_path, size_t* count_dst) {
     if (!temp) {
       log_error("Failed to reallocate names array");
       g_free(name);
-      fclose(file);
-      // Clean up already allocated names
-      for (size_t i = 0; i < count; i++) {
-        g_free(names[i]);
-      }
-      g_free(names);
+      (void)fclose(file);
+      free_string_index(names, count);
       return NULL;
     }
 
@@ -298,7 +301,7 @@ char** parse_index_file(const char* index_file_path, size_t* count_dst) {
     count++;
   }
 
-  fclose(file);
+  (void)fclose(file);
   *count_dst = count;
 
   log_debug("Loaded %zu entries from index file: %s", count, index_file_path);
@@ -472,4 +475,134 @@ GPtrArray* load_interrupt_index_table(const char* path) {
       names_set, 256U - names_set);
 
   return table;
+}
+
+// NOLINTNEXTLINE(readability-function-cognitive-complexity)
+bool ipv4_is_public(uint32_t ip_be) {
+  uint32_t ip_addr = ntohl(ip_be);
+
+#define IN(ip_addr_, base_, maskbits_)                              \
+  (((ip_addr_) &                                                    \
+    ((maskbits_) == 0 ? 0u : 0xFFFFFFFFu << (32 - (maskbits_)))) == \
+   ((base_) & ((maskbits_) == 0 ? 0u : 0xFFFFFFFFu << (32 - (maskbits_)))))
+
+  // 0.0.0.0/8
+  if (IN(ip_addr, 0x00000000U, 8))
+    return false;
+  // 10.0.0.0/8 - Private (RFC 1918)
+  if (IN(ip_addr, 0x0A000000U, 8))
+    return false;
+  // 100.64.0.0/10 - Shared Address Space (RFC 6598)
+  if (IN(ip_addr, 0x64400000U, 10))
+    return false;
+  // 127.0.0.0/8 - Loopback (RFC 1122)
+  if (IN(ip_addr, 0x7F000000U, 8))
+    return false;
+  // 169.254.0.0/16 - Link-Local (RFC 3927)
+  if (IN(ip_addr, 0xA9FE0000U, 16))
+    return false;
+  // 172.16.0.0/12 - Private (RFC 1918)
+  if (IN(ip_addr, 0xAC100000U, 12))
+    return false;
+  // 192.0.0.0/24 - IETF Protocol Assignments
+  if (IN(ip_addr, 0xC0000000U, 24))
+    return false;
+  // 192.0.2.0/24 - Documentation TEST-NET-1 (RFC 5737)
+  if (IN(ip_addr, 0xC0000200U, 24))
+    return false;
+  // 192.88.99.0/24 - 6to4 Relay Anycast (RFC 7526)
+  if (IN(ip_addr, 0xC0586300U, 24))
+    return false;
+  // 192.168.0.0/16 - Private (RFC 1918)
+  if (IN(ip_addr, 0xC0A80000U, 16))
+    return false;
+  // 198.18.0.0/15 - Benchmarking (RFC 2544)
+  if (IN(ip_addr, 0xC6120000U, 15))
+    return false;
+  // 198.51.100.0/24 - Documentation TEST-NET-2 (RFC 5737)
+  if (IN(ip_addr, 0xC6336400U, 24))
+    return false;
+  // 203.0.113.0/24 - Documentation TEST-NET-3 (RFC 5737)
+  if (IN(ip_addr, 0xCB007100U, 24))
+    return false;
+  // 224.0.0.0/4 - Multicast (RFC 5771)
+  if (IN(ip_addr, 0xE0000000U, 4))
+    return false;
+  // 240.0.0.0/4 - Reserved/Future use
+  if (IN(ip_addr, 0xF0000000U, 4))
+    return false;
+
+  return true;
+
+#undef IN
+}
+
+bool is_suspicious_port(uint16_t port) {
+  // Common rootkit/backdoor ports
+  static const uint16_t suspicious_ports[] = {
+      666,   667,   // Reptile rootkit
+      4444,  5555,  // Common backdoor ports
+      31337,        // Back Orifice (LEET)
+      5900,         // VNC Rooty
+      8000,         // Web backdoors
+      0,     65535  // Invalid ports
+  };
+
+  for (size_t i = 0; i < sizeof(suspicious_ports) / sizeof(suspicious_ports[0]);
+       i++) {
+    if (port == suspicious_ports[i]) {
+      return true;
+    }
+  }
+
+  // High ports
+  return (port >= 60000);
+}
+
+const char* get_port_classification(uint16_t port) {
+  if (port < 1024)
+    return "privileged";
+  if (port < 49152)
+    return "registered";
+  return "dynamic";
+}
+
+const char* get_ip_type_string(uint32_t ip_addr) {
+  if (ip_addr == 0)
+    return "ANY";
+  if (ip_addr == 0x7F000001)
+    return "localhost";
+  if ((ip_addr & 0xFF000000) == 0x0A000000)
+    return "private";
+  if ((ip_addr & 0xFFF00000) == 0xAC100000)
+    return "private";
+  if ((ip_addr & 0xFFFF0000) == 0xC0A80000)
+    return "private";
+
+  // Use comprehensive check for public
+  if (ipv4_is_public(htonl(ip_addr)))
+    return "public";
+
+  return "special";
+}
+
+status_t get_standard_registers(vmi_instance_t vmi, uint32_t vcpu_id,
+                                uint64_t* rip, uint64_t* cr3, uint64_t* rsp) {
+  if (!vmi || !rip || !cr3 || !rsp) {
+    return VMI_FAILURE;
+  }
+
+  if (vmi_get_vcpureg(vmi, rip, RIP, vcpu_id) != VMI_SUCCESS) {
+    return VMI_FAILURE;
+  }
+
+  if (vmi_get_vcpureg(vmi, cr3, CR3, vcpu_id) != VMI_SUCCESS) {
+    return VMI_FAILURE;
+  }
+
+  if (vmi_get_vcpureg(vmi, rsp, RSP, vcpu_id) != VMI_SUCCESS) {
+    return VMI_FAILURE;
+  }
+
+  return VMI_SUCCESS;
 }

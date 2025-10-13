@@ -38,7 +38,7 @@ static GPtrArray* load_known_files() {
     g_ptr_array_add(known_files, g_strdup(trimmed));
   }
 
-  fclose(file);
+  (void)fclose(file);
   log_info("Loaded %u known files/directories from %s",
            (unsigned int)known_files->len, KNOWN_FILES_FILE);
 

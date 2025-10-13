@@ -21,23 +21,10 @@ event_response_t event_msr_write_callback(vmi_instance_t vmi,
   uint64_t msr_index = event->reg_event.reg;
 
   uint64_t rip = 0, cr3 = 0, rsp = 0;
-
-  if (vmi_get_vcpureg(vmi, &rip, RIP, vcpu_id) != VMI_SUCCESS) {
+  if (get_standard_registers(vmi, vcpu_id, &rip, &cr3, &rsp) != VMI_SUCCESS) {
     return log_error_and_queue_response_event(
         "msr_write", EVENT_MSR_WRITE, VMI_OP_FAILURE,
-        "Failed to get RIP register value.");
-  }
-
-  if (vmi_get_vcpureg(vmi, &cr3, CR3, vcpu_id) != VMI_SUCCESS) {
-    return log_error_and_queue_response_event(
-        "msr_write", EVENT_MSR_WRITE, VMI_OP_FAILURE,
-        "Failed to get CR3 register value.");
-  }
-
-  if (vmi_get_vcpureg(vmi, &rsp, RSP, vcpu_id) != VMI_SUCCESS) {
-    return log_error_and_queue_response_event(
-        "msr_write", EVENT_MSR_WRITE, VMI_OP_FAILURE,
-        "Failed to get RSP register value.");
+        "Failed to get standard registers.");
   }
 
   msr_write_data_t* msr_data =

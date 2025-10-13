@@ -5,30 +5,39 @@
 #include "state_callbacks/responses/msr_registers_response.h"
 #include "utils.h"
 
+// Common syscall entry symbols.
+static const char* syscall_entry_symbols[] = {
+    "entry_SYSCALL_64",                ///< Modern kernels (primary)
+    "system_call",                     ///< Older kernels
+    "entry_SYSCALL_64_after_hwframe",  ///< Alternative entry point
+    NULL                               ///< Sentinel
+};
+
 /**
  * @brief Get the legitimate syscall entry point symbol
  *
  * @param vmi LibVMI instance
- * @param syscall_entry legitimate syscall entry address
+ * @param syscall_entry Output: legitimate syscall entry address
+ * @param symbol_name Output: name of the symbol found (can be NULL)
  * @return true on success, false on failure
  */
 static bool get_legitimate_syscall_entry(vmi_instance_t vmi,
-                                         addr_t* syscall_entry) {
+                                         addr_t* syscall_entry,
+                                         const char** symbol_name) {
   if (!syscall_entry) {
     return false;
   }
 
-  // Try common syscall entry symbols.
-  const char* syscall_symbols[] = {
-      "entry_SYSCALL_64",  ///< Modern kernels
-      "system_call",  ///< Older kernels (as mentioned in vvdveen's document)
-      "entry_SYSCALL_64_after_hwframe", NULL};
-
-  for (int i = 0; syscall_symbols[i] != NULL; i++) {
-    if (vmi_translate_ksym2v(vmi, syscall_symbols[i], syscall_entry) ==
+  for (int i = 0; syscall_entry_symbols[i] != NULL; i++) {
+    if (vmi_translate_ksym2v(vmi, syscall_entry_symbols[i], syscall_entry) ==
         VMI_SUCCESS) {
       log_debug("Found legitimate syscall entry: %s at 0x%" PRIx64,
-                syscall_symbols[i], (uint64_t)*syscall_entry);
+                syscall_entry_symbols[i], (uint64_t)*syscall_entry);
+
+      // Return the symbol name if requested
+      if (symbol_name) {
+        *symbol_name = syscall_entry_symbols[i];
+      }
       return true;
     }
   }
@@ -104,27 +113,11 @@ uint32_t state_msr_registers_callback(vmi_instance_t vmi, void* context) {
            (uint64_t)kernel_start, (uint64_t)kernel_end);
 
   addr_t legitimate_syscall = 0;
+  const char* symbol_name = "unknown";
   bool has_legitimate_ref =
-      get_legitimate_syscall_entry(vmi, &legitimate_syscall);
+      get_legitimate_syscall_entry(vmi, &legitimate_syscall, &symbol_name);
 
   // Set legitimate syscall entry information
-  const char* symbol_name = "unknown";
-  if (has_legitimate_ref) {
-    // Try to determine which symbol was found
-    const char* syscall_symbols[] = {"entry_SYSCALL_64", "system_call",
-                                     "entry_SYSCALL_64_after_hwframe", NULL};
-
-    for (int i = 0; syscall_symbols[i] != NULL; i++) {
-      addr_t test_addr = 0;
-      if (vmi_translate_ksym2v(vmi, syscall_symbols[i], &test_addr) ==
-              VMI_SUCCESS &&
-          test_addr == legitimate_syscall) {
-        symbol_name = syscall_symbols[i];
-        break;
-      }
-    }
-  }
-
   msr_registers_state_set_legitimate_entry(
       msr_data, (uint64_t)legitimate_syscall, symbol_name, has_legitimate_ref);
 

@@ -169,6 +169,14 @@ void cjson_add_hex_u32(cJSON* parent, const char* key, uint32_t val);
 char** parse_index_file(const char* index_file_path, size_t* count_dst);
 
 /**
+ * @brief Free a dynamically allocated array of strings
+ * 
+ * @param array The string array to free
+ * @param count The number of strings in the array
+ */
+void free_string_index(char** array, size_t count);
+
+/**
  * @brief Resolve a syscall number to its name using the syscall index file
  * 
  * @param syscall_number The syscall number to resolve
@@ -191,5 +199,54 @@ char* resolve_interrupt_name(uint8_t interrupt_vector);
  * @return A GPtrArray* of length 256 with gchar* names (owned by the array). Defaults to "unknown"
  */
 GPtrArray* load_interrupt_index_table(const char* path);
+
+/**
+ * @brief Check if an IPv4 address is public (RFC-compliant)
+ * 
+ * Comprehensive check against IANA Special-Purpose Address Registry.
+ * Checks private ranges (RFC 1918), loopback, link-local, documentation,
+ * multicast, and other non-routable addresses.
+ * 
+ * @param ip_be IP address in network byte order
+ * @return true if IP is public/routable, false if private/special-use
+ */
+bool ipv4_is_public(uint32_t ip_be);
+
+/**
+ * @brief Check if a port number is commonly associated with rootkits/backdoors
+ * 
+ * @param port Port number to check
+ * @return true if port is suspicious, false otherwise
+ */
+bool is_suspicious_port(uint16_t port);
+
+/**
+ * @brief Get port classification string
+ * 
+ * @param port Port number
+ * @return "privileged" (<1024), "registered" (1024-49151), or "dynamic" (>=49152)
+ */
+const char* get_port_classification(uint16_t port);
+
+/**
+ * @brief Get IP address type string
+ * 
+ * @param ip_addr IP address in host byte order
+ * @return "ANY", "localhost", "private", or "public"
+ */
+const char* get_ip_type_string(uint32_t ip_addr);
+
+/**
+ * @brief Read standard CPU registers (RIP, CR3, RSP)
+ * 
+ * @param vmi VMI instance
+ * @param vcpu_id vCPU identifier
+ * @param rip Output: Instruction pointer
+ * @param cr3 Output: Page table base register
+ * @param rsp Output: Stack pointer
+ * @return VMI_SUCCESS on success, VMI_FAILURE otherwise
+ */
+status_t get_standard_registers(vmi_instance_t vmi, uint32_t vcpu_id,
+                                uint64_t* rip, uint64_t* cr3, uint64_t* rsp);
 
 #endif

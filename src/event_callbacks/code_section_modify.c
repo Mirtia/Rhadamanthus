@@ -37,32 +37,15 @@ event_response_t event_code_section_modify_callback(vmi_instance_t vmi,
   const uint32_t vcpu_id = event->vcpu_id;
 
   uint64_t rip = 0, cr3 = 0, rsp = 0;
-
-  if (vmi_get_vcpureg(vmi, &rip, RIP, vcpu_id) != VMI_SUCCESS) {
+  if (get_standard_registers(vmi, vcpu_id, &rip, &cr3, &rsp) != VMI_SUCCESS) {
     return log_error_and_queue_response_event(
         "code_section_modify", EVENT_CODE_SECTION_MODIFY, VMI_OP_FAILURE,
-        "Failed to get RIP register value.");
-  }
-
-  if (vmi_get_vcpureg(vmi, &cr3, CR3, vcpu_id) != VMI_SUCCESS) {
-    return log_error_and_queue_response_event(
-        "code_section_modify", EVENT_CODE_SECTION_MODIFY, VMI_OP_FAILURE,
-        "Failed to get CR3 register value.");
-  }
-
-  if (vmi_get_vcpureg(vmi, &rsp, RSP, vcpu_id) != VMI_SUCCESS) {
-    return log_error_and_queue_response_event(
-        "code_section_modify", EVENT_CODE_SECTION_MODIFY, VMI_OP_FAILURE,
-        "Failed to get RSP register value.");
+        "Failed to get standard registers.");
   }
 
   const addr_t write_gla = event->mem_event.gla;
-  // On x86_64 with 4 KiB pages, the lowest 12 bits (page offset) are
-  // preserved by the MMU translation, GFN indexes 4 KiB frames.
-  const addr_t write_gpa = (event->mem_event.gfn << 12)  // 4 KiB page base.
-                           |
-                           // Offset in page.
-                           event->mem_event.offset;
+  const addr_t write_gpa =
+      (event->mem_event.gfn << 12) | event->mem_event.offset;
 
   const char* ksym = NULL;
   // There is a chance gla may be 0 (GLA valid check).

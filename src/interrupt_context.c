@@ -281,10 +281,7 @@ static event_response_t handle_network_monitor_breakpoint(
   void* original_data = event->data;
   event->data = ctx;
 
-  // Use the netfilter callback for all network monitoring (sockets, ports, connections, netfilter hooks)
   event_response_t result = event_network_monitor_callback(vmi, event);
-
-  // Restore original event data
   event->data = original_data;
   return result;
 }
