@@ -68,7 +68,8 @@ static const event_task_map_entry_t event_task_map[] = {
     {.task_id = EVENT_PAGE_TABLE_MODIFICATION,
      .create_func = create_event_page_table_modification,
      .callback = event_page_table_modification_callback,
-     .description = "Page table entry modification detection"},
+     .description =
+         "CR3 register modification detection (page table base changes)"},
     {.task_id = EVENT_MSR_WRITE,
      .create_func = create_event_msr_write,
      .callback = event_msr_write_callback,
@@ -343,50 +344,17 @@ static GPtrArray* create_event_page_table_modification(vmi_instance_t vmi) {
     return NULL;
   }
 
-  // Get kernel CR3 from vCPU 0 (single-baseline... extend later if needed)
-  uint64_t cr3 = 0;
-  if (vmi_get_vcpureg(vmi, &cr3, CR3, 0) != VMI_SUCCESS) {
-    log_error("PT watch: failed to read CR3");
-    return NULL;
-  }
-
-  // Extract PML4 base physical address: CR3[63:12]
-  const addr_t pml4_pa = (addr_t)(cr3 & PAGE_MASK);
-
-  // Create the memory event on the PML4 page (writes only)
-  vmi_event_t* event = setup_memory_event(
-      pml4_pa, VMI_MEMACCESS_W, event_page_table_modification_callback);
+  vmi_event_t* event = setup_register_event(
+      CR3, VMI_REGACCESS_W, event_page_table_modification_callback);
 
   if (!event) {
-    log_error("PT watch: failed to create memory event");
+    log_error("PT watch: failed to create CR3 register event");
     return NULL;
   }
 
-  // Allocate and seed the watcher context with an initial snapshot (best-effort)
-  pt_watch_ctx_t* ctx = g_malloc0(sizeof(*ctx));
+  log_info("PT watch: CR3 register event created successfully");
 
-  if (!ctx) {
-    log_error("PT watch: failed to allocate context");
-    g_free(event);
-    return NULL;
-  }
-
-  ctx->pml4_pa = pml4_pa;
-
-  if (vmi_read_pa(vmi, ctx->pml4_pa, sizeof(ctx->shadow), ctx->shadow, NULL) ==
-      VMI_SUCCESS) {
-    ctx->shadow_valid = 1;
-    log_info("PT watch: initial PML4 snapshot taken @0x%lx",
-             (unsigned long)ctx->pml4_pa);
-  } else {
-    log_warn(
-        "PT watch: could not snapshot PML4 @0x%lx now; will prime on first "
-        "write",
-        (unsigned long)ctx->pml4_pa);
-  }
-  event->data = ctx;
-
-  GPtrArray* events = g_ptr_array_new_with_free_func(NULL);
+  GPtrArray* events = g_ptr_array_new_with_free_func(g_free);
   g_ptr_array_add(events, event);
   return events;
 }
@@ -413,14 +381,13 @@ static GPtrArray* create_event_msr_write(vmi_instance_t vmi) {
 
 static GPtrArray* create_event_code_section_modify(vmi_instance_t vmi) {
   // Preconditions
-  // TODO:
   if (!vmi) {
     log_error("Invalid VMI instance at event registration.");
     return NULL;
   }
+
   addr_t text_start = 0, text_end = 0;
-  if (vmi_translate_ksym2v(vmi, "_text", &text_start) != VMI_SUCCESS ||
-      vmi_translate_ksym2v(vmi, "_etext", &text_end) != VMI_SUCCESS) {
+  if (get_kernel_text_section_range(vmi, &text_start, &text_end)) {
     log_error("Failed to resolve kernel text section boundaries");
     return NULL;
   }
@@ -428,32 +395,33 @@ static GPtrArray* create_event_code_section_modify(vmi_instance_t vmi) {
   size_t text_size = text_end - text_start;
   size_t page_count = (text_size + PAGE_SIZE - 1) / PAGE_SIZE;
 
+  GPtrArray* events = g_ptr_array_new_with_free_func(g_free);
+
   for (size_t i = 0; i < page_count; ++i) {
     addr_t page_addr = text_start + i * PAGE_SIZE;
     addr_t page_phy_addr = 0;
+
     if (vmi_translate_kv2p(vmi, page_addr, &page_phy_addr) != VMI_SUCCESS ||
         !page_phy_addr) {
       log_warn("Failed to translate text section page VA->PA @0x%" PRIx64,
                page_addr);
       continue;
     }
+
     vmi_event_t* event = setup_memory_event(page_phy_addr, VMI_MEMACCESS_W,
                                             event_code_section_modify_callback);
-
     if (!event) {
       log_error("Failed to setup code section modify event at 0x%" PRIx64,
                 page_addr);
-      return NULL;
+      continue;
     }
-    GPtrArray* events = g_ptr_array_new_with_free_func(g_free);
     g_ptr_array_add(events, event);
-    return events;
   }
 
-  log_info("Registered write monitoring on %zu pages of kernel .text section",
-           page_count);
+  log_info("Registered write monitoring on %u pages of kernel .text section",
+           events->len);
 
-  return NULL;
+  return events;
 }
 
 static GPtrArray* create_event_kallsyms_table_write(vmi_instance_t vmi) {

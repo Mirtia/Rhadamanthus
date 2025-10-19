@@ -204,7 +204,8 @@ static int perform_bruteforce_module_scan(
 
         // Read module state
         uint32_t state = 0;
-        vmi_read_32_va(vmi, current_addr + LINUX_MODULE_STATE_OFFSET, 0, &state);
+        vmi_read_32_va(vmi, current_addr + LINUX_MODULE_STATE_OFFSET, 0,
+                       &state);
         const char* state_str = get_module_state_string(state);
 
         // Format offset string
