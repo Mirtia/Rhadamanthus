@@ -433,9 +433,11 @@ static GPtrArray* create_event_kallsyms_table_write(vmi_instance_t vmi) {
   if ((vmi_translate_ksym2v(vmi, "kallsyms_offsets", &kallsyms_offset_addr) !=
        VMI_SUCCESS)) {
     log_warn("Could not resolve kallsyms_offsets symbol.");
+    return NULL;
   }
 
-  size_t kallsyms_size = 0;
+  // Calculate the size of kallsyms table
+  size_t kallsyms_size = PAGE_SIZE;  // Default: monitor at least one page
   addr_t kallsyms_num_syms = 0;
   if (vmi_translate_ksym2v(vmi, "kallsyms_num_syms", &kallsyms_num_syms) ==
       VMI_SUCCESS) {
@@ -443,7 +445,8 @@ static GPtrArray* create_event_kallsyms_table_write(vmi_instance_t vmi) {
     if (vmi_read_va(vmi, kallsyms_num_syms, 0, sizeof(uint32_t), &num_syms,
                     NULL) == VMI_SUCCESS &&
         num_syms > 0) {
-      kallsyms_size = num_syms * sizeof(addr_t);
+      kallsyms_size =
+          num_syms * sizeof(int);  // kallsyms_offsets is array of int
       log_debug("Resolved %u kallsyms entries (total size: %zu bytes)",
                 num_syms, kallsyms_size);
     } else {
@@ -454,22 +457,42 @@ static GPtrArray* create_event_kallsyms_table_write(vmi_instance_t vmi) {
     log_debug(
         "Could not resolve kallsyms_num_syms, falling back to default size.");
   }
-  addr_t kallsyms_offset_phy_addr = 0;
-  if (kallsyms_offset_addr == 0 ||
-      vmi_translate_kv2p(vmi, kallsyms_offset_addr,
-                         &kallsyms_offset_phy_addr) != VMI_SUCCESS ||
-      !kallsyms_offset_phy_addr) {
-    log_warn("Failed to translate kallsyms_offsets VA->PA");
-    return NULL;
+
+  // Calculate how many pages the kallsyms table spans
+  // The table could span to multiple pages...
+  const addr_t first_page_va = kallsyms_offset_addr & PAGE_MASK;
+  const size_t first_off = kallsyms_offset_addr & (PAGE_SIZE - 1);
+  const size_t page_count =
+      (first_off + kallsyms_size + PAGE_SIZE - 1) / PAGE_SIZE;
+
+  GPtrArray* events = g_ptr_array_new_with_free_func(g_free);
+
+  for (size_t i = 0; i < page_count; ++i) {
+    addr_t page_va = first_page_va + i * PAGE_SIZE;
+    addr_t page_pa = 0;
+
+    if (vmi_translate_kv2p(vmi, page_va, &page_pa) != VMI_SUCCESS || !page_pa) {
+      log_warn("Failed to translate kallsyms page VA->PA @0x%" PRIx64, page_va);
+      continue;
+    }
+
+    vmi_event_t* event = setup_memory_event(page_pa, VMI_MEMACCESS_W,
+                                            event_kallsyms_write_callback);
+    if (!event) {
+      log_error("Failed to create kallsyms event for page %zu", i);
+      continue;
+    }
+    g_ptr_array_add(events, event);
   }
-  vmi_event_t* event = setup_memory_event(
-      kallsyms_offset_phy_addr, VMI_MEMACCESS_W, event_kallsyms_write_callback);
-  if (!event) {
+
+  if (events->len == 0) {
+    g_ptr_array_free(events, TRUE);
+    log_warn("Kallsyms: no pages were registered (no translations succeeded).");
     return NULL;
   }
 
-  GPtrArray* events = g_ptr_array_new_with_free_func(g_free);
-  g_ptr_array_add(events, event);
+  log_info("Kallsyms table monitoring: %u pages (total size: %zu bytes)",
+           events->len, kallsyms_size);
   return events;
 }
 
